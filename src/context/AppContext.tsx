@@ -843,6 +843,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentUser(updated);
     setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updated : u)));
 
+    // Update all posts authored by currentUser so posts and profile avatars stay 100% in sync
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (p.author.id === currentUser.id) {
+          const updatedPost = { ...p, author: updated };
+          firebaseSync.savePost(updatedPost);
+          return updatedPost;
+        }
+        return p;
+      })
+    );
+
+    // Update all comments authored by currentUser
+    setComments((prev) => {
+      const newComments: Record<string, Comment[]> = {};
+      for (const [postId, list] of Object.entries(prev)) {
+        newComments[postId] = list.map((c) =>
+          c.author.id === currentUser.id ? { ...c, author: updated } : c
+        );
+      }
+      return newComments;
+    });
+
     // Save to Cloud Firestore
     firebaseSync.saveUser(updated);
 

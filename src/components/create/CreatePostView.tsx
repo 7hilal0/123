@@ -13,6 +13,7 @@ import {
   Plus
 } from 'lucide-react';
 import { readImageFile } from '../../utils/fileUpload';
+import { Avatar } from '../common/Avatar';
 
 export const CreatePostView: React.FC = () => {
   const {
@@ -384,6 +385,25 @@ export const CreatePostView: React.FC = () => {
             <span className="text-[10px] font-mono text-emerald-400 block uppercase tracking-wider font-semibold">
               {t.livePreview}:
             </span>
+
+            {/* Author Header in Preview */}
+            <div className="flex items-center gap-2 text-xs text-neutral-400">
+              <Avatar
+                src={currentUser?.avatar}
+                alt={currentUser?.displayName || 'User'}
+                size="xs"
+                status={currentUser?.status}
+              />
+              <span className="font-semibold text-neutral-100">
+                {currentUser?.displayName || 'Your Name'}
+              </span>
+              <span className="font-mono text-neutral-400 text-[11px]">
+                @{currentUser?.username || 'username'}
+              </span>
+              <span aria-hidden="true" className="text-neutral-600">·</span>
+              <span className="text-[11px] text-neutral-400">الآن</span>
+            </div>
+
             <div className="text-lg font-bold text-white">{title || 'Sample Post Title'}</div>
             {content && <p className="text-xs md:text-sm text-neutral-300 whitespace-pre-line">{content}</p>}
             {mediaUrl && (

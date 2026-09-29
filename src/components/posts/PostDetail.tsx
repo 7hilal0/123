@@ -21,10 +21,15 @@ interface CommentItemProps {
 }
 
 const CommentItem: React.FC<CommentItemProps> = ({ comment, postId, depth = 0 }) => {
-  const { upvoteComment, addComment, deleteComment, navigateToProfile, currentUser, setAuthModalOpen, t } = useApp();
+  const { upvoteComment, addComment, deleteComment, navigateToProfile, currentUser, users, setAuthModalOpen, t } = useApp();
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyContent, setReplyContent] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const author =
+    (currentUser && currentUser.id === comment.author.id)
+      ? currentUser
+      : (users.find((u) => u.id === comment.author.id) || comment.author);
 
   const handleReplySubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,14 +48,14 @@ const CommentItem: React.FC<CommentItemProps> = ({ comment, postId, depth = 0 })
     <div className={`relative ${depth > 0 ? 'ms-3 sm:ms-6 ps-3 border-s border-white/5' : ''} my-3 text-start`}>
       <div className="flex items-start gap-2.5">
         <button
-          onClick={() => navigateToProfile(comment.author.id)}
+          onClick={() => navigateToProfile(author.id)}
           className="focus:outline-none shrink-0"
         >
           <Avatar
-            src={comment.author.avatar}
-            alt={comment.author.displayName}
+            src={author.avatar}
+            alt={author.displayName}
             size="xs"
-            status={comment.author.status}
+            status={author.status}
           />
         </button>
 
@@ -58,12 +63,12 @@ const CommentItem: React.FC<CommentItemProps> = ({ comment, postId, depth = 0 })
           {/* Header */}
           <div className="flex items-center gap-2 text-xs text-neutral-400">
             <button
-              onClick={() => navigateToProfile(comment.author.id)}
+              onClick={() => navigateToProfile(author.id)}
               className="font-medium text-neutral-200 hover:text-emerald-400 transition-colors"
             >
-              {comment.author.displayName}
+              {author.displayName}
             </button>
-            <span className="font-mono text-neutral-500">@{comment.author.username}</span>
+            <span className="font-mono text-neutral-500">@{author.username}</span>
             <span aria-hidden="true">·</span>
             <span>{comment.createdAt}</span>
 

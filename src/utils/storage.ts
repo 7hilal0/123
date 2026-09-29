@@ -100,7 +100,26 @@ export const storage = {
 
   getPosts: (): Post[] => {
     const list = safeGet<Post[]>(STORAGE_KEYS.POSTS, MOCK_POSTS);
-    return list.filter((p) => p.id !== 'post_official_welcome');
+    const users = storage.getUsers();
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    return list
+      .filter((p) => p.id !== 'post_official_welcome')
+      .map((p) => {
+        const u = userMap.get(p.author.id);
+        if (u) {
+          return {
+            ...p,
+            author: {
+              ...p.author,
+              avatar: u.avatar,
+              displayName: u.displayName,
+              username: u.username,
+            },
+          };
+        }
+        return p;
+      });
   },
 
   savePosts: (posts: Post[]): void => {

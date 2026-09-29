@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Post } from '../../types';
 import { useApp } from '../../context/AppContext';
+import { Avatar } from '../common/Avatar';
 import {
   ArrowBigUp,
   ArrowBigDown,
@@ -20,6 +21,7 @@ interface PostCardProps {
 export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false }) => {
   const {
     currentUser,
+    users,
     upvotePost,
     downvotePost,
     toggleSavePost,
@@ -30,6 +32,12 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
     showToast,
     t,
   } = useApp();
+
+  // Always resolve the latest author profile so avatar and name stay 100% in sync with the user's account
+  const author =
+    (currentUser && currentUser.id === post.author.id)
+      ? currentUser
+      : (users.find((u) => u.id === post.author.id) || post.author);
 
   const [imageError, setImageError] = useState(false);
 
@@ -101,44 +109,39 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
 
         {/* Post Main Body */}
         <div className="flex-1 min-w-0">
-          {/* Metadata Header */}
-          <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-neutral-400 mb-2">
+          {/* Metadata Header: Author Avatar, Display Name, Username & Community */}
+          <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1.5 text-xs text-neutral-400 mb-2.5">
+            {/* Author Info */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                navigateToCommunity(post.communitySlug);
+                navigateToProfile(author.id);
               }}
-              className="flex items-center gap-1.5 font-semibold text-neutral-200 hover:text-emerald-400 transition-colors"
+              className="flex items-center gap-2 group/author focus:outline-none"
             >
-              <img
-                src={post.communityIcon}
-                alt={post.communityName}
-                referrerPolicy="no-referrer"
-                className="w-4 h-4 rounded-full object-cover"
+              <Avatar
+                src={author.avatar}
+                alt={author.displayName}
+                size="xs"
+                status={author.status}
               />
-              <span>{post.communityName}</span>
-              <span className="text-neutral-500 font-mono text-[11px]">({post.communitySlug})</span>
+              <div className="flex items-center gap-1.5 text-start">
+                <span className="font-semibold text-neutral-100 group-hover/author:text-emerald-400 transition-colors">
+                  {author.displayName}
+                </span>
+                <span className="font-mono text-neutral-400 text-[11px]">
+                  @{author.username}
+                </span>
+              </div>
             </button>
 
             <span aria-hidden="true" className="text-neutral-600">·</span>
-
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                navigateToProfile(post.author.id);
-              }}
-              className="hover:text-neutral-200 transition-colors font-mono"
-            >
-              @{post.author.username}
-            </button>
-
-            <span aria-hidden="true" className="text-neutral-600">·</span>
-            <span>{post.createdAt}</span>
+            <span className="text-[11px] text-neutral-400">{post.createdAt}</span>
 
             {post.isPinned && (
               <>
                 <span aria-hidden="true" className="text-neutral-600">·</span>
-                <span className="text-amber-400 font-medium">{t.pinned}</span>
+                <span className="text-amber-400 font-medium text-[11px]">{t.pinned}</span>
               </>
             )}
           </div>
