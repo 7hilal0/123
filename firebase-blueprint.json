@@ -1,0 +1,137 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Public profile and metadata for registered community members.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique user ID" },
+        "username": { "type": "string", "description": "Unique handle without @" },
+        "displayName": { "type": "string", "description": "Visible display name" },
+        "avatar": { "type": "string", "description": "Profile picture URL or Data URI" },
+        "banner": { "type": "string", "description": "Cover banner URL" },
+        "bio": { "type": "string", "description": "User short biography" },
+        "status": { "type": "string", "description": "Presence state", "enum": ["online", "idle", "dnd", "offline"] },
+        "customStatus": { "type": "string", "description": "Custom status phrase" },
+        "karma": { "type": "number", "description": "Reputation and interaction score" },
+        "joinedDate": { "type": "string", "description": "Account registration date" },
+        "followersCount": { "type": "number", "description": "Count of members following this user" },
+        "followingCount": { "type": "number", "description": "Count of members followed by this user" },
+        "email": { "type": "string", "description": "User email address" },
+        "password": { "type": "string", "description": "User account password hash/credential" }
+      },
+      "required": ["id", "username", "displayName"]
+    },
+    "Community": {
+      "title": "Community Hub",
+      "description": "Topic-based community space where members can join and publish posts.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique community identifier" },
+        "name": { "type": "string", "description": "Community title" },
+        "slug": { "type": "string", "description": "Community path handle" },
+        "description": { "type": "string", "description": "Community summary and mission" },
+        "icon": { "type": "string", "description": "Community icon image URL" },
+        "banner": { "type": "string", "description": "Community banner image URL" },
+        "memberCount": { "type": "number", "description": "Number of joined members" },
+        "onlineCount": { "type": "number", "description": "Number of active online members" },
+        "category": { "type": "string", "description": "Category domain" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" }
+      },
+      "required": ["id", "name", "slug"]
+    },
+    "Post": {
+      "title": "Community Post",
+      "description": "Post published by a member inside a community.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique post ID" },
+        "authorId": { "type": "string", "description": "User ID of the author" },
+        "communitySlug": { "type": "string", "description": "Slug of the target community" },
+        "communityName": { "type": "string", "description": "Name of the target community" },
+        "communityIcon": { "type": "string", "description": "Icon of the target community" },
+        "title": { "type": "string", "description": "Post title" },
+        "content": { "type": "string", "description": "Post text body" },
+        "mediaType": { "type": "string", "description": "Type of media attached", "enum": ["text", "image", "video", "link"] },
+        "mediaUrl": { "type": "string", "description": "Attached image URL or data URI" },
+        "linkUrl": { "type": "string", "description": "External URL if link post" },
+        "upvotes": { "type": "number", "description": "Upvotes count" },
+        "downvotes": { "type": "number", "description": "Downvotes count" },
+        "commentCount": { "type": "number", "description": "Number of comments" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" },
+        "isPinned": { "type": "boolean", "description": "Whether pinned by admin" }
+      },
+      "required": ["id", "title", "authorId", "communitySlug"]
+    },
+    "Comment": {
+      "title": "Post Comment",
+      "description": "Threaded comment or reply to a post.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique comment ID" },
+        "postId": { "type": "string", "description": "Parent post ID" },
+        "authorId": { "type": "string", "description": "User ID of the author" },
+        "content": { "type": "string", "description": "Comment text content" },
+        "createdAt": { "type": "string", "description": "Timestamp when comment was made" },
+        "upvotes": { "type": "number", "description": "Comment upvotes" },
+        "downvotes": { "type": "number", "description": "Comment downvotes" },
+        "parentId": { "type": "string", "description": "Parent comment ID if nested reply" }
+      },
+      "required": ["id", "postId", "authorId", "content"]
+    },
+    "Conversation": {
+      "title": "Private Conversation",
+      "description": "Direct message thread between members.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique conversation ID" },
+        "participantIds": { "type": "string", "description": "Joined IDs of participants" },
+        "lastMessage": { "type": "string", "description": "Text of the latest message" },
+        "lastMessageTime": { "type": "string", "description": "Timestamp of the latest message" },
+        "unreadCount": { "type": "number", "description": "Count of unread messages" }
+      },
+      "required": ["id"]
+    },
+    "DirectMessage": {
+      "title": "Direct Message",
+      "description": "A single private message sent within a conversation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique message ID" },
+        "conversationId": { "type": "string", "description": "Parent conversation ID" },
+        "senderId": { "type": "string", "description": "Sender User ID" },
+        "text": { "type": "string", "description": "Message text" },
+        "mediaUrl": { "type": "string", "description": "Optional attached image" },
+        "timestamp": { "type": "string", "description": "Sent timestamp" },
+        "isRead": { "type": "boolean", "description": "Read status" }
+      },
+      "required": ["id", "conversationId", "senderId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles indexed by User ID"
+    },
+    "/communities/{communityId}": {
+      "schema": "Community",
+      "description": "Community spaces indexed by community ID"
+    },
+    "/posts/{postId}": {
+      "schema": "Post",
+      "description": "Posts published by users across communities"
+    },
+    "/posts/{postId}/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Comments attached to a specific post"
+    },
+    "/conversations/{conversationId}": {
+      "schema": "Conversation",
+      "description": "Direct messaging threads"
+    },
+    "/conversations/{conversationId}/messages/{messageId}": {
+      "schema": "DirectMessage",
+      "description": "Messages sent within a conversation"
+    }
+  }
+}

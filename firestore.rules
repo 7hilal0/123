@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if request.resource.data.id == userId || resource.data.id == userId || request.auth != null || true;
+    }
+
+    // Communities collection
+    match /communities/{communityId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Posts collection and subcollections
+    match /posts/{postId} {
+      allow read: if true;
+      allow write: if true;
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow write: if true;
+      }
+    }
+
+    // Direct message conversations
+    match /conversations/{conversationId} {
+      allow read, write: if true;
+
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
+
+    // Connection test document
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "نوفا الجزائر | NOVA DZ",
+  "description": "منصة اجتماعية وتفاعلية جزائرية حديثة تجمع بين نقاشات المجتمعات وغرف المحادثة المباشرة والملفات الشخصية للمبدعين في الجزائر.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
