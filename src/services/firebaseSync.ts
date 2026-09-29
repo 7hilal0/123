@@ -198,7 +198,7 @@ export const firebaseSync = {
       return list;
     } catch (err) {
       console.error(`[Firestore] Error fetching comments for ${postId}:`, err);
-      return [];
+      throw err;
     }
   },
 

@@ -320,14 +320,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Sync remote comments for this post
     firebaseSync.fetchComments(postId).then((remoteComments) => {
       const cleanRemote = remoteComments.filter((comment) => !deletedCommentIdsRef.current.has(comment.id));
-      setComments((prev) => {
-        const remoteIds = new Set(cleanRemote.map((comment) => comment.id));
-        const localPending = (prev[postId] || []).filter(
-          (comment) => !remoteIds.has(comment.id) && !deletedCommentIdsRef.current.has(comment.id)
-        );
-        return { ...prev, [postId]: [...cleanRemote, ...localPending] };
-      });
-    }).catch(() => {});
+      // Firestore is authoritative after a refresh. Do not merge stale localStorage
+      // comments back into the post, otherwise another device can see deleted data.
+      setComments((prev) => ({ ...prev, [postId]: cleanRemote }));
+    }).catch(() => {
+      // Keep the current local view only when the cloud request genuinely fails.
+    });
   };
 
   const navigateToProfile = (userId: string) => {
