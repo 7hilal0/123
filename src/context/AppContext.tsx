@@ -188,13 +188,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     setCloudSyncStatus('syncing');
 
+    // Proactively purge welcome post from Firestore
+    firebaseSync.deletePost('post_official_welcome').catch(() => {});
+
     // 1. Fetch remote posts
     firebaseSync.fetchPosts().then((remotePosts) => {
-      if (remotePosts && remotePosts.length > 0) {
+      if (remotePosts) {
         setPosts((local) => {
-          const remoteIds = new Set(remotePosts.map((p) => p.id));
-          const localOnly = local.filter((p) => !remoteIds.has(p.id));
-          return [...remotePosts, ...localOnly];
+          const cleanRemote = remotePosts.filter((p) => p.id !== 'post_official_welcome');
+          const remoteIds = new Set(cleanRemote.map((p) => p.id));
+          const localOnly = local.filter((p) => !remoteIds.has(p.id) && p.id !== 'post_official_welcome');
+          return [...cleanRemote, ...localOnly];
         });
       }
       setCloudSyncStatus('connected');
@@ -204,8 +208,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 2. Subscribe to remote posts live
     const unsubPosts = firebaseSync.subscribePosts((remotePosts) => {
-      if (remotePosts && remotePosts.length > 0) {
-        setPosts(remotePosts);
+      if (remotePosts) {
+        setPosts(remotePosts.filter((p) => p.id !== 'post_official_welcome'));
       }
     });
 

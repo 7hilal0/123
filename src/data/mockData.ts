@@ -144,53 +144,11 @@ export const MOCK_COMMUNITIES: Community[] = [
   },
 ];
 
-export const MOCK_POSTS: Post[] = [
-  {
-    id: 'post_official_welcome',
-    author: ADMIN_USER,
-    communitySlug: 'dz/general',
-    communityName: 'المجتمع العام DZCORE',
-    communityIcon: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=200&q=80',
-    title: 'مرحباً بكم في منصة DZCORE 🇩🇿',
-    content: `أهلاً وسهلاً بجميع الإخوة والأخوات في منصة DZCORE.
+export const MOCK_POSTS: Post[] = [];
 
-صُممت المنصة لتكون مساحة حرة تجمع بين نقاشات المجتمعات المتخصصة، وغرف المحادثات الخاصة المباشرة، مع حفظ تام للبيانات وإمكانية رفع الصور والملفات من هاتفك أو حاسوبك مباشرة.
-
-يمكنك الآن:
-1. إنشاء حسابك الخاص أو تسجيل الدخول.
-2. نشر أول موضوع لك في أي مجتمع، أو تأسيس مجتمع جديد خاص بك.
-3. التفاعل والتصويت والتعليق والمحادثة الفورية مع الأعضاء.
-
-نتمنى لكم تجربة ممتعة ومفيدة!`,
-    mediaType: 'text',
-    upvotes: 5,
-    downvotes: 0,
-    userVote: null,
-    commentCount: 0,
-    createdAt: 'منشور مثبت',
-    tags: ['DZCORE', 'ترحيب', 'المجتمع_التقني'],
-    isSaved: false,
-    isPinned: true,
-  },
-];
-
-export const MOCK_COMMENTS: Record<string, Comment[]> = {
-  post_official_welcome: [],
-};
+export const MOCK_COMMENTS: Record<string, Comment[]> = {};
 
 export const MOCK_CONVERSATIONS: Conversation[] = [];
 export const MOCK_DIRECT_MESSAGES: Record<string, DirectMessage[]> = {};
 
-export const MOCK_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: 'notif_welcome',
-    type: 'community',
-    actor: ADMIN_USER,
-    title: 'أهلاً بك في منصة DZCORE',
-    message: 'يمكنك الآن نشر مواضيعك، تأسيس مجتمعك الجديد، ومراسلة الأعضاء بحرية.',
-    timestamp: 'الآن',
-    isRead: false,
-    targetType: 'post',
-    targetId: 'post_official_welcome',
-  },
-];
+export const MOCK_NOTIFICATIONS: NotificationItem[] = [];

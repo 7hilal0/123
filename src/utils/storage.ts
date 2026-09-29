@@ -89,11 +89,12 @@ export const storage = {
   },
 
   getPosts: (): Post[] => {
-    return safeGet<Post[]>(STORAGE_KEYS.POSTS, MOCK_POSTS);
+    const list = safeGet<Post[]>(STORAGE_KEYS.POSTS, MOCK_POSTS);
+    return list.filter((p) => p.id !== 'post_official_welcome');
   },
 
   savePosts: (posts: Post[]): void => {
-    safeSet(STORAGE_KEYS.POSTS, posts);
+    safeSet(STORAGE_KEYS.POSTS, posts.filter((p) => p.id !== 'post_official_welcome'));
   },
 
   getComments: (): Record<string, Comment[]> => {
@@ -129,7 +130,8 @@ export const storage = {
   },
 
   getNotifications: (): NotificationItem[] => {
-    return safeGet<NotificationItem[]>(STORAGE_KEYS.NOTIFICATIONS, MOCK_NOTIFICATIONS);
+    const list = safeGet<NotificationItem[]>(STORAGE_KEYS.NOTIFICATIONS, MOCK_NOTIFICATIONS);
+    return list.filter((n) => n.id !== 'notif_welcome' && n.targetId !== 'post_official_welcome');
   },
 
   saveNotifications: (notifications: NotificationItem[]): void => {
