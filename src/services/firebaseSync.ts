@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   setDoc,
   deleteDoc,
@@ -144,7 +145,14 @@ export const firebaseSync = {
   // --- COMMENTS ---
   async saveComment(postId: string, comment: Comment): Promise<void> {
     try {
+      // A delete tombstone prevents a late save request from resurrecting a comment
+      // after another device has already deleted it.
       const commentRef = doc(db, 'posts', postId, 'comments', comment.id);
+      const existing = await getDoc(commentRef);
+      if (existing.exists() && (existing.data() as { deleted?: boolean }).deleted) {
+        console.warn(`[Firestore] Ignoring save for deleted comment ${comment.id}`);
+        return;
+      }
       const cleanData = stripUndefined(comment);
       await setDoc(commentRef, cleanData, { merge: true });
       console.log(`[Firestore] Saved comment ${comment.id} for post ${postId}`);
@@ -158,7 +166,13 @@ export const firebaseSync = {
     try {
       const batch = writeBatch(db);
       commentIds.forEach((commentId) => {
-        batch.delete(doc(db, 'posts', postId, 'comments', commentId));
+        // Keep a tombstone in the existing comments collection. This prevents a
+        // delayed save from another device from recreating the deleted comment.
+        batch.set(doc(db, 'posts', postId, 'comments', commentId), {
+          commentId,
+          deleted: true,
+          deletedAt: Date.now(),
+        });
       });
       await batch.commit();
       console.log(`[Firestore] Deleted ${commentIds.length} comment document(s) from ${postId}`);
@@ -177,7 +191,10 @@ export const firebaseSync = {
     try {
       const snap = await getDocs(collection(db, 'posts', postId, 'comments'));
       const list: Comment[] = [];
-      snap.forEach((d) => list.push(d.data() as Comment));
+      snap.forEach((d) => {
+        const data = d.data() as { deleted?: boolean };
+        if (!data.deleted) list.push(data as Comment);
+      });
       return list;
     } catch (err) {
       console.error(`[Firestore] Error fetching comments for ${postId}:`, err);
