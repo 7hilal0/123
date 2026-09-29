@@ -58,7 +58,7 @@ export const TopBar: React.FC = () => {
             <Sparkles className="w-4 h-4 text-white" />
           </div>
           <span className="font-display font-bold text-lg tracking-wide text-white">
-            {t.appName}
+            <span className="text-emerald-500 font-extrabold">D</span>ZCORE
           </span>
         </button>
       </div>

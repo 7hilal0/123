@@ -70,7 +70,7 @@ export const SearchView: React.FC = () => {
           </button>
           <div>
             <h1 className="text-xl md:text-2xl font-display font-bold text-white tracking-tight">
-              Search {t.appName}
+              Search <span className="text-emerald-500 font-extrabold">D</span>ZCORE
             </h1>
             <p className="text-xs text-neutral-400">
               Find topics, community spaces, or people.

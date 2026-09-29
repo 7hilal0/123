@@ -81,7 +81,7 @@ export const Sidebar: React.FC = () => {
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-display font-bold text-lg tracking-wide text-white">
-                {t.appName}
+                <span className="text-emerald-500 font-extrabold">D</span>ZCORE
               </span>
               <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                 PRO
