@@ -179,6 +179,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'connected' | 'syncing' | 'offline'>('connected');
   // Keeps optimistic deletions out of a stale Firestore snapshot while the delete request settles.
   const deletedPostIdsRef = useRef<Set<string>>(new Set());
+  const deletedCommentIdsRef = useRef<Set<string>>(new Set());
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -318,12 +319,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Sync remote comments for this post
     firebaseSync.fetchComments(postId).then((remoteComments) => {
-      if (remoteComments && remoteComments.length > 0) {
-        setComments((prev) => ({
-          ...prev,
-          [postId]: remoteComments,
-        }));
-      }
+      const cleanRemote = remoteComments.filter((comment) => !deletedCommentIdsRef.current.has(comment.id));
+      setComments((prev) => {
+        const remoteIds = new Set(cleanRemote.map((comment) => comment.id));
+        const localPending = (prev[postId] || []).filter(
+          (comment) => !remoteIds.has(comment.id) && !deletedCommentIdsRef.current.has(comment.id)
+        );
+        return { ...prev, [postId]: [...cleanRemote, ...localPending] };
+      });
     }).catch(() => {});
   };
 
@@ -604,14 +607,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteComment = (postId: string, commentId: string) => {
     if (!currentUser) return;
-
+    const previousComments = comments[postId] || [];
+    const idsToDelete: string[] = [];
     let removedCount = 0;
+
+    const collectIds = (comment: Comment) => {
+      idsToDelete.push(comment.id);
+      removedCount += 1;
+      comment.replies?.forEach(collectIds);
+    };
 
     const removeRecursive = (list: Comment[]): Comment[] => {
       const filtered: Comment[] = [];
       for (const c of list) {
         if (c.id === commentId) {
-          removedCount += 1 + (c.replies ? c.replies.length : 0);
+          collectIds(c);
           continue;
         }
         if (c.replies && c.replies.length > 0) {
@@ -623,9 +633,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return filtered;
     };
 
+    const nextComments = removeRecursive(previousComments);
+    if (idsToDelete.length === 0) return;
+    idsToDelete.forEach((id) => deletedCommentIdsRef.current.add(id));
+
     setComments((prev) => {
-      const current = prev[postId] || [];
-      return { ...prev, [postId]: removeRecursive(current) };
+      return { ...prev, [postId]: nextComments };
     });
 
     setPosts((prev) =>
@@ -639,10 +652,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
     );
 
-    // Cloud Delete Comment
-    firebaseSync.deleteComment(postId, commentId);
+    // Delete the selected comment and all nested replies as one cloud operation.
+    firebaseSync.deleteComments(postId, idsToDelete).then((deleted) => {
+      if (deleted) {
+        showToast(language === 'ar' ? 'تم حذف التعليق نهائياً' : 'Comment permanently deleted', 'success');
+        return;
+      }
 
-    showToast(language === 'ar' ? 'تم حذف التعليق' : 'Comment deleted', 'info');
+      idsToDelete.forEach((id) => deletedCommentIdsRef.current.delete(id));
+      setComments((prev) => ({ ...prev, [postId]: previousComments }));
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId ? { ...p, commentCount: p.commentCount + removedCount } : p
+        )
+      );
+      showToast(language === 'ar' ? 'تعذر حذف التعليق من السيرفر' : 'The comment could not be deleted from the server', 'warning');
+    });
   };
 
   const upvoteComment = (postId: string, commentId: string) => {

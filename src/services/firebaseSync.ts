@@ -4,6 +4,7 @@ import {
   getDocs,
   setDoc,
   deleteDoc,
+  writeBatch,
   onSnapshot,
   query,
   limit,
@@ -152,13 +153,24 @@ export const firebaseSync = {
     }
   },
 
-  async deleteComment(postId: string, commentId: string): Promise<void> {
+  async deleteComments(postId: string, commentIds: string[]): Promise<boolean> {
+    if (commentIds.length === 0) return true;
     try {
-      await deleteDoc(doc(db, 'posts', postId, 'comments', commentId));
-      console.log(`[Firestore] Deleted comment ${commentId}`);
+      const batch = writeBatch(db);
+      commentIds.forEach((commentId) => {
+        batch.delete(doc(db, 'posts', postId, 'comments', commentId));
+      });
+      await batch.commit();
+      console.log(`[Firestore] Deleted ${commentIds.length} comment document(s) from ${postId}`);
+      return true;
     } catch (err) {
-      console.error('[Firestore] Error deleting comment from Firestore:', err);
+      console.error('[Firestore] Error deleting comments from Firestore:', err);
+      return false;
     }
+  },
+
+  async deleteComment(postId: string, commentId: string): Promise<boolean> {
+    return this.deleteComments(postId, [commentId]);
   },
 
   async fetchComments(postId: string): Promise<Comment[]> {
