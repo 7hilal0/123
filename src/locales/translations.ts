@@ -35,6 +35,9 @@ export interface Translations {
   feedNew: string;
   feedTop: string;
   feedFollowing: string;
+  followingEmptyTitle: string;
+  followingEmptyDesc: string;
+  explorePeople: string;
   noPostsFound: string;
   startDiscussion: string;
   pinned: string;
@@ -187,6 +190,9 @@ export const translations: Record<Language, Translations> = {
     feedNew: 'New',
     feedTop: 'Top',
     feedFollowing: 'Following',
+    followingEmptyTitle: 'No posts from people you follow',
+    followingEmptyDesc: 'Follow members and creators across the platform to see their latest updates and posts here.',
+    explorePeople: 'Explore Members',
     noPostsFound: 'No posts in this feed yet. Be the first to share!',
     startDiscussion: 'Start a Discussion',
     pinned: 'Pinned',
@@ -328,7 +334,7 @@ export const translations: Record<Language, Translations> = {
     navNotifications: 'الإشعارات',
     navProfile: 'ملفي الشخصي',
     navSettings: 'الإعدادات',
-    navCreate: 'موضوع جديد',
+    navCreate: 'نشر',
     navLogin: 'تسجيل الدخول',
     navRegister: 'إنشاء حساب',
     navLogout: 'تسجيل الخروج',
@@ -338,6 +344,9 @@ export const translations: Record<Language, Translations> = {
     feedNew: 'الجديد',
     feedTop: 'الأفضل',
     feedFollowing: 'من أتابعهم',
+    followingEmptyTitle: 'لا توجد منشورات من الأشخاص الذين تتابعهم',
+    followingEmptyDesc: 'تابع الأعضاء وصنّاع المحتوى في المنصة لتشاهد أحدث منشوراتهم وتحديثاتهم هنا فور نشرها.',
+    explorePeople: 'استكشاف الأعضاء ومتابعتهم',
     noPostsFound: 'لا توجد منشورات في هذه الخلاصة حالياً. كن أول من ينشر!',
     startDiscussion: 'ابدأ نقاشاً في المجتمع',
     pinned: 'مثبت',
@@ -358,8 +367,8 @@ export const translations: Record<Language, Translations> = {
     submitComment: 'إرسال التعليق',
 
     // Create Post
-    createPostTitle: 'إنشاء موضوع جديد',
-    createPostSubtitle: 'شارك خبراتك، مشاريعك، أفكارك أو استفساراتك مع أعضاء المجتمع.',
+    createPostTitle: 'منشور جديد',
+    createPostSubtitle: 'شارك خبراتك، أفكارك، أو استفساراتك مع الجميع.',
     targetCommunity: 'النشر في مجتمع',
     postTypeDiscussion: 'نقاش ومقال',
     postTypeImage: 'صورة أو عمل فني',

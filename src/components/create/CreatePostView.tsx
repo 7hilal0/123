@@ -88,7 +88,7 @@ export const CreatePostView: React.FC = () => {
   const BackIcon = dir === 'rtl' ? ArrowRight : ArrowLeft;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 md:py-8 space-y-6 text-start">
+    <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 md:py-8 space-y-6 text-start">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

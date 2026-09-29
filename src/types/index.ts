@@ -66,6 +66,8 @@ export interface Post {
   userVote: 1 | -1 | null;
   commentCount: number;
   createdAt: string;
+  timestamp?: number;
+  lastCommentTimestamp?: number;
   tags: string[];
   isSaved: boolean;
   isPinned?: boolean;
@@ -77,6 +79,7 @@ export interface Comment {
   author: User;
   content: string;
   createdAt: string;
+  timestamp?: number;
   upvotes: number;
   downvotes: number;
   userVote: 1 | -1 | null;

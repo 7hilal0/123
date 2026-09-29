@@ -21,7 +21,11 @@ const MainContent: React.FC = () => {
   const { activeTab } = useApp();
 
   return (
-    <main className="flex-1 min-w-0 pb-20 lg:pb-8">
+    <main
+      className={`flex-1 min-w-0 w-full ${
+        activeTab === 'messages' ? 'pb-16 lg:pb-0' : 'pb-24 lg:pb-12'
+      }`}
+    >
       {activeTab === 'feed' && <FeedView />}
       {activeTab === 'community-detail' && <CommunityDetail />}
       {activeTab === 'communities' && <CommunitiesExplorer />}
@@ -41,13 +45,13 @@ const AppLayout: React.FC = () => {
   return (
     <div
       dir={dir}
-      className="min-h-screen bg-neutral-950 text-neutral-100 flex font-sans selection:bg-emerald-600 selection:text-white"
+      className="min-h-screen w-full bg-neutral-950 text-neutral-100 flex font-sans selection:bg-emerald-600 selection:text-white"
     >
       {/* Desktop Sidebar */}
       <Sidebar />
 
       {/* Main App Shell */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden">
         <TopBar />
         <MainContent />
       </div>

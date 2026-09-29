@@ -426,7 +426,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const effectiveSlug = postData.communitySlug || 'dz/general';
     const targetCommunity = communities.find((c) => c.slug === effectiveSlug);
-    const newPostId = `post_${Date.now()}`;
+    const now = Date.now();
+    const newPostId = `post_${now}`;
 
     const newPost: Post = {
       id: newPostId,
@@ -446,6 +447,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userVote: 1,
       commentCount: 0,
       createdAt: language === 'ar' ? 'الآن' : 'Just now',
+      timestamp: now,
       tags: postData.tags,
       isSaved: false,
     };
@@ -485,12 +487,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
+    const commentNow = Date.now();
     const newComment: Comment = {
-      id: `comment_${Date.now()}`,
+      id: `comment_${commentNow}`,
       postId,
       author: currentUser,
       content,
       createdAt: language === 'ar' ? 'الآن' : 'Just now',
+      timestamp: commentNow,
       upvotes: 1,
       downvotes: 0,
       userVote: 1,
@@ -522,7 +526,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPosts((prev) =>
       prev.map((p) => {
         if (p.id === postId) {
-          const updated = { ...p, commentCount: p.commentCount + 1 };
+          const updated = {
+            ...p,
+            commentCount: p.commentCount + 1,
+            lastCommentTimestamp: commentNow,
+          };
           firebaseSync.savePost(updated);
           return updated;
         }

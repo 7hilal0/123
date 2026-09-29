@@ -82,7 +82,7 @@ export const DirectMessagesView: React.FC = () => {
   const BackIcon = dir === 'rtl' ? ArrowRight : ArrowLeft;
 
   return (
-    <div className="h-[calc(100vh-4rem-4rem)] lg:h-[calc(100vh-4rem)] flex overflow-hidden bg-neutral-950 text-start">
+    <div className="h-[calc(100dvh-4rem-4rem)] lg:h-[calc(100dvh-4rem)] flex overflow-hidden bg-neutral-950 text-start">
       {/* Channels List */}
       <div
         className={`w-full md:w-80 lg:w-96 flex-col border-e border-white/5 bg-neutral-950/60 backdrop-blur-md shrink-0 ${
