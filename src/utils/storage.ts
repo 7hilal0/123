@@ -33,6 +33,20 @@ const STORAGE_KEYS = {
   NOTIFICATIONS: `${STORAGE_PREFIX}notifications`,
 };
 
+// One-time cleanup after the global comment reset. This removes stale comments
+// cached on phones and browsers; posts, users, and other data stay untouched.
+const COMMENT_RESET_VERSION = 'nova_dz_comments_reset_v1';
+if (typeof window !== 'undefined') {
+  try {
+    if (localStorage.getItem(COMMENT_RESET_VERSION) !== 'done') {
+      localStorage.removeItem(STORAGE_KEYS.COMMENTS);
+      localStorage.setItem(COMMENT_RESET_VERSION, 'done');
+    }
+  } catch (e) {
+    console.warn('Comment cache reset skipped', e);
+  }
+}
+
 // Clean up obsolete mock keys from older runs so user sees the fresh real changes immediately
 if (typeof window !== 'undefined') {
   try {
