@@ -1,21 +1,21 @@
 import { User, Community, Post, Comment, Conversation, DirectMessage, NotificationItem } from '../types';
 
 export const ADMIN_USER: User = {
-  id: 'admin_nova',
-  username: 'nova_dz',
-  displayName: 'إدارة نوفا الجزائر',
+  id: 'admin_dzcore',
+  username: 'dzcore',
+  displayName: 'إدارة DZCORE',
   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
   banner: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
-  bio: 'الحساب الرسمي لمنصة نوفا الجزائر. فضاء مخصص للمجتمع الجزائري لتبادل المعرفة البرمجية، النقاشات الهادفة، والعمل الحر.',
+  bio: 'الحساب الرسمي لمنصة DZCORE. فضاء مخصص لتبادل المعرفة البرمجية، النقاشات الهادفة، والمجتمعات التقنية.',
   status: 'online',
-  customStatus: 'المنصة جاهزة للاستخدام الفعلي 🇩🇿',
+  customStatus: 'المنصة جاهزة للاستخدام 🚀',
   badges: ['إدارة المنصة', 'رسمي'],
   karma: 50,
   joinedDate: 'سبتمبر 2026',
   followersCount: 0,
   followingCount: 0,
   isFollowing: false,
-  email: 'admin@nova.dz',
+  email: 'admin@dzcore.top',
   password: 'admin',
 };
 
@@ -30,14 +30,14 @@ export const MOCK_USERS: User[] = [
     banner: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1200&q=80',
     bio: 'مهتم بالبرمجة والتطوير والعمل الحر في الجزائر.',
     status: 'online',
-    customStatus: 'أستكشف منصة نوفا',
+    customStatus: 'أستكشف منصة DZCORE',
     badges: ['عضو نشط'],
     karma: 15,
     joinedDate: 'سبتمبر 2026',
     followersCount: 0,
     followingCount: 0,
     isFollowing: false,
-    email: 'member@nova.dz',
+    email: 'member@dzcore.top',
     password: '123',
   },
 ];
@@ -47,9 +47,9 @@ export const CURRENT_USER: User | null = null; // Start as guest or prompt to lo
 export const MOCK_COMMUNITIES: Community[] = [
   {
     id: 'comm_general',
-    name: 'المجتمع العام لنوفا',
+    name: 'المجتمع العام DZCORE',
     slug: 'dz/general',
-    description: 'المجتمع الرئيسي لنوفا الجزائر. نقاشات عامة، تبادل للأفكار، وطرح للمواضيع اليومية في مختلف المجالات.',
+    description: 'المجتمع الرئيسي لمنصة DZCORE. نقاشات عامة، تبادل للأفكار، وطرح للمواضيع اليومية في مختلف المجالات.',
     icon: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=200&q=80',
     banner: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
     memberCount: 2,
@@ -149,16 +149,16 @@ export const MOCK_POSTS: Post[] = [
     id: 'post_official_welcome',
     author: ADMIN_USER,
     communitySlug: 'dz/general',
-    communityName: 'المجتمع العام لنوفا',
+    communityName: 'المجتمع العام DZCORE',
     communityIcon: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=200&q=80',
-    title: 'مرحباً بكم في منصة نوفا الجزائر (NOVA DZ) 🇩🇿',
-    content: `أهلاً وسهلاً بجميع الإخوة والأخوات في منصة نوفا الجزائر.
+    title: 'مرحباً بكم في منصة DZCORE 🇩🇿',
+    content: `أهلاً وسهلاً بجميع الإخوة والأخوات في منصة DZCORE.
 
 صُممت المنصة لتكون مساحة حرة تجمع بين نقاشات المجتمعات المتخصصة، وغرف المحادثات الخاصة المباشرة، مع حفظ تام للبيانات وإمكانية رفع الصور والملفات من هاتفك أو حاسوبك مباشرة.
 
 يمكنك الآن:
 1. إنشاء حسابك الخاص أو تسجيل الدخول.
-2. نشر أول موضوع لك في أي مجتمع، أو تأسيس مجتمع جزائري جديد خاص بك.
+2. نشر أول موضوع لك في أي مجتمع، أو تأسيس مجتمع جديد خاص بك.
 3. التفاعل والتصويت والتعليق والمحادثة الفورية مع الأعضاء.
 
 نتمنى لكم تجربة ممتعة ومفيدة!`,
@@ -168,7 +168,7 @@ export const MOCK_POSTS: Post[] = [
     userVote: null,
     commentCount: 0,
     createdAt: 'منشور مثبت',
-    tags: ['نوفا_الجزائر', 'ترحيب', 'المجتمع_الجزائري'],
+    tags: ['DZCORE', 'ترحيب', 'المجتمع_التقني'],
     isSaved: false,
     isPinned: true,
   },
@@ -186,7 +186,7 @@ export const MOCK_NOTIFICATIONS: NotificationItem[] = [
     id: 'notif_welcome',
     type: 'community',
     actor: ADMIN_USER,
-    title: 'أهلاً بك في نوفا الجزائر',
+    title: 'أهلاً بك في منصة DZCORE',
     message: 'يمكنك الآن نشر مواضيعك، تأسيس مجتمعك الجديد، ومراسلة الأعضاء بحرية.',
     timestamp: 'الآن',
     isRead: false,

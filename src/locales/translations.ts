@@ -152,9 +152,9 @@ export interface Translations {
 export const translations: Record<Language, Translations> = {
   en: {
     // Brand & General
-    appName: 'NOVA',
+    appName: 'DZCORE',
     appTagline: 'Modern Community & Communication Platform',
-    welcome: 'Welcome to NOVA',
+    welcome: 'Welcome to DZCORE',
     welcomeSub: 'A next-generation community space combining open discussions with real-time direct messaging.',
     searchPlaceholder: 'Search discussions, communities, or members...',
     cancel: 'Cancel',
@@ -289,9 +289,9 @@ export const translations: Record<Language, Translations> = {
     resetAllDataHint: 'Clear locally created posts and comments to restore fresh defaults.',
 
     // Auth Modal
-    loginTitle: 'Sign In to NOVA',
+    loginTitle: 'Sign In to DZCORE',
     loginSub: 'Access your profile, direct messages, and subscribed communities.',
-    registerTitle: 'Create your NOVA Account',
+    registerTitle: 'Create your DZCORE Account',
     registerSub: 'Join the community to post, comment, and connect directly.',
     loginBtn: 'Sign In',
     registerBtn: 'Create Account',
@@ -301,9 +301,9 @@ export const translations: Record<Language, Translations> = {
 
   ar: {
     // Brand & General
-    appName: 'نوفا',
+    appName: 'DZCORE',
     appTagline: 'منصة المجتمعات والمحادثات المباشرة الحديثة',
-    welcome: 'مرحباً بك في نوفا',
+    welcome: 'مرحباً بك في DZCORE',
     welcomeSub: 'منصة اجتماعية تفاعلية تجمع بين نقاشات المجتمعات المفتوحة وغرف المحادثات الخاصة المباشرة.',
     searchPlaceholder: 'ابحث عن مواضيع، مجتمعات، أو أعضاء...',
     cancel: 'إلغاء',
@@ -438,10 +438,10 @@ export const translations: Record<Language, Translations> = {
     resetAllDataHint: 'مسح المنشورات والرسائل المنشأة محلياً واستعادة البيانات الأولية.',
 
     // Auth Modal
-    loginTitle: 'تسجيل الدخول إلى نوفا',
+    loginTitle: 'تسجيل الدخول إلى DZCORE',
     loginSub: 'سجل دخولك للتفاعل مع المجتمعات والمحادثات والملف الشخصي.',
-    registerTitle: 'إنشاء حساب جديد في نوفا',
-    registerSub: 'انضم إلى مجتمع نوفا للمشاركة والنقاش والمراسلة المباشرة.',
+    registerTitle: 'إنشاء حساب جديد في DZCORE',
+    registerSub: 'انضم إلى مجتمع DZCORE للمشاركة والنقاش والمراسلة المباشرة.',
     loginBtn: 'دخول إلى الحساب',
     registerBtn: 'إنشاء الحساب وبدء الاستخدام',
     dontHaveAccount: 'ليس لديك حساب؟ أنشئ حساباً جديداً',

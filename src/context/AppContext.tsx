@@ -956,9 +956,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80`,
       banner:
         'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
-      bio: language === 'ar' ? 'عضو جديد في مجتمع نوفا 🚀' : 'New member of NOVA community 🚀',
+      bio: language === 'ar' ? 'عضو جديد في مجتمع DZCORE 🚀' : 'New member of DZCORE community 🚀',
       status: 'online',
-      customStatus: language === 'ar' ? 'مرحباً بالجميع في نوفا!' : 'Excited to be on NOVA!',
+      customStatus: language === 'ar' ? 'مرحباً بالجميع في DZCORE!' : 'Excited to be on DZCORE!',
       badges: [language === 'ar' ? 'عضو موثق' : 'Member'],
       karma: 10,
       joinedDate: language === 'ar' ? 'انضم اليوم' : 'Joined today',
@@ -975,7 +975,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setAuthModalOpenState(false);
     showToast(
-      language === 'ar' ? `أهلاً بك في نوفا، ${newUser.displayName}! 🎉` : `Welcome to NOVA, ${newUser.displayName}! 🎉`,
+      language === 'ar' ? `أهلاً بك في DZCORE، ${newUser.displayName}! 🎉` : `Welcome to DZCORE, ${newUser.displayName}! 🎉`,
       'success'
     );
     return true;

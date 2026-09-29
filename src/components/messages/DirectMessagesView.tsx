@@ -231,7 +231,7 @@ export const DirectMessagesView: React.FC = () => {
                     </span>
                   </div>
                   <span className="text-[11px] text-neutral-400 block -mt-0.5">
-                    {activeConv.participant.customStatus || 'NOVA Member'}
+                    {activeConv.participant.customStatus || 'DZCORE Member'}
                   </span>
                 </div>
               </div>
