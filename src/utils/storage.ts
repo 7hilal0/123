@@ -17,6 +17,7 @@ import {
   MOCK_DIRECT_MESSAGES,
   MOCK_NOTIFICATIONS,
 } from '../data/mockData';
+import { DEFAULT_USER_AVATAR, OFFICIAL_DZCORE_AVATAR } from './avatarConstants';
 
 // Version 5 clean namespace
 const STORAGE_PREFIX = 'nova_dz_prod_v5_';
@@ -73,7 +74,16 @@ function safeSet(key: string, value: unknown): void {
 
 export const storage = {
   getUsers: (): User[] => {
-    return safeGet<User[]>(STORAGE_KEYS.USERS, MOCK_USERS);
+    const list = safeGet<User[]>(STORAGE_KEYS.USERS, MOCK_USERS);
+    return list.map((u) => {
+      if (u.id === 'admin_dzcore') {
+        return { ...u, avatar: OFFICIAL_DZCORE_AVATAR };
+      }
+      if (!u.avatar || u.avatar.includes('photo-1534528741775-53994a69daeb')) {
+        return { ...u, avatar: DEFAULT_USER_AVATAR };
+      }
+      return u;
+    });
   },
 
   saveUsers: (users: User[]): void => {

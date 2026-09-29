@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { X, Sparkles, User as UserIcon, Lock, Mail, ArrowRight, ArrowLeft, Upload, CheckCircle } from 'lucide-react';
 import { readImageFile } from '../../utils/fileUpload';
+import { DEFAULT_USER_AVATAR, PRESET_AVATARS } from '../../utils/avatarConstants';
 
 export const AuthModal: React.FC = () => {
   const {
@@ -150,18 +151,18 @@ export const AuthModal: React.FC = () => {
         <form onSubmit={handleSubmit} className="p-5 md:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
           {mode === 'register' && (
             <>
-              {/* Avatar Upload */}
+              {/* Avatar Selection & Upload */}
               <div>
                 <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
                   {t.avatarUpload} (optional)
                 </label>
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-xl bg-neutral-950 border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
-                    {avatarPreview ? (
-                      <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                    ) : (
-                      <UserIcon className="w-6 h-6 text-neutral-600" />
-                    )}
+                    <img
+                      src={avatarPreview || DEFAULT_USER_AVATAR}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                   <div className="flex-1">
                     <input
@@ -183,6 +184,31 @@ export const AuthModal: React.FC = () => {
                     <span className="text-[10px] text-neutral-500 block mt-1">
                       PNG, JPG, or device camera
                     </span>
+                  </div>
+                </div>
+
+                {/* Preset Avatars Selection */}
+                <div className="mt-2.5 pt-2 border-t border-white/5">
+                  <span className="text-[11px] text-neutral-400 block mb-1.5">
+                    {t.choosePresetAvatar}
+                  </span>
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                    {PRESET_AVATARS.map((preset) => {
+                      const isSelected = (avatarPreview || DEFAULT_USER_AVATAR) === preset.url;
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => setAvatarPreview(preset.url)}
+                          title={preset.name}
+                          className={`w-8 h-8 rounded-full overflow-hidden shrink-0 transition-transform hover:scale-105 cursor-pointer ring-2 ${
+                            isSelected ? 'ring-emerald-500 scale-105' : 'ring-white/10 hover:ring-white/30'
+                          }`}
+                        >
+                          <img src={preset.url} alt={preset.name} className="w-full h-full object-cover" />
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

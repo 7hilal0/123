@@ -118,6 +118,7 @@ export interface Translations {
   statusDnd: string;
   statusOffline: string;
   avatarUpload: string;
+  choosePresetAvatar: string;
   bannerUpload: string;
   follow: string;
   following: string;
@@ -268,6 +269,7 @@ export const translations: Record<Language, Translations> = {
     statusDnd: 'Do Not Disturb',
     statusOffline: 'Invisible / Offline',
     avatarUpload: 'Upload Profile Avatar',
+    choosePresetAvatar: 'Or pick a ready avatar:',
     bannerUpload: 'Upload Profile Banner',
     follow: 'Follow',
     following: 'Following',
@@ -417,6 +419,7 @@ export const translations: Record<Language, Translations> = {
     statusDnd: 'عدم الإزعاج',
     statusOffline: 'مخفي / غير متصل',
     avatarUpload: 'رفع صورة شخصية',
+    choosePresetAvatar: 'أو اختر صورة جاهزة:',
     bannerUpload: 'رفع غلاف الحساب',
     follow: 'متابعة',
     following: 'تتابعه',

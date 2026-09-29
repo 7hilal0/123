@@ -14,6 +14,7 @@ import {
 import { storage } from '../utils/storage';
 import { translations, Language, Translations } from '../locales/translations';
 import { firebaseSync } from '../services/firebaseSync';
+import { DEFAULT_USER_AVATAR } from '../utils/avatarConstants';
 
 export interface ToastMessage {
   id: string;
@@ -955,9 +956,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       displayName: displayName.trim() || cleanUsername,
       email: email.trim(),
       password,
-      avatar:
-        avatarUrl ||
-        `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80`,
+      avatar: avatarUrl || DEFAULT_USER_AVATAR,
       banner:
         'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
       bio: language === 'ar' ? 'عضو جديد في مجتمع DZCORE 🚀' : 'New member of DZCORE community 🚀',

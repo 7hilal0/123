@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { X, Upload, Camera } from 'lucide-react';
 import { UserStatus } from '../../types';
 import { readImageFile } from '../../utils/fileUpload';
+import { DEFAULT_USER_AVATAR, PRESET_AVATARS } from '../../utils/avatarConstants';
 
 interface EditProfileModalProps {
   onClose: () => void;
@@ -119,12 +120,12 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
             <div className="flex items-center gap-4">
               <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-neutral-950 border border-white/10 shrink-0">
                 <img
-                  src={avatarUrl}
+                  src={avatarUrl || DEFAULT_USER_AVATAR}
                   alt={displayName}
                   className="w-full h-full object-cover"
                 />
               </div>
-              <div>
+              <div className="flex-1">
                 <input
                   ref={avatarInputRef}
                   type="file"
@@ -140,6 +141,31 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                   <Upload className="w-3.5 h-3.5" />
                   <span>{t.avatarUpload}</span>
                 </button>
+              </div>
+            </div>
+
+            {/* Preset Avatars Selection */}
+            <div className="mt-2.5 pt-2 border-t border-white/5">
+              <span className="text-[11px] text-neutral-400 block mb-1.5">
+                {t.choosePresetAvatar}
+              </span>
+              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                {PRESET_AVATARS.map((preset) => {
+                  const isSelected = (avatarUrl || DEFAULT_USER_AVATAR) === preset.url;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => setAvatarUrl(preset.url)}
+                      title={preset.name}
+                      className={`w-9 h-9 rounded-full overflow-hidden shrink-0 transition-transform hover:scale-105 cursor-pointer ring-2 ${
+                        isSelected ? 'ring-emerald-500 scale-105' : 'ring-white/10 hover:ring-white/30'
+                      }`}
+                    >
+                      <img src={preset.url} alt={preset.name} className="w-full h-full object-cover" />
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>

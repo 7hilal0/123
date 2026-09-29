@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UserStatus } from '../../types';
+import { DEFAULT_USER_AVATAR } from '../../utils/avatarConstants';
 
 interface AvatarProps {
   src?: string;
@@ -43,30 +44,20 @@ export const Avatar: React.FC<AvatarProps> = ({
 }) => {
   const [imageFailed, setImageFailed] = useState(false);
 
-  // Generate fallback initials
-  const initials = alt
-    ? alt
-        .split(' ')
-        .map((part) => part[0])
-        .slice(0, 2)
-        .join('')
-        .toUpperCase()
-    : 'U';
+  const displaySrc = (!src || imageFailed) ? DEFAULT_USER_AVATAR : src;
 
   return (
     <div className={`relative inline-block shrink-0 ${sizeClasses[size]} ${className}`}>
-      <div className="w-full h-full rounded-full overflow-hidden bg-gradient-to-br from-indigo-900/60 to-purple-900/60 ring-1 ring-white/10 flex items-center justify-center select-none font-semibold text-neutral-200">
-        {src && !imageFailed ? (
-          <img
-            src={src}
-            alt={alt}
-            referrerPolicy="no-referrer"
-            onError={() => setImageFailed(true)}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <span>{initials}</span>
-        )}
+      <div className="w-full h-full rounded-full overflow-hidden bg-neutral-900 ring-1 ring-white/10 flex items-center justify-center select-none font-semibold text-neutral-200">
+        <img
+          src={displaySrc}
+          alt={alt || 'Avatar'}
+          referrerPolicy="no-referrer"
+          onError={() => {
+            if (!imageFailed) setImageFailed(true);
+          }}
+          className="w-full h-full object-cover"
+        />
       </div>
 
       {status && (

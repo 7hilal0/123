@@ -1,10 +1,11 @@
 import { User, Community, Post, Comment, Conversation, DirectMessage, NotificationItem } from '../types';
+import { OFFICIAL_DZCORE_AVATAR } from '../utils/avatarConstants';
 
 export const ADMIN_USER: User = {
   id: 'admin_dzcore',
   username: 'dzcore',
   displayName: 'إدارة DZCORE',
-  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+  avatar: OFFICIAL_DZCORE_AVATAR,
   banner: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
   bio: 'الحساب الرسمي لمنصة DZCORE. فضاء مخصص لتبادل المعرفة البرمجية، النقاشات الهادفة، والمجتمعات التقنية.',
   status: 'online',
