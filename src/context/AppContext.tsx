@@ -74,7 +74,7 @@ interface AppContextType {
   downvotePost: (postId: string) => void;
   toggleSavePost: (postId: string) => void;
   createPost: (postData: {
-    communitySlug: string;
+    communitySlug?: string;
     title: string;
     content: string;
     mediaType: 'text' | 'image' | 'video' | 'link';
@@ -411,7 +411,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const createPost = (postData: {
-    communitySlug: string;
+    communitySlug?: string;
     title: string;
     content: string;
     mediaType: 'text' | 'image' | 'video' | 'link';
@@ -424,14 +424,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    const targetCommunity = communities.find((c) => c.slug === postData.communitySlug);
+    const effectiveSlug = postData.communitySlug || 'dz/general';
+    const targetCommunity = communities.find((c) => c.slug === effectiveSlug);
     const newPostId = `post_${Date.now()}`;
 
     const newPost: Post = {
       id: newPostId,
       author: currentUser,
-      communitySlug: postData.communitySlug,
-      communityName: targetCommunity ? targetCommunity.name : postData.communitySlug,
+      communitySlug: effectiveSlug,
+      communityName: targetCommunity ? targetCommunity.name : 'DZCORE',
       communityIcon: targetCommunity
         ? targetCommunity.icon
         : 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=120&q=80',

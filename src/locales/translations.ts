@@ -19,6 +19,7 @@ export interface Translations {
 
   // Navigation
   navHome: string;
+  navExplore: string;
   navCommunities: string;
   navMessages: string;
   navNotifications: string;
@@ -170,6 +171,7 @@ export const translations: Record<Language, Translations> = {
 
     // Navigation
     navHome: 'Home Feed',
+    navExplore: 'Explore',
     navCommunities: 'Communities',
     navMessages: 'Direct Messages',
     navNotifications: 'Notifications',
@@ -320,6 +322,7 @@ export const translations: Record<Language, Translations> = {
 
     // Navigation
     navHome: 'الرئيسية',
+    navExplore: 'استكشاف وبحث',
     navCommunities: 'المجتمعات',
     navMessages: 'المحادثات الخاصة',
     navNotifications: 'الإشعارات',

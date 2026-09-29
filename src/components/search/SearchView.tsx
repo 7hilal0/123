@@ -5,7 +5,6 @@ import { Avatar } from '../common/Avatar';
 import {
   Search,
   Users,
-  Compass,
   FileText,
   ArrowRight,
   ArrowLeft,
@@ -17,18 +16,14 @@ export const SearchView: React.FC = () => {
     searchQuery,
     setSearchQuery,
     posts,
-    communities,
     users,
-    navigateToCommunity,
     navigateToProfile,
     navigateToFeed,
-    joinCommunity,
-    leaveCommunity,
     t,
     dir,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'all' | 'posts' | 'communities' | 'people'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'posts' | 'people'>('all');
   const BackIcon = dir === 'rtl' ? ArrowRight : ArrowLeft;
 
   const query = searchQuery.toLowerCase().trim();
@@ -37,17 +32,7 @@ export const SearchView: React.FC = () => {
     (p) =>
       p.title.toLowerCase().includes(query) ||
       p.content.toLowerCase().includes(query) ||
-      p.tags.some((t) => t.toLowerCase().includes(query)) ||
-      p.communitySlug.toLowerCase().includes(query) ||
-      p.communityName.toLowerCase().includes(query)
-  );
-
-  const matchedCommunities = communities.filter(
-    (c) =>
-      c.name.toLowerCase().includes(query) ||
-      c.slug.toLowerCase().includes(query) ||
-      c.description.toLowerCase().includes(query) ||
-      c.category.toLowerCase().includes(query)
+      p.tags.some((t) => t.toLowerCase().includes(query))
   );
 
   const matchedUsers = users.filter(
@@ -125,18 +110,6 @@ export const SearchView: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('communities')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-            activeTab === 'communities'
-              ? 'bg-neutral-800 text-white shadow-sm ring-1 ring-white/10'
-              : 'text-neutral-400 hover:text-white'
-          }`}
-        >
-          <Compass className="w-3.5 h-3.5" />
-          <span>{t.navCommunities} ({matchedCommunities.length})</span>
-        </button>
-
-        <button
           onClick={() => setActiveTab('people')}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'people'
@@ -145,7 +118,7 @@ export const SearchView: React.FC = () => {
           }`}
         >
           <Users className="w-3.5 h-3.5" />
-          <span>Members ({matchedUsers.length})</span>
+          <span>الأعضاء ({matchedUsers.length})</span>
         </button>
       </div>
 
@@ -156,64 +129,12 @@ export const SearchView: React.FC = () => {
           <div className="space-y-3">
             {activeTab === 'all' && (
               <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
-                Discussions ({matchedPosts.length})
+                المنشورات ({matchedPosts.length})
               </h2>
             )}
             <div className="space-y-3">
               {matchedPosts.map((post) => (
                 <PostCard key={post.id} post={post} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Communities */}
-        {(activeTab === 'all' || activeTab === 'communities') && matchedCommunities.length > 0 && (
-          <div className="space-y-3">
-            {activeTab === 'all' && (
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
-                {t.navCommunities} ({matchedCommunities.length})
-              </h2>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {matchedCommunities.map((c) => (
-                <div
-                  key={c.id}
-                  className="p-4 rounded-2xl bg-neutral-900/60 border border-white/5 flex items-center justify-between gap-3 text-start"
-                >
-                  <div
-                    onClick={() => navigateToCommunity(c.slug)}
-                    className="flex items-center gap-3 min-w-0 cursor-pointer"
-                  >
-                    <img
-                      src={c.icon}
-                      alt={c.name}
-                      referrerPolicy="no-referrer"
-                      className="w-10 h-10 rounded-xl object-cover ring-1 ring-white/10 shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <div className="text-xs font-semibold text-white hover:text-emerald-400 truncate">
-                        {c.name}
-                      </div>
-                      <div className="text-[10px] text-neutral-500 font-mono">
-                        {c.memberCount} {t.members}
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      c.isMember ? leaveCommunity(c.slug) : joinCommunity(c.slug)
-                    }
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer ${
-                      c.isMember
-                        ? 'bg-white/5 text-neutral-300 hover:text-rose-400'
-                        : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                    }`}
-                  >
-                    {c.isMember ? t.joined : t.join}
-                  </button>
-                </div>
               ))}
             </div>
           </div>
@@ -250,10 +171,9 @@ export const SearchView: React.FC = () => {
         )}
 
         {matchedPosts.length === 0 &&
-          matchedCommunities.length === 0 &&
           matchedUsers.length === 0 && (
             <div className="p-12 text-center text-xs text-neutral-500">
-              No results found for "{searchQuery}". Try different keywords.
+              لا توجد نتائج بحث لـ "{searchQuery}". جرب كلمات أو وسوماً أخرى.
             </div>
           )}
       </div>

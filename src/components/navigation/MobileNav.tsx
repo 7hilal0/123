@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { Avatar } from '../common/Avatar';
-import { Sparkles, Compass, Plus, MessageSquare, User } from 'lucide-react';
+import { Sparkles, Search, Plus, MessageSquare, User } from 'lucide-react';
 
 export const MobileNav: React.FC = () => {
   const {
@@ -9,8 +9,7 @@ export const MobileNav: React.FC = () => {
     activeTab,
     conversations,
     navigateToFeed,
-    navigateToCommunity,
-    communities,
+    navigateToSearch,
     navigateToCreatePost,
     navigateToMessages,
     navigateToProfile,
@@ -44,28 +43,28 @@ export const MobileNav: React.FC = () => {
           </span>
         </button>
 
-        {/* Communities */}
+        {/* Explore / Search */}
         <button
-          onClick={() => navigateToCommunity(communities[0]?.slug || 'dz/tech')}
+          onClick={() => navigateToSearch()}
           className="min-h-[44px] min-w-[44px] flex flex-col items-center justify-center relative group cursor-pointer"
         >
           <div
             className={`p-1 rounded-xl transition-colors ${
-              activeTab === 'communities' || activeTab === 'community-detail'
+              activeTab === 'search'
                 ? 'text-emerald-400'
                 : 'text-neutral-400 group-hover:text-neutral-200'
             }`}
           >
-            <Compass className="w-5 h-5" />
+            <Search className="w-5 h-5" />
           </div>
           <span
             className={`text-[10px] font-medium tracking-tight mt-0.5 truncate max-w-[56px] ${
-              activeTab === 'communities' || activeTab === 'community-detail'
+              activeTab === 'search'
                 ? 'text-emerald-400 font-semibold'
                 : 'text-neutral-400'
             }`}
           >
-            {t.navCommunities}
+            {t.navExplore}
           </span>
         </button>
 

@@ -7,8 +7,9 @@ import {
   Sparkles,
   TrendingUp,
   Users,
-  Compass,
-  Plus
+  Plus,
+  ShieldCheck,
+  Hash
 } from 'lucide-react';
 
 export const FeedView: React.FC = () => {
@@ -16,9 +17,8 @@ export const FeedView: React.FC = () => {
     posts,
     feedSort,
     setFeedSort,
-    communities,
-    navigateToCommunity,
     navigateToCreatePost,
+    navigateToSearch,
     t,
   } = useApp();
 
@@ -44,6 +44,18 @@ export const FeedView: React.FC = () => {
     { id: 'new', label: t.feedNew, icon: <Sparkles className="w-4 h-4" /> },
     { id: 'top', label: t.feedTop, icon: <TrendingUp className="w-4 h-4" /> },
     { id: 'following', label: t.feedFollowing, icon: <Users className="w-4 h-4" /> },
+  ];
+
+  // Popular Trending Tags across posts
+  const popularTags = [
+    'برمجة',
+    'الجزائر',
+    'تقنية',
+    'تطوير',
+    'عمل_حر',
+    'ذكاء_اصطناعي',
+    'تصميم',
+    'نقاش'
   ];
 
   return (
@@ -75,7 +87,7 @@ export const FeedView: React.FC = () => {
 
             <button
               onClick={() => navigateToCreatePost()}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-neutral-300 hover:text-white hover:bg-white/5 transition-colors"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm shadow-emerald-600/20 transition-all cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>{t.navCreate}</span>
@@ -93,7 +105,7 @@ export const FeedView: React.FC = () => {
                 <p className="text-sm">{t.noPostsFound}</p>
                 <button
                   onClick={() => navigateToCreatePost()}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition-colors"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                 >
                   {t.startDiscussion}
                 </button>
@@ -115,7 +127,7 @@ export const FeedView: React.FC = () => {
               </h3>
             </div>
             <p className="text-xs text-neutral-400 leading-relaxed mb-4">
-              {t.welcomeSub}
+              ساحة المنشورات الموحدة لمنصة DZCORE. شارك أفكارك، وناقش وتواصل بحرية مع الجميع.
             </p>
             <button
               onClick={() => navigateToCreatePost()}
@@ -125,49 +137,40 @@ export const FeedView: React.FC = () => {
             </button>
           </div>
 
-          {/* Top Communities Widget */}
-          <div className="p-5 rounded-2xl bg-neutral-900/60 border border-white/5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Compass className="w-4 h-4 text-emerald-400" />
-                <h4 className="font-semibold text-xs text-white uppercase tracking-wider">
-                  {t.navCommunities}
-                </h4>
-              </div>
+          {/* Trending Topics / Tags */}
+          <div className="p-5 rounded-2xl bg-neutral-900/60 border border-white/5 space-y-3.5">
+            <div className="flex items-center gap-2">
+              <Hash className="w-4 h-4 text-emerald-400" />
+              <h4 className="font-semibold text-xs text-white uppercase tracking-wider">
+                الوسوم الشائعة
+              </h4>
             </div>
 
-            <div className="divide-y divide-white/5">
-              {communities.slice(0, 4).map((c) => (
-                <div key={c.id} className="py-2.5 flex items-center justify-between gap-3">
-                  <button
-                    onClick={() => navigateToCommunity(c.slug)}
-                    className="flex items-center gap-2.5 text-start min-w-0 group"
-                  >
-                    <img
-                      src={c.icon}
-                      alt={c.name}
-                      referrerPolicy="no-referrer"
-                      className="w-7 h-7 rounded-lg object-cover ring-1 ring-white/10"
-                    />
-                    <div className="min-w-0">
-                      <div className="text-xs font-medium text-white group-hover:text-emerald-400 truncate transition-colors">
-                        {c.name}
-                      </div>
-                      <div className="text-[10px] text-neutral-500 font-mono">
-                        {c.memberCount} {t.members}
-                      </div>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => navigateToCommunity(c.slug)}
-                    className="text-[11px] text-emerald-400 hover:underline shrink-0"
-                  >
-                    {t.about}
-                  </button>
-                </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {popularTags.map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => navigateToSearch(tag)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-mono text-neutral-300 hover:text-emerald-400 transition-colors cursor-pointer"
+                >
+                  <span className="text-emerald-400">#</span>
+                  <span>{tag}</span>
+                </button>
               ))}
             </div>
+          </div>
+
+          {/* Community Guidelines Widget */}
+          <div className="p-5 rounded-2xl bg-neutral-900/40 border border-white/5 space-y-3 text-xs text-neutral-400">
+            <div className="flex items-center gap-2 text-white font-semibold">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>ميثاق وقواعد النشر</span>
+            </div>
+            <ul className="space-y-2 text-[11px] leading-relaxed list-disc list-inside text-neutral-400">
+              <li>الاحترام المتبادل ونقاش الأفكار برقي.</li>
+              <li>مشاركة محتوى أصيل ومفيد لجميع الأعضاء.</li>
+              <li>الابتعاد عن الترويج العشوائي والسبام.</li>
+            </ul>
           </div>
         </div>
       </div>

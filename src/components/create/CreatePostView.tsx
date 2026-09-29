@@ -17,8 +17,6 @@ import { Avatar } from '../common/Avatar';
 
 export const CreatePostView: React.FC = () => {
   const {
-    communities,
-    selectedCommunitySlug,
     createPost,
     navigateToFeed,
     currentUser,
@@ -27,23 +25,18 @@ export const CreatePostView: React.FC = () => {
     dir,
   } = useApp();
 
-  const [communitySlug, setCommunitySlug] = useState<string>(
-    selectedCommunitySlug || communities[0]?.slug || 'dz/tech'
-  );
   const [mediaType, setMediaType] = useState<PostMediaType>('text');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [tagInput, setTagInput] = useState('');
-  const [tags, setTags] = useState<string[]>(['nova', 'community']);
+  const [tags, setTags] = useState<string[]>(['dzcore', 'عام']);
   const [showPreview, setShowPreview] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const selectedCommunity = communities.find((c) => c.slug === communitySlug) || communities[0];
 
   const handleAddTag = () => {
     const clean = tagInput.trim().replace(/^#/, '');
@@ -83,7 +76,6 @@ export const CreatePostView: React.FC = () => {
     if (!title.trim()) return;
 
     createPost({
-      communitySlug,
       title: title.trim(),
       content: content.trim(),
       mediaType,
@@ -132,34 +124,6 @@ export const CreatePostView: React.FC = () => {
 
       {/* Main Form */}
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Select Target Community */}
-        <div className="bg-neutral-900/60 border border-white/5 rounded-2xl p-4 space-y-2">
-          <label className="block text-xs font-semibold text-neutral-300">
-            {t.targetCommunity}
-          </label>
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg overflow-hidden bg-neutral-950 shrink-0 ring-1 ring-white/10">
-              <img
-                src={selectedCommunity.icon}
-                alt={selectedCommunity.name}
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <select
-              value={communitySlug}
-              onChange={(e) => setCommunitySlug(e.target.value)}
-              className="flex-1 bg-neutral-950 border border-white/10 rounded-xl px-3 py-2 text-xs md:text-sm text-neutral-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-start"
-            >
-              {communities.map((c) => (
-                <option key={c.id} value={c.slug}>
-                  {c.name} ({c.slug})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
         {/* Post Type Selector */}
         <div className="grid grid-cols-3 gap-2 p-1 bg-neutral-900/60 border border-white/5 rounded-2xl">
           <button
