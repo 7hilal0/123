@@ -12,7 +12,6 @@ import {
   MOCK_USERS,
   MOCK_COMMUNITIES,
   MOCK_POSTS,
-  MOCK_COMMENTS,
   MOCK_CONVERSATIONS,
   MOCK_DIRECT_MESSAGES,
   MOCK_NOTIFICATIONS,
@@ -140,12 +139,11 @@ export const storage = {
     safeSet(STORAGE_KEYS.POSTS, posts.filter((p) => p.id !== 'post_official_welcome'));
   },
 
-  getComments: (): Record<string, Comment[]> => {
-    return safeGet<Record<string, Comment[]>>(STORAGE_KEYS.COMMENTS, MOCK_COMMENTS);
-  },
+  // Comments are cloud-only. Never restore them from a phone's localStorage.
+  getComments: (): Record<string, Comment[]> => ({}),
 
-  saveComments: (comments: Record<string, Comment[]>): void => {
-    safeSet(STORAGE_KEYS.COMMENTS, comments);
+  saveComments: (_comments: Record<string, Comment[]>): void => {
+    if (typeof window !== 'undefined') localStorage.removeItem(STORAGE_KEYS.COMMENTS);
   },
 
   getCommunities: (): Community[] => {
