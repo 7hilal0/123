@@ -6,20 +6,44 @@ import {
   deleteDoc,
   onSnapshot,
   query,
-  orderBy,
   limit,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { User, Community, Post, Comment, Conversation, DirectMessage } from '../types';
+
+/**
+ * Deeply strips undefined properties from an object so Firestore setDoc does not reject it.
+ * Firestore throws a runtime error if any field value is `undefined`.
+ */
+export function stripUndefined<T>(obj: T): T {
+  if (obj === undefined || obj === null) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map((item) => stripUndefined(item)) as unknown as T;
+  }
+  if (typeof obj === 'object' && !(obj instanceof Date)) {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = stripUndefined(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return obj;
+}
 
 export const firebaseSync = {
   // --- USERS ---
   async saveUser(user: User): Promise<void> {
     try {
       const userRef = doc(db, 'users', user.id);
-      await setDoc(userRef, user, { merge: true });
+      const cleanData = stripUndefined(user);
+      await setDoc(userRef, cleanData, { merge: true });
+      console.log(`[Firestore] Saved user ${user.id}`);
     } catch (err) {
-      console.warn('Error saving user to Firestore:', err);
+      console.error('[Firestore] Error saving user to Firestore:', err);
     }
   },
 
@@ -30,7 +54,7 @@ export const firebaseSync = {
       snap.forEach((d) => list.push(d.data() as User));
       return list;
     } catch (err) {
-      console.warn('Error fetching users from Firestore:', err);
+      console.error('[Firestore] Error fetching users from Firestore:', err);
       return [];
     }
   },
@@ -39,9 +63,11 @@ export const firebaseSync = {
   async saveCommunity(community: Community): Promise<void> {
     try {
       const commRef = doc(db, 'communities', community.id);
-      await setDoc(commRef, community, { merge: true });
+      const cleanData = stripUndefined(community);
+      await setDoc(commRef, cleanData, { merge: true });
+      console.log(`[Firestore] Saved community ${community.id}`);
     } catch (err) {
-      console.warn('Error saving community to Firestore:', err);
+      console.error('[Firestore] Error saving community to Firestore:', err);
     }
   },
 
@@ -52,7 +78,7 @@ export const firebaseSync = {
       snap.forEach((d) => list.push(d.data() as Community));
       return list;
     } catch (err) {
-      console.warn('Error fetching communities from Firestore:', err);
+      console.error('[Firestore] Error fetching communities from Firestore:', err);
       return [];
     }
   },
@@ -61,29 +87,33 @@ export const firebaseSync = {
   async savePost(post: Post): Promise<void> {
     try {
       const postRef = doc(db, 'posts', post.id);
-      await setDoc(postRef, post, { merge: true });
+      const cleanData = stripUndefined(post);
+      await setDoc(postRef, cleanData, { merge: true });
+      console.log(`[Firestore] Successfully saved post to cloud: ${post.id}`);
     } catch (err) {
-      console.warn('Error saving post to Firestore:', err);
+      console.error('[Firestore] Error saving post to Firestore:', err);
     }
   },
 
   async deletePost(postId: string): Promise<void> {
     try {
       await deleteDoc(doc(db, 'posts', postId));
+      console.log(`[Firestore] Deleted post from cloud: ${postId}`);
     } catch (err) {
-      console.warn('Error deleting post from Firestore:', err);
+      console.error('[Firestore] Error deleting post from Firestore:', err);
     }
   },
 
   async fetchPosts(): Promise<Post[]> {
     try {
-      const q = query(collection(db, 'posts'), limit(100));
+      const q = query(collection(db, 'posts'), limit(150));
       const snap = await getDocs(q);
       const list: Post[] = [];
       snap.forEach((d) => list.push(d.data() as Post));
+      console.log(`[Firestore] Fetched ${list.length} posts from Firestore.`);
       return list;
     } catch (err) {
-      console.warn('Error fetching posts from Firestore:', err);
+      console.error('[Firestore] Error fetching posts from Firestore:', err);
       return [];
     }
   },
@@ -95,16 +125,15 @@ export const firebaseSync = {
         (snapshot) => {
           const list: Post[] = [];
           snapshot.forEach((d) => list.push(d.data() as Post));
-          if (list.length > 0) {
-            callback(list);
-          }
+          console.log(`[Firestore] Real-time snapshot: ${list.length} posts from cloud.`);
+          callback(list);
         },
         (error) => {
-          console.warn('Posts subscription error:', error);
+          console.error('[Firestore] Posts subscription error:', error);
         }
       );
     } catch (err) {
-      console.warn('Failed to subscribe to posts:', err);
+      console.error('[Firestore] Failed to subscribe to posts:', err);
       return () => {};
     }
   },
@@ -113,17 +142,20 @@ export const firebaseSync = {
   async saveComment(postId: string, comment: Comment): Promise<void> {
     try {
       const commentRef = doc(db, 'posts', postId, 'comments', comment.id);
-      await setDoc(commentRef, comment, { merge: true });
+      const cleanData = stripUndefined(comment);
+      await setDoc(commentRef, cleanData, { merge: true });
+      console.log(`[Firestore] Saved comment ${comment.id} for post ${postId}`);
     } catch (err) {
-      console.warn('Error saving comment to Firestore:', err);
+      console.error('[Firestore] Error saving comment to Firestore:', err);
     }
   },
 
   async deleteComment(postId: string, commentId: string): Promise<void> {
     try {
       await deleteDoc(doc(db, 'posts', postId, 'comments', commentId));
+      console.log(`[Firestore] Deleted comment ${commentId}`);
     } catch (err) {
-      console.warn('Error deleting comment from Firestore:', err);
+      console.error('[Firestore] Error deleting comment from Firestore:', err);
     }
   },
 
@@ -134,7 +166,7 @@ export const firebaseSync = {
       snap.forEach((d) => list.push(d.data() as Comment));
       return list;
     } catch (err) {
-      console.warn(`Error fetching comments for ${postId}:`, err);
+      console.error(`[Firestore] Error fetching comments for ${postId}:`, err);
       return [];
     }
   },
@@ -143,18 +175,20 @@ export const firebaseSync = {
   async saveConversation(conv: Conversation): Promise<void> {
     try {
       const convRef = doc(db, 'conversations', conv.id);
-      await setDoc(convRef, conv, { merge: true });
+      const cleanData = stripUndefined(conv);
+      await setDoc(convRef, cleanData, { merge: true });
     } catch (err) {
-      console.warn('Error saving conversation to Firestore:', err);
+      console.error('[Firestore] Error saving conversation to Firestore:', err);
     }
   },
 
   async saveDirectMessage(conversationId: string, message: DirectMessage): Promise<void> {
     try {
       const msgRef = doc(db, 'conversations', conversationId, 'messages', message.id);
-      await setDoc(msgRef, message, { merge: true });
+      const cleanData = stripUndefined(message);
+      await setDoc(msgRef, cleanData, { merge: true });
     } catch (err) {
-      console.warn('Error saving message to Firestore:', err);
+      console.error('[Firestore] Error saving message to Firestore:', err);
     }
   },
 
@@ -168,11 +202,11 @@ export const firebaseSync = {
           callback(list);
         },
         (error) => {
-          console.warn('Messages subscription error:', error);
+          console.error('[Firestore] Messages subscription error:', error);
         }
       );
     } catch (err) {
-      console.warn('Failed to subscribe to messages:', err);
+      console.error('[Firestore] Failed to subscribe to messages:', err);
       return () => {};
     }
   },

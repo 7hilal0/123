@@ -199,18 +199,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const cleanRemote = remotePosts.filter((p) => p.id !== 'post_official_welcome');
           const remoteIds = new Set(cleanRemote.map((p) => p.id));
           const localOnly = local.filter((p) => !remoteIds.has(p.id) && p.id !== 'post_official_welcome');
+
+          // Immediately sync any local posts that are not yet on Firestore so everyone can see them
+          for (const lp of localOnly) {
+            console.log(`[Cloud Sync] Uploading local post to Firestore: ${lp.id}`);
+            firebaseSync.savePost(lp);
+          }
+
           return [...cleanRemote, ...localOnly];
         });
       }
       setCloudSyncStatus('connected');
-    }).catch(() => {
+    }).catch((err) => {
+      console.error('[Cloud Sync] fetchPosts error:', err);
       setCloudSyncStatus('connected');
     });
 
     // 2. Subscribe to remote posts live
     const unsubPosts = firebaseSync.subscribePosts((remotePosts) => {
       if (remotePosts) {
-        setPosts(remotePosts.filter((p) => p.id !== 'post_official_welcome'));
+        const cleanRemote = remotePosts.filter((p) => p.id !== 'post_official_welcome');
+        setPosts((currentLocal) => {
+          const remoteIds = new Set(cleanRemote.map((p) => p.id));
+          const localPending = currentLocal.filter((p) => !remoteIds.has(p.id) && p.id !== 'post_official_welcome');
+          return [...cleanRemote, ...localPending];
+        });
       }
     });
 
@@ -292,6 +305,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSelectedPostId(postId);
     setActiveTab('post-detail');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Sync remote comments for this post
+    firebaseSync.fetchComments(postId).then((remoteComments) => {
+      if (remoteComments && remoteComments.length > 0) {
+        setComments((prev) => ({
+          ...prev,
+          [postId]: remoteComments,
+        }));
+      }
+    }).catch(() => {});
   };
 
   const navigateToProfile = (userId: string) => {
@@ -429,9 +452,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const now = Date.now();
     const newPostId = `post_${now}`;
 
+    const cleanAuthor: User = {
+      id: currentUser.id,
+      username: currentUser.username,
+      displayName: currentUser.displayName,
+      avatar: currentUser.avatar,
+      banner: currentUser.banner || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+      bio: currentUser.bio || '',
+      status: currentUser.status || 'online',
+      badges: currentUser.badges || [],
+      karma: currentUser.karma || 0,
+      joinedDate: currentUser.joinedDate || '2026',
+      followersCount: currentUser.followersCount || 0,
+      followingCount: currentUser.followingCount || 0,
+    };
+
     const newPost: Post = {
       id: newPostId,
-      author: currentUser,
+      author: cleanAuthor,
       communitySlug: effectiveSlug,
       communityName: targetCommunity ? targetCommunity.name : 'DZCORE',
       communityIcon: targetCommunity
@@ -440,15 +478,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       title: postData.title,
       content: postData.content,
       mediaType: postData.mediaType,
-      mediaUrl: postData.mediaUrl,
-      linkUrl: postData.linkUrl,
+      mediaUrl: postData.mediaUrl || '',
+      linkUrl: postData.linkUrl || '',
       upvotes: 1,
       downvotes: 0,
       userVote: 1,
       commentCount: 0,
       createdAt: language === 'ar' ? 'الآن' : 'Just now',
       timestamp: now,
-      tags: postData.tags,
+      tags: postData.tags || [],
       isSaved: false,
     };
 
