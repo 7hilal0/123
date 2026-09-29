@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   User,
   Community,
@@ -177,6 +177,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [directMessages, setDirectMessages] = useState<Record<string, DirectMessage[]>>(() => storage.getDirectMessages());
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => storage.getNotifications());
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'connected' | 'syncing' | 'offline'>('connected');
+  // Keeps optimistic deletions out of a stale Firestore snapshot while the delete request settles.
+  const deletedPostIdsRef = useRef<Set<string>>(new Set());
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -196,9 +198,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     firebaseSync.fetchPosts().then((remotePosts) => {
       if (remotePosts) {
         setPosts((local) => {
-          const cleanRemote = remotePosts.filter((p) => p.id !== 'post_official_welcome');
+          const cleanRemote = remotePosts.filter(
+            (p) => p.id !== 'post_official_welcome' && !deletedPostIdsRef.current.has(p.id)
+          );
           const remoteIds = new Set(cleanRemote.map((p) => p.id));
-          const localOnly = local.filter((p) => !remoteIds.has(p.id) && p.id !== 'post_official_welcome');
+          const localOnly = local.filter(
+            (p) => !remoteIds.has(p.id) && p.id !== 'post_official_welcome' && !deletedPostIdsRef.current.has(p.id)
+          );
 
           // Immediately sync any local posts that are not yet on Firestore so everyone can see them
           for (const lp of localOnly) {
@@ -218,10 +224,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 2. Subscribe to remote posts live
     const unsubPosts = firebaseSync.subscribePosts((remotePosts) => {
       if (remotePosts) {
-        const cleanRemote = remotePosts.filter((p) => p.id !== 'post_official_welcome');
+        const cleanRemote = remotePosts.filter(
+          (p) => p.id !== 'post_official_welcome' && !deletedPostIdsRef.current.has(p.id)
+        );
         setPosts((currentLocal) => {
           const remoteIds = new Set(cleanRemote.map((p) => p.id));
-          const localPending = currentLocal.filter((p) => !remoteIds.has(p.id) && p.id !== 'post_official_welcome');
+          const localPending = currentLocal.filter(
+            (p) => !remoteIds.has(p.id) && p.id !== 'post_official_welcome' && !deletedPostIdsRef.current.has(p.id)
+          );
           return [...cleanRemote, ...localPending];
         });
       }
@@ -502,6 +512,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deletePost = (postId: string) => {
     if (!currentUser) return;
+    const postToDelete = posts.find((p) => p.id === postId);
+    if (!postToDelete || postToDelete.author.id !== currentUser.id) return;
+
+    deletedPostIdsRef.current.add(postId);
     setPosts((prev) => prev.filter((p) => p.id !== postId));
     setComments((prev) => {
       const copy = { ...prev };
@@ -509,10 +523,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return copy;
     });
 
-    // Cloud Delete
-    firebaseSync.deletePost(postId);
-
-    showToast(language === 'ar' ? 'تم حذف المنشور من السيرفر' : 'Post deleted from server', 'info');
+    // Cloud Delete. If it fails, restore the post instead of silently losing the user's data.
+    firebaseSync.deletePost(postId).then((deleted) => {
+      if (deleted) {
+        showToast(language === 'ar' ? 'تم حذف المنشور نهائياً' : 'Post permanently deleted', 'success');
+        return;
+      }
+      deletedPostIdsRef.current.delete(postId);
+      setPosts((prev) => (prev.some((p) => p.id === postId) ? prev : [postToDelete, ...prev]));
+      showToast(language === 'ar' ? 'تعذر حذف المنشور من السيرفر' : 'The post could not be deleted from the server', 'warning');
+    });
     if (selectedPostId === postId) {
       navigateToFeed();
     }

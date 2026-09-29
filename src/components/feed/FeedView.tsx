@@ -205,12 +205,12 @@ export const FeedView: React.FC = () => {
     .slice(0, 3);
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 md:py-6 text-start">
+    <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 md:py-8 text-start">
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         {/* Main Feed Column */}
-        <div className="xl:col-span-8 space-y-4 min-w-0 w-full">
+        <div className="xl:col-span-8 space-y-5 min-w-0 w-full">
           {/* Feed Filter Bar (Segmented Controls) */}
-          <div className="bg-neutral-900/60 border border-white/5 rounded-2xl p-1.5 backdrop-blur-md">
+          <div className="bg-neutral-900/75 border border-white/[0.08] rounded-2xl p-1.5 backdrop-blur-xl shadow-lg shadow-black/10">
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar w-full">
               {sortTabs.map((tab) => {
                 const isActive = feedSort === tab.id;
@@ -221,7 +221,7 @@ export const FeedView: React.FC = () => {
                     title={tab.description}
                     className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                       isActive
-                        ? 'bg-neutral-800 text-white shadow-sm ring-1 ring-white/10'
+                        ? 'bg-emerald-500/12 text-white shadow-sm ring-1 ring-emerald-400/20'
                         : 'text-neutral-400 hover:text-neutral-200 hover:bg-white/5'
                     }`}
                   >
@@ -314,7 +314,7 @@ export const FeedView: React.FC = () => {
               </div>
             ) : (
               /* General Empty State */
-              <div className="p-12 text-center bg-neutral-900/30 rounded-2xl border border-white/5 text-neutral-400 space-y-3">
+              <div className="p-12 text-center bg-gradient-to-br from-neutral-900/70 to-neutral-950/60 rounded-2xl border border-white/[0.08] text-neutral-400 space-y-3 shadow-lg shadow-black/10">
                 <p className="text-sm">{t.noPostsFound}</p>
                 <button
                   onClick={() => navigateToCreatePost()}
@@ -330,7 +330,7 @@ export const FeedView: React.FC = () => {
         {/* Sidebar Widgets (Desktop) */}
         <div className="hidden xl:block xl:col-span-4 space-y-5 sticky top-20 text-start min-w-0">
           {/* Welcome Card */}
-          <div className="p-5 rounded-2xl bg-gradient-to-br from-neutral-900/80 to-neutral-950 border border-white/10 shadow-xl">
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-neutral-900/90 via-neutral-900/75 to-neutral-950 border border-white/[0.08] shadow-xl shadow-black/20">
             <div className="flex items-center gap-2.5 mb-3">
               <div className="w-7 h-7 rounded-lg bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
                 <Sparkles className="w-4 h-4" />
@@ -351,7 +351,7 @@ export const FeedView: React.FC = () => {
           </div>
 
           {/* Trending Topics / Tags */}
-          <div className="p-5 rounded-2xl bg-neutral-900/60 border border-white/5 space-y-3.5">
+          <div className="p-5 rounded-2xl bg-neutral-900/75 border border-white/[0.08] space-y-3.5 shadow-lg shadow-black/10">
             <div className="flex items-center gap-2">
               <Hash className="w-4 h-4 text-emerald-400" />
               <h4 className="font-semibold text-xs text-white uppercase tracking-wider">

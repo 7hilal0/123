@@ -58,10 +58,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
   return (
     <article
       onClick={handleCardClick}
-      className={`group bg-neutral-900/60 border border-white/5 hover:border-white/10 rounded-2xl transition-all duration-200 overflow-hidden text-start ${
-        isDetailedView ? 'p-5 md:p-6' : 'p-4 md:p-5 cursor-pointer hover:bg-neutral-900/80 shadow-lg shadow-black/20'
+      className={`group relative bg-gradient-to-br from-neutral-900/90 via-neutral-900/70 to-neutral-950/80 border border-white/[0.07] hover:border-emerald-400/25 rounded-2xl transition-all duration-300 overflow-hidden text-start ${
+        isDetailedView
+          ? 'p-5 md:p-6 shadow-2xl shadow-black/25'
+          : 'p-4 md:p-5 cursor-pointer hover:-translate-y-0.5 hover:bg-neutral-900/95 shadow-lg shadow-black/20 hover:shadow-emerald-950/20'
       }`}
     >
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
       <div className="flex gap-3 md:gap-4 items-start">
         {/* Voting Column (Desktop) */}
         <div
@@ -110,7 +113,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
         {/* Post Main Body */}
         <div className="flex-1 min-w-0">
           {/* Metadata Header: Author Avatar, Display Name, Username & Community */}
-          <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1.5 text-xs text-neutral-400 mb-2.5">
+          <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1.5 text-xs text-neutral-400 mb-3">
             {/* Author Info */}
             <button
               onClick={(e) => {
@@ -148,7 +151,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
 
           {/* Title */}
           <h2
-            className={`font-semibold text-neutral-100 group-hover:text-white transition-colors leading-snug tracking-tight mb-2 ${
+            className={`font-semibold text-neutral-100 group-hover:text-white transition-colors leading-snug tracking-tight mb-2.5 ${
               isDetailedView ? 'text-xl md:text-2xl font-bold' : 'text-base md:text-lg'
             }`}
             style={{ textWrap: 'balance' }}
@@ -217,7 +220,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
           {/* Card Footer Actions */}
           <div
             onClick={(e) => e.stopPropagation()}
-            className="flex items-center justify-between pt-2 border-t border-white/5 text-xs text-neutral-400"
+              className="flex items-center justify-between pt-3 mt-4 border-t border-white/[0.07] text-xs text-neutral-400"
           >
             {/* Mobile Vote Buttons */}
             <div className="flex sm:hidden items-center bg-neutral-950/80 rounded-lg p-0.5 border border-white/5">

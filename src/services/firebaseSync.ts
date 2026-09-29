@@ -95,12 +95,14 @@ export const firebaseSync = {
     }
   },
 
-  async deletePost(postId: string): Promise<void> {
+  async deletePost(postId: string): Promise<boolean> {
     try {
       await deleteDoc(doc(db, 'posts', postId));
       console.log(`[Firestore] Deleted post from cloud: ${postId}`);
+      return true;
     } catch (err) {
       console.error('[Firestore] Error deleting post from Firestore:', err);
+      return false;
     }
   },
 
