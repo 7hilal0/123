@@ -5,8 +5,8 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    // GitHub Pages serves this repository under /123/.
-    base: process.env.GITHUB_ACTIONS ? '/123/' : '/',
+    // The site is served from the custom root domain dzcore.top.
+    base: '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
