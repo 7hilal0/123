@@ -4,7 +4,6 @@ import {
   getDoc,
   getDocs,
   setDoc,
-  deleteDoc,
   writeBatch,
   onSnapshot,
   query,
@@ -99,8 +98,11 @@ export const firebaseSync = {
 
   async deletePost(postId: string): Promise<boolean> {
     try {
-      await deleteDoc(doc(db, 'posts', postId));
-      console.log(`[Firestore] Deleted post from cloud: ${postId}`);
+      await setDoc(doc(db, 'posts', postId), {
+        deleted: true,
+        deletedAt: Date.now(),
+      }, { merge: true });
+      console.log(`[Firestore] Marked post deleted in cloud: ${postId}`);
       return true;
     } catch (err) {
       console.error('[Firestore] Error deleting post from Firestore:', err);

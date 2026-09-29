@@ -71,6 +71,8 @@ export interface Post {
   tags: string[];
   isSaved: boolean;
   isPinned?: boolean;
+  deleted?: boolean;
+  deletedAt?: number;
 }
 
 export interface Comment {

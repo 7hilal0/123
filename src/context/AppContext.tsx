@@ -199,10 +199,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     firebaseSync.fetchPosts().then((remotePosts) => {
       if (remotePosts) {
         setPosts((local) => {
+          const remoteIds = new Set(remotePosts.map((p) => p.id));
           const cleanRemote = remotePosts.filter(
-            (p) => p.id !== 'post_official_welcome' && !deletedPostIdsRef.current.has(p.id)
+            (p) => p.id !== 'post_official_welcome' && !p.deleted && !deletedPostIdsRef.current.has(p.id)
           );
-          const remoteIds = new Set(cleanRemote.map((p) => p.id));
           const localOnly = local.filter(
             (p) => !remoteIds.has(p.id) && p.id !== 'post_official_welcome' && !deletedPostIdsRef.current.has(p.id)
           );
@@ -225,11 +225,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 2. Subscribe to remote posts live
     const unsubPosts = firebaseSync.subscribePosts((remotePosts) => {
       if (remotePosts) {
+        const remoteIds = new Set(remotePosts.map((p) => p.id));
         const cleanRemote = remotePosts.filter(
-          (p) => p.id !== 'post_official_welcome' && !deletedPostIdsRef.current.has(p.id)
+          (p) => p.id !== 'post_official_welcome' && !p.deleted && !deletedPostIdsRef.current.has(p.id)
         );
         setPosts((currentLocal) => {
-          const remoteIds = new Set(cleanRemote.map((p) => p.id));
           const localPending = currentLocal.filter(
             (p) => !remoteIds.has(p.id) && p.id !== 'post_official_welcome' && !deletedPostIdsRef.current.has(p.id)
           );
