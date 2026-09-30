@@ -35,7 +35,7 @@ const STORAGE_KEYS = {
 const COMMENT_RESET_VERSION = 'nova_dz_comments_reset_v1';
 const VOTE_RESET_VERSION = 'nova_dz_votes_reset_v1';
 const ACCOUNT_RESET_VERSION = 'nova_dz_accounts_reset_v1';
-const POST_RESET_VERSION = 'nova_dz_posts_reset_v2';
+const POST_RESET_VERSION = 'nova_dz_posts_reset_v3';
 if (typeof window !== 'undefined') {
   try {
     if (localStorage.getItem(COMMENT_RESET_VERSION) !== 'done') {
