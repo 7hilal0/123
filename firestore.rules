@@ -34,6 +34,11 @@ service cloud.firestore {
       }
     }
 
+    // Activity notifications
+    match /notifications/{notificationId} {
+      allow read, write: if true;
+    }
+
     // Connection test document
     match /test/{docId} {
       allow read, write: if true;

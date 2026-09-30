@@ -115,10 +115,11 @@ export interface Conversation {
   pinned?: boolean;
 }
 
-export type NotificationType = 'upvote' | 'comment' | 'reply' | 'follow' | 'mention' | 'community';
+export type NotificationType = 'upvote' | 'downvote' | 'comment' | 'reply' | 'follow' | 'mention' | 'community';
 
 export interface NotificationItem {
   id: string;
+  recipientId?: string;
   type: NotificationType;
   actor: User;
   title: string;

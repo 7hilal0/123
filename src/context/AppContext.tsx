@@ -133,7 +133,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [language, setLanguageState] = useState<Language>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('nova_primary_language');
-      if (stored === 'en' || stored === 'ar') return stored;
+      if (stored === 'en' || stored === 'ar' || stored === 'fr') return stored;
     }
     return 'en';
   });
@@ -149,7 +149,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       document.documentElement.lang = newLang;
       document.documentElement.dir = 'ltr';
     }
-    showToast(newLang === 'en' ? 'Language switched to English' : 'تم تغيير اللغة إلى العربية', 'success');
+    showToast(newLang === 'en' ? 'Language switched to English' : newLang === 'fr' ? 'Langue changée en français' : 'تم تغيير اللغة إلى العربية', 'success');
   };
 
   useEffect(() => {
@@ -456,7 +456,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveTab('search');
   };
 
+  useEffect(() => {
+    if (!currentUser?.id) { setNotifications([]); return; }
+    const unsubscribe = firebaseSync.subscribeNotifications(currentUser.id, (remote) => setNotifications(remote));
+    return unsubscribe;
+  }, [currentUser?.id]);
+
   // Interactions (Upvote/Downvote/Save)
+  const addActivityNotification = (recipientId: string | undefined, type: NotificationItem['type'], actor: User, title: string, message: string, targetType: NotificationItem['targetType'], targetId: string) => {
+    if (!currentUser || !recipientId || recipientId === actor.id || !actor) return;
+    const item: NotificationItem = { id: `notification_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, recipientId, type, actor, title, message, timestamp: language === 'ar' ? 'الآن' : language === 'fr' ? 'À l’instant' : 'Just now', isRead: false, targetType, targetId };
+    firebaseSync.saveNotification(item).catch((error) => console.error('[Firestore] Notification save failed', error));
+    if (recipientId === currentUser.id) setNotifications((prev) => [item, ...prev].slice(0, 100));
+  };
+
   const upvotePost = (postId: string) => {
     if (!currentUser) {
       setAuthModalOpen(true, 'login');
@@ -493,6 +506,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
 
         firebaseSync.savePost(updated);
+        if (nextUserVote === 1 && p.author.id !== currentUser.id) addActivityNotification(p.author.id, 'upvote', currentUser, language === 'ar' ? 'إعجاب جديد بمنشورك' : language === 'fr' ? 'Nouveau j’aime' : 'New like on your post', language === 'ar' ? `أعجب @${currentUser.username} بمنشورك` : language === 'fr' ? `@${currentUser.username} a aimé votre publication` : `@${currentUser.username} liked your post`, 'post', p.id);
         return updated;
       })
     );
@@ -534,6 +548,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
 
         firebaseSync.savePost(updated);
+        if (nextUserVote === -1 && p.author.id !== currentUser.id) addActivityNotification(p.author.id, 'downvote', currentUser, language === 'ar' ? 'عدم إعجاب بمنشورك' : language === 'fr' ? 'Nouveau je n’aime pas' : 'New dislike on your post', language === 'ar' ? `لم يعجب @${currentUser.username} بمنشورك` : language === 'fr' ? `@${currentUser.username} n’a pas aimé votre publication` : `@${currentUser.username} disliked your post`, 'post', p.id);
         return updated;
       })
     );
@@ -719,6 +734,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Cloud Save Comment
     firebaseSync.saveComment(postId, newComment);
+    const targetPost = posts.find((p) => p.id === postId);
+    const targetComment = parentId ? (comments[postId] || []).flatMap((c) => [c, ...(c.replies || [])]).find((c) => c.id === parentId) : null;
+    const recipientId = parentId ? targetComment?.author.id : targetPost?.author.id;
+    addActivityNotification(recipientId, parentId ? 'reply' : 'comment', currentUser, parentId ? (language === 'ar' ? 'رد جديد على تعليقك' : language === 'fr' ? 'Nouvelle réponse' : 'New reply') : (language === 'ar' ? 'تعليق جديد على منشورك' : language === 'fr' ? 'Nouveau commentaire' : 'New comment'), parentId ? `@${currentUser.username} replied to your comment` : `@${currentUser.username} commented on your post`, 'post', postId);
 
     showToast(language === 'ar' ? 'تمت إضافة التعليق وحفظه سحابياً' : 'Comment saved to cloud', 'success');
   };

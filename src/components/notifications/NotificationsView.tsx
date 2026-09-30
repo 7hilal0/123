@@ -5,6 +5,7 @@ import {
   Bell,
   CheckCheck,
   ArrowBigUp,
+  ArrowBigDown,
   MessageSquare,
   UserPlus,
   Compass,
@@ -45,6 +46,8 @@ export const NotificationsView: React.FC = () => {
     switch (type) {
       case 'upvote':
         return <ArrowBigUp className="w-4 h-4 text-emerald-500 fill-current" />;
+      case 'downvote':
+        return <ArrowBigDown className="w-4 h-4 text-rose-400 fill-current" />;
       case 'comment':
       case 'reply':
         return <MessageSquare className="w-4 h-4 text-emerald-400" />;
@@ -76,7 +79,7 @@ export const NotificationsView: React.FC = () => {
               <span>{t.navNotifications}</span>
             </h1>
             <p className="text-xs text-neutral-400">
-              Track interactions, upvotes, and replies on your activity.
+              {t.languageDescription}
             </p>
           </div>
         </div>
@@ -86,7 +89,7 @@ export const NotificationsView: React.FC = () => {
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-neutral-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/5 transition-colors cursor-pointer"
         >
           <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Mark all read</span>
+          <span>{dir === 'rtl' ? 'تحديد الكل كمقروء' : 'Mark all read'}</span>
         </button>
       </div>
 
@@ -100,7 +103,7 @@ export const NotificationsView: React.FC = () => {
               : 'text-neutral-400 hover:text-white'
           }`}
         >
-          All Activity
+          {dir === 'rtl' ? 'كل النشاط' : 'All Activity'}
         </button>
         <button
           onClick={() => setFilter('unread')}
@@ -110,7 +113,7 @@ export const NotificationsView: React.FC = () => {
               : 'text-neutral-400 hover:text-white'
           }`}
         >
-          Unread
+          {dir === 'rtl' ? 'غير مقروء' : 'Unread'}
         </button>
       </div>
 
@@ -157,7 +160,7 @@ export const NotificationsView: React.FC = () => {
 
         {filtered.length === 0 && (
           <div className="p-12 text-center text-xs text-neutral-500">
-            No notifications in this filter.
+            {dir === 'rtl' ? 'لا توجد تنبيهات في هذا القسم.' : 'No notifications in this filter.'}
           </div>
         )}
       </div>

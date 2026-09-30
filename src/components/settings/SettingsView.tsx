@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, ChevronLeft, Database, Globe, LogOut, RotateCcw, Settings, ShieldCheck } from 'lucide-react';
+import { Check, ChevronLeft, Globe, LogOut, Settings, ShieldCheck } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const SettingsView: React.FC = () => {
@@ -7,7 +7,6 @@ export const SettingsView: React.FC = () => {
     language,
     setLanguage,
     t,
-    resetAllData,
     logout,
     setActiveTab,
     currentUser,
@@ -25,12 +24,7 @@ export const SettingsView: React.FC = () => {
     }
   };
 
-  const handleReset = () => {
-    const message = language === 'ar'
-      ? 'هل تريد إعادة ضبط البيانات المحلية؟'
-      : 'Reset local data on this device?';
-    if (window.confirm(message)) resetAllData();
-  };
+
 
   return (
     <section className="min-h-[calc(100vh-4rem)] bg-neutral-950 px-4 py-6 md:px-8 md:py-10">
@@ -69,6 +63,7 @@ export const SettingsView: React.FC = () => {
               {[
                 { value: 'en' as const, flag: '🇬🇧', title: 'English', detail: 'Left-to-right (LTR)' },
                 { value: 'ar' as const, flag: '🇩🇿', title: 'العربية (Arabic)', detail: 'واجهة عربية مع اتجاه ثابت' },
+                { value: 'fr' as const, flag: '🇫🇷', title: 'Français', detail: 'Interface en français' },
               ].map((option) => (
                 <button
                   key={option.value}
@@ -86,16 +81,6 @@ export const SettingsView: React.FC = () => {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-neutral-900/70 p-5 shadow-xl shadow-black/10">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="rounded-xl bg-violet-500/10 p-2 text-violet-400"><Database className="h-5 w-5" /></div>
-              <div><h2 className="text-sm font-bold text-white">{t.dataSetting}</h2><p className="text-xs text-neutral-500">{t.resetAllDataHint}</p></div>
-            </div>
-            <button type="button" onClick={handleReset} className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-neutral-950/60 p-4 text-start transition hover:border-rose-500/30 hover:bg-rose-500/5">
-              <span><span className="block text-sm font-semibold text-neutral-200">{t.resetAllData}</span><span className="mt-1 block text-xs text-neutral-500">{language === 'ar' ? 'يمسح البيانات المحلية على هذا الجهاز فقط' : 'Clears local data on this device only'}</span></span>
-              <RotateCcw className="h-4 w-4 shrink-0 text-neutral-400" />
-            </button>
-          </div>
 
           <div className="rounded-3xl border border-white/10 bg-neutral-900/70 p-5 shadow-xl shadow-black/10">
             <div className="mb-4 flex items-center gap-3">

@@ -116,21 +116,6 @@ export const DirectMessagesView: React.FC = () => {
               <MessageSquare className="w-4 h-4 text-emerald-400" />
               <span>{t.directMessagesTitle}</span>
             </h2>
-
-            <button
-              onClick={() => {
-                if (!currentUser) {
-                  setAuthModalOpen(true, 'login');
-                } else {
-                  setIsNewChatModalOpen(true);
-                }
-              }}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/20 text-xs font-medium transition-colors cursor-pointer"
-              title={t.newChat}
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>{t.newChat}</span>
-            </button>
           </div>
 
           <div className="relative">
@@ -197,12 +182,6 @@ export const DirectMessagesView: React.FC = () => {
           {filteredConversations.length === 0 && (
             <div className="p-6 text-center text-xs text-neutral-500 space-y-2">
               <p>{t.noMessagesYet}</p>
-              <button
-                onClick={() => setIsNewChatModalOpen(true)}
-                className="text-emerald-400 underline block mx-auto text-xs cursor-pointer"
-              >
-                {t.newChat}
-              </button>
             </div>
           )}
         </div>
@@ -459,12 +438,6 @@ export const DirectMessagesView: React.FC = () => {
             <p className="text-xs text-neutral-400 max-w-sm">
               {t.selectConversationPrompt}
             </p>
-            <button
-              onClick={() => setIsNewChatModalOpen(true)}
-              className="mt-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold cursor-pointer"
-            >
-              {t.newChat}
-            </button>
           </div>
         )}
       </div>
