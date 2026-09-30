@@ -135,46 +135,64 @@ export const CreatePostView: React.FC = () => {
 
       {/* Main Form */}
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Post Type Selector */}
-        <div className="grid grid-cols-3 gap-2 p-1 bg-neutral-900/60 border border-white/5 rounded-2xl">
+        {/* Unified Post Type Selector */}
+        <div className="rounded-2xl border border-white/10 bg-neutral-900/70 p-3 shadow-xl shadow-black/10">
+          <div className="flex items-center justify-between px-1 mb-2.5">
+            <div>
+              <p className="text-xs font-semibold text-neutral-200">{dir === 'rtl' ? 'نوع المنشور' : 'Post format'}</p>
+              <p className="text-[10px] text-neutral-500">{dir === 'rtl' ? 'اختر الصيغة المناسبة لمحتواك' : 'Choose the format that fits your content'}</p>
+            </div>
+            <span className="rounded-full bg-white/5 px-2 py-1 text-[10px] text-neutral-500">3 formats</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <button
             type="button"
             onClick={() => setMediaType('text')}
-            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+            aria-pressed={mediaType === 'text'}
+            className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-start transition-all cursor-pointer ${
               mediaType === 'text'
-                ? 'bg-neutral-800 text-white shadow-sm ring-1 ring-white/10'
-                : 'text-neutral-400 hover:text-white'
+                ? 'bg-emerald-500/10 text-white border-emerald-500/40 shadow-sm'
+                : 'bg-neutral-950/40 text-neutral-400 border-white/5 hover:border-white/15 hover:text-white'
             }`}
           >
-            <FileText className="w-4 h-4 text-emerald-400" />
-            <span>{t.postTypeDiscussion}</span>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10">
+              <FileText className="w-4 h-4 text-emerald-400" />
+            </span>
+            <span className="min-w-0"><span className="block text-xs font-semibold truncate">{t.postTypeDiscussion}</span><span className="block text-[10px] text-neutral-500 mt-0.5">{dir === 'rtl' ? 'فكرة أو سؤال' : 'Ideas & questions'}</span></span>
           </button>
 
           <button
             type="button"
             onClick={() => setMediaType('image')}
-            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+            aria-pressed={mediaType === 'image'}
+            className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-start transition-all cursor-pointer ${
               mediaType === 'image'
-                ? 'bg-neutral-800 text-white shadow-sm ring-1 ring-white/10'
-                : 'text-neutral-400 hover:text-white'
+                ? 'bg-teal-500/10 text-white border-teal-500/40 shadow-sm'
+                : 'bg-neutral-950/40 text-neutral-400 border-white/5 hover:border-white/15 hover:text-white'
             }`}
           >
-            <ImageIcon className="w-4 h-4 text-teal-400" />
-            <span>{t.postTypeImage}</span>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-500/10">
+              <ImageIcon className="w-4 h-4 text-teal-400" />
+            </span>
+            <span className="min-w-0"><span className="block text-xs font-semibold truncate">{t.postTypeImage}</span><span className="block text-[10px] text-neutral-500 mt-0.5">{dir === 'rtl' ? 'صور وأعمال' : 'Visual content'}</span></span>
           </button>
 
           <button
             type="button"
             onClick={() => setMediaType('link')}
-            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+            aria-pressed={mediaType === 'link'}
+            className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-start transition-all cursor-pointer ${
               mediaType === 'link'
-                ? 'bg-neutral-800 text-white shadow-sm ring-1 ring-white/10'
-                : 'text-neutral-400 hover:text-white'
+                ? 'bg-indigo-500/10 text-white border-indigo-500/40 shadow-sm'
+                : 'bg-neutral-950/40 text-neutral-400 border-white/5 hover:border-white/15 hover:text-white'
             }`}
           >
-            <Link2 className="w-4 h-4 text-indigo-400" />
-            <span>{t.postTypeLink}</span>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10">
+              <Link2 className="w-4 h-4 text-indigo-400" />
+            </span>
+            <span className="min-w-0"><span className="block text-xs font-semibold truncate">{t.postTypeLink}</span><span className="block text-[10px] text-neutral-500 mt-0.5">{dir === 'rtl' ? 'مصدر خارجي' : 'External source'}</span></span>
           </button>
+          </div>
         </div>
 
         {/* Form Body Container */}
