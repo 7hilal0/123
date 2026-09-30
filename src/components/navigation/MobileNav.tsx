@@ -7,6 +7,7 @@ export const MobileNav: React.FC = () => {
   const {
     currentUser,
     activeTab,
+    isInsideChat,
     conversations,
     navigateToFeed,
     navigateToSearch,
@@ -16,6 +17,10 @@ export const MobileNav: React.FC = () => {
     setAuthModalOpen,
     t,
   } = useApp();
+
+  if (isInsideChat) {
+    return null;
+  }
 
   const totalUnreadMessages = conversations.reduce((acc, c) => acc + c.unreadCount, 0);
 

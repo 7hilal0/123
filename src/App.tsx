@@ -18,12 +18,16 @@ import { NotificationsView } from './components/notifications/NotificationsView'
 import { SearchView } from './components/search/SearchView';
 
 const MainContent: React.FC = () => {
-  const { activeTab } = useApp();
+  const { activeTab, isInsideChat } = useApp();
 
   return (
     <main
       className={`flex-1 min-w-0 w-full ${
-        activeTab === 'messages' ? 'pb-16 lg:pb-0' : 'pb-24 lg:pb-12'
+        isInsideChat
+          ? 'pb-0'
+          : activeTab === 'messages'
+          ? 'pb-16 lg:pb-0'
+          : 'pb-24 lg:pb-12'
       }`}
     >
       {activeTab === 'feed' && <FeedView />}
@@ -40,7 +44,7 @@ const MainContent: React.FC = () => {
 };
 
 const AppLayout: React.FC = () => {
-  const { dir, settingsModalOpen, setSettingsModalOpen } = useApp();
+  const { dir, settingsModalOpen, setSettingsModalOpen, isInsideChat } = useApp();
 
   return (
     <div
@@ -56,8 +60,8 @@ const AppLayout: React.FC = () => {
         <MainContent />
       </div>
 
-      {/* Mobile Navigation */}
-      <MobileNav />
+      {/* Mobile Navigation - Hidden when inside a conversation with someone */}
+      {!isInsideChat && <MobileNav />}
 
       {/* Modals & Dialogs */}
       <AuthModal />

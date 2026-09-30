@@ -14,11 +14,15 @@ import {
   UserPlus
 } from 'lucide-react';
 import { readImageFile } from '../../utils/fileUpload';
+import { GifPicker } from './GifPicker';
 
 export const DirectMessagesView: React.FC = () => {
   const {
     conversations,
     activeConversationId,
+    setActiveConversationId,
+    isInsideChat,
+    setIsInsideChat,
     selectConversation,
     startConversationWithUser,
     directMessages,
@@ -37,12 +41,23 @@ export const DirectMessagesView: React.FC = () => {
   const [filterQuery, setFilterQuery] = useState('');
   const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [showGifPicker, setShowGifPicker] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeConv = conversations.find((c) => c.id === activeConversationId);
   const activeChatMessages = (activeConversationId && directMessages[activeConversationId]) || [];
+
+  // Sync mobile view with isInsideChat state
+  useEffect(() => {
+    if (activeConv && isInsideChat) {
+      setShowMobileList(false);
+    } else if (!isInsideChat) {
+      setShowMobileList(true);
+    }
+  }, [activeConv, isInsideChat]);
 
   // Scroll to bottom when messages update
   useEffect(() => {
@@ -68,7 +83,7 @@ export const DirectMessagesView: React.FC = () => {
     }
     if (!messageText.trim() && !attachedImage) return;
 
-    sendDirectMessage(messageText.trim() || 'Attached image', attachedImage || undefined);
+    sendDirectMessage(messageText.trim(), attachedImage || undefined);
     setMessageText('');
     setAttachedImage(null);
   };
@@ -83,7 +98,11 @@ export const DirectMessagesView: React.FC = () => {
   const BackIcon = dir === 'rtl' ? ArrowRight : ArrowLeft;
 
   return (
-    <div className="h-[calc(100dvh-4rem-4rem)] lg:h-[calc(100dvh-4rem)] flex overflow-hidden bg-neutral-950 text-start">
+    <div
+      className={`flex overflow-hidden bg-neutral-950 text-start ${
+        isInsideChat ? 'h-[calc(100dvh-4rem)]' : 'h-[calc(100dvh-4rem-4rem)] lg:h-[calc(100dvh-4rem)]'
+      }`}
+    >
       {/* Channels List */}
       <div
         className={`w-full md:w-80 lg:w-96 flex-col border-e border-white/5 bg-neutral-950/60 backdrop-blur-md shrink-0 ${
@@ -136,6 +155,7 @@ export const DirectMessagesView: React.FC = () => {
                 onClick={() => {
                   selectConversation(conv.id);
                   setShowMobileList(false);
+                  setIsInsideChat(true);
                 }}
                 className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all text-start group cursor-pointer ${
                   isSelected
@@ -201,8 +221,13 @@ export const DirectMessagesView: React.FC = () => {
               <div className="flex items-center gap-3">
                 {/* Mobile Back Button */}
                 <button
-                  onClick={() => setShowMobileList(true)}
-                  className="md:hidden p-1.5 text-neutral-400 hover:text-white"
+                  onClick={() => {
+                    setShowMobileList(true);
+                    setIsInsideChat(false);
+                    setActiveConversationId(null);
+                  }}
+                  className="md:hidden p-1.5 text-neutral-400 hover:text-white cursor-pointer"
+                  title={language === 'ar' ? 'رجوع' : 'Back'}
                 >
                   <BackIcon className="w-5 h-5" />
                 </button>
@@ -268,41 +293,63 @@ export const DirectMessagesView: React.FC = () => {
               {/* Message Items */}
               {activeChatMessages.map((msg) => {
                 const isMe = currentUser && msg.senderId === currentUser.id;
+                const authorUser = isMe ? currentUser : activeConv.participant;
+
                 return (
                   <div
                     key={msg.id}
-                    className={`flex items-start gap-2.5 max-w-lg ${
+                    className={`flex items-end gap-2.5 max-w-sm sm:max-w-md ${
                       isMe ? 'ms-auto flex-row-reverse text-end' : 'me-auto text-start'
                     }`}
                   >
-                    {!isMe && (
+                    {/* User Profile Avatar - shown on both sides (sender and receiver) */}
+                    <button
+                      type="button"
+                      onClick={() => navigateToProfile(authorUser.id)}
+                      className="shrink-0 transition-transform hover:scale-105 focus:outline-none cursor-pointer"
+                      title={authorUser.displayName}
+                    >
                       <Avatar
-                        src={activeConv.participant.avatar}
-                        alt={activeConv.participant.displayName}
+                        src={authorUser.avatar}
+                        alt={authorUser.displayName}
                         size="xs"
                       />
-                    )}
+                    </button>
 
-                    <div className="space-y-1">
-                      <div
-                        className={`p-3 rounded-2xl text-xs md:text-sm leading-relaxed ${
-                          isMe
-                            ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white'
-                            : 'bg-neutral-800 text-neutral-100 border border-white/5'
-                        }`}
-                      >
-                        {msg.text}
+                    <div className={`space-y-1.5 flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                      {/* Attached Image or Animated GIF */}
+                      {msg.mediaUrl && (
+                        <div
+                          onClick={() => setPreviewImage(msg.mediaUrl || null)}
+                          className="rounded-2xl overflow-hidden border border-white/10 bg-neutral-900 shadow-md cursor-pointer hover:border-white/25 transition-all max-w-[260px] sm:max-w-[320px] relative group"
+                          title={language === 'ar' ? 'انقر لعرض الصورة بالحجم الكامل' : 'Click to view full image'}
+                        >
+                          <img
+                            src={msg.mediaUrl}
+                            alt="Attached"
+                            className="w-full h-auto max-h-[420px] object-contain block bg-neutral-950/70"
+                          />
+                          {(msg.mediaUrl.toLowerCase().includes('.gif') || msg.mediaUrl.toLowerCase().includes('giphy')) && (
+                            <span className="absolute bottom-2 start-2 px-1.5 py-0.5 rounded-md bg-black/75 backdrop-blur-md border border-white/20 text-[10px] font-mono font-bold text-emerald-400 tracking-wider pointer-events-none select-none">
+                              GIF
+                            </span>
+                          )}
+                        </div>
+                      )}
 
-                        {msg.mediaUrl && (
-                          <div className="mt-2 rounded-xl overflow-hidden max-h-60 bg-black/30">
-                            <img
-                              src={msg.mediaUrl}
-                              alt="Attached"
-                              className="w-full h-auto object-cover"
-                            />
-                          </div>
-                        )}
-                      </div>
+                      {/* Text Bubble: Only rendered if there is text */}
+                      {msg.text && (
+                        <div
+                          className={`px-3.5 py-2 rounded-2xl text-xs md:text-sm leading-relaxed max-w-xs sm:max-w-sm break-words ${
+                            isMe
+                              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm'
+                              : 'bg-neutral-800 text-neutral-100 border border-white/5'
+                          }`}
+                        >
+                          {msg.text}
+                        </div>
+                      )}
+
                       <span className="text-[10px] text-neutral-500 font-mono block px-1">
                         {msg.timestamp}
                       </span>
@@ -320,22 +367,37 @@ export const DirectMessagesView: React.FC = () => {
                   <img
                     src={attachedImage}
                     alt="Attach"
-                    className="w-10 h-10 rounded-lg object-cover border border-white/10"
+                    className="w-10 h-10 rounded-lg object-contain bg-neutral-950 border border-white/10"
                   />
-                  <span className="text-xs text-neutral-300">Ready to send image</span>
+                  <span className="text-xs text-neutral-300">
+                    {language === 'ar' ? 'الصورة جاهزة للإرسال' : 'Ready to send image'}
+                  </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setAttachedImage(null)}
-                  className="p-1 rounded-full text-neutral-400 hover:text-white"
+                  className="p-1 rounded-full text-neutral-400 hover:text-white cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             )}
 
+            {/* GIF Picker Popover / Drawer */}
+            {showGifPicker && (
+              <div className="p-3 border-t border-white/5 bg-neutral-950/95 flex justify-center">
+                <GifPicker
+                  onSelectGif={(gifUrl) => {
+                    sendDirectMessage('', gifUrl);
+                    setShowGifPicker(false);
+                  }}
+                  onClose={() => setShowGifPicker(false)}
+                />
+              </div>
+            )}
+
             {/* Input Bar */}
-            <div className="p-3 md:p-4 border-t border-white/5 bg-neutral-950/60">
+            <div className="p-3 md:p-4 border-t border-white/5 bg-neutral-950/60 pb-safe">
               <form onSubmit={handleSendMessage} className="flex items-center gap-2">
                 <input
                   ref={fileInputRef}
@@ -351,6 +413,20 @@ export const DirectMessagesView: React.FC = () => {
                   title={t.attachImage}
                 >
                   <ImageIcon className="w-5 h-5" />
+                </button>
+
+                {/* GIF Picker Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowGifPicker(!showGifPicker)}
+                  className={`px-2.5 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer ${
+                    showGifPicker
+                      ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/30'
+                      : 'bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white border-white/10'
+                  }`}
+                  title={language === 'ar' ? 'إرسال صورة متحركة GIF' : 'Send animated GIF'}
+                >
+                  GIF
                 </button>
 
                 <input
@@ -451,6 +527,29 @@ export const DirectMessagesView: React.FC = () => {
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Full-Screen Image Lightbox Modal */}
+      {previewImage && (
+        <div
+          onClick={() => setPreviewImage(null)}
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer animate-in fade-in"
+        >
+          <button
+            type="button"
+            onClick={() => setPreviewImage(null)}
+            className="absolute top-4 end-4 p-2.5 rounded-full bg-neutral-900/80 hover:bg-neutral-800 text-white border border-white/10 transition-colors cursor-pointer"
+            title={language === 'ar' ? 'إغلاق' : 'Close'}
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img
+            src={previewImage}
+            alt="Full Preview"
+            className="max-w-[95vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>

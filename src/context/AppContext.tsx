@@ -97,6 +97,9 @@ interface AppContextType {
   createCommunity: (name: string, description: string, category: string, iconUrl?: string, bannerUrl?: string) => void;
 
   // Messaging
+  isInsideChat: boolean;
+  setIsInsideChat: (val: boolean) => void;
+  setActiveConversationId: (id: string | null) => void;
   selectConversation: (conversationId: string) => void;
   startConversationWithUser: (targetUserId: string) => void;
   sendDirectMessage: (text: string, mediaUrl?: string) => void;
@@ -177,10 +180,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [communities, setCommunities] = useState<Community[]>(() => storage.getCommunities());
   const [comments, setComments] = useState<Record<string, Comment[]>>(() => storage.getComments());
   const [conversations, setConversations] = useState<Conversation[]>(() => storage.getConversations());
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(() => {
-    const convs = storage.getConversations();
-    return convs.length > 0 ? convs[0].id : null;
-  });
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [isInsideChat, setIsInsideChat] = useState<boolean>(false);
   const [directMessages, setDirectMessages] = useState<Record<string, DirectMessage[]>>(() => storage.getDirectMessages());
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => storage.getNotifications());
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'connected' | 'syncing' | 'offline'>('connected');
@@ -371,6 +372,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSelectedCommunitySlug(null);
     setSelectedPostId(null);
     setSelectedUserId(null);
+    setIsInsideChat(false);
     setActiveTab('feed');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -379,12 +381,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSelectedCommunitySlug(slug);
     setSelectedPostId(null);
     setSelectedUserId(null);
+    setIsInsideChat(false);
     setActiveTab('community-detail');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const navigateToPost = (postId: string) => {
     setSelectedPostId(postId);
+    setIsInsideChat(false);
     setActiveTab('post-detail');
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -417,6 +421,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSelectedUserId(userId);
     setSelectedPostId(null);
     setSelectedCommunitySlug(null);
+    setIsInsideChat(false);
     setActiveTab('profile');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -432,9 +437,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       if (existingConv) {
         setActiveConversationId(existingConv.id);
+        setIsInsideChat(true);
       } else {
         startConversationWithUser(userIdOrConvId);
       }
+    } else {
+      setIsInsideChat(false);
     }
   };
 
@@ -442,15 +450,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (communitySlug) {
       setSelectedCommunitySlug(communitySlug);
     }
+    setIsInsideChat(false);
     setActiveTab('create');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const navigateToNotifications = () => {
+    setIsInsideChat(false);
     setActiveTab('notifications');
   };
 
   const navigateToSearch = (query?: string) => {
+    setIsInsideChat(false);
     if (query !== undefined) {
       setSearchQuery(query);
     }
@@ -941,6 +952,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Messaging
   const selectConversation = (conversationId: string) => {
     setActiveConversationId(conversationId);
+    setIsInsideChat(true);
     setConversations((prev) =>
       prev.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c))
     );
@@ -974,6 +986,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
     if (existingConv) {
       setActiveConversationId(existingConv.id);
+      setIsInsideChat(true);
       setActiveTab('messages');
       return;
     }
@@ -1004,6 +1017,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await firebaseSync.saveConversation(newConv);
 
     setActiveConversationId(convId);
+    setIsInsideChat(true);
     setActiveTab('messages');
   };
 
@@ -1047,11 +1061,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       [otherUser.id]: otherUser,
     };
 
+    const displayLastMessage = text.trim() || (mediaUrl ? (language === 'ar' ? '📷 صورة' : '📷 Photo') : '');
+
     const updatedConv: Conversation = {
       ...currentConv,
       participantIds,
       participants,
-      lastMessage: text,
+      lastMessage: displayLastMessage,
       lastMessageTime: formattedTime,
       lastMessageTimestamp: now,
       lastSenderId: currentUser.id,
@@ -1359,6 +1375,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         leaveCommunity,
         createCommunity,
 
+        isInsideChat,
+        setIsInsideChat,
+        setActiveConversationId,
         selectConversation,
         startConversationWithUser,
         sendDirectMessage,
