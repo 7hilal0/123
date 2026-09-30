@@ -17,8 +17,6 @@ import { firebaseSync } from '../services/firebaseSync';
 import { DEFAULT_USER_AVATAR } from '../utils/avatarConstants';
 import { resolvePostForUser, resolveCommentForUser } from '../utils/voting';
 import { resolveConversationForUser } from '../utils/conversationUtils';
-import { auth } from '../lib/firebase';
-import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
 export interface ToastMessage {
   id: string;
@@ -118,8 +116,8 @@ interface AppContextType {
   unreadCount: number;
 
   // Auth
-  login: (usernameOrEmail: string, password: string) => Promise<boolean>;
-  register: (username: string, displayName: string, email: string, password: string, avatarUrl?: string) => Promise<boolean>;
+  login: (usernameOrEmail: string, password?: string) => boolean;
+  register: (username: string, displayName: string, email: string, password?: string, avatarUrl?: string) => boolean;
   logout: () => void;
   switchUser: (userId: string) => void;
 
@@ -253,18 +251,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
   const [editProfileModalOpen, setEditProfileModalOpen] = useState<boolean>(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState<boolean>(false);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (!firebaseUser) {
-        setCurrentUser(null);
-        return;
-      }
-      const profile = users.find((u) => u.id === firebaseUser.uid);
-      if (profile) setCurrentUser({ ...profile, email: firebaseUser.email || profile.email });
-    });
-    return unsubscribe;
-  }, [users]);
 
   // --- Real-time Cloud Synchronization (Firestore) ---
   useEffect(() => {
@@ -1209,104 +1195,108 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  // Firebase Authentication keeps passwords out of Firestore and localStorage.
-  const login = async (usernameOrEmail: string, password: string): Promise<boolean> => {
+  // Real Authentication
+  const login = (usernameOrEmail: string, password?: string): boolean => {
     const term = usernameOrEmail.trim().toLowerCase();
     const existing = users.find(
       (u) => u.username.toLowerCase() === term || (u.email && u.email.toLowerCase() === term)
     );
-    const email = existing?.email || (term.includes('@') ? term : '');
 
-    if (!email || !password) {
-      showToast(language === 'ar' ? 'أدخل البريد وكلمة المرور' : language === 'fr' ? 'Saisissez votre e-mail et votre mot de passe' : 'Enter your email and password', 'warning');
+    if (!existing) {
+      showToast(
+        language === 'ar' ? 'اسم المستخدم أو البريد غير مسجل!' : 'Username or email not registered!',
+        'warning'
+      );
       return false;
     }
 
-    try {
-      const credential = await signInWithEmailAndPassword(auth, email, password);
-      const profile = users.find((u) => u.id === credential.user.uid) || existing;
-      if (!profile) {
-        showToast(language === 'ar' ? 'لم يتم العثور على ملف الحساب' : 'Account profile was not found', 'warning');
-        return false;
-      }
-      setCurrentUser({ ...profile, id: credential.user.uid, email: credential.user.email || profile.email });
-      setAuthModalOpenState(false);
-      showToast(language === 'ar' ? `مرحباً بعودتك، ${profile.displayName}!` : language === 'fr' ? `Bon retour, ${profile.displayName} !` : `Welcome back, ${profile.displayName}!`, 'success');
-      return true;
-    } catch (error: any) {
-      const message = error?.code === 'auth/invalid-credential' || error?.code === 'auth/wrong-password'
-        ? (language === 'ar' ? 'البريد أو كلمة المرور غير صحيحة' : language === 'fr' ? 'E-mail ou mot de passe incorrect' : 'Incorrect email or password')
-        : (language === 'ar' ? 'تعذر تسجيل الدخول. تأكد من بياناتك.' : language === 'fr' ? 'Connexion impossible. Vérifiez vos données.' : 'Could not sign in. Check your details.');
-      showToast(message, 'warning');
+    if (password && existing.password && existing.password !== password) {
+      showToast(
+        language === 'ar' ? 'كلمة المرور غير صحيحة' : 'Incorrect password, please try again',
+        'warning'
+      );
       return false;
     }
+
+    setCurrentUser(existing);
+    setAuthModalOpenState(false);
+    showToast(
+      language === 'ar' ? `مرحباً بعودتك، ${existing.displayName}! 👋` : `Welcome back, ${existing.displayName}! 👋`,
+      'success'
+    );
+    return true;
   };
 
-  const register = async (
+  const register = (
     username: string,
     displayName: string,
     email: string,
-    password: string,
+    password = 'password123',
     avatarUrl?: string
-  ): Promise<boolean> => {
+  ): boolean => {
     const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
-    const cleanEmail = email.trim().toLowerCase();
 
     if (cleanUsername.length < 3) {
-      showToast(language === 'ar' ? 'اسم المستخدم يجب أن يحتوي على 3 أحرف على الأقل' : 'Username must contain at least 3 characters', 'warning');
-      return false;
-    }
-    if (!cleanEmail || password.length < 6) {
-      showToast(language === 'ar' ? 'أدخل بريداً صحيحاً وكلمة مرور من 6 أحرف على الأقل' : language === 'fr' ? 'E-mail valide et mot de passe de 6 caractères minimum requis' : 'A valid email and a password of at least 6 characters are required', 'warning');
-      return false;
-    }
-    if (users.some((u) => u.username.toLowerCase() === cleanUsername)) {
-      showToast(language === 'ar' ? 'اسم المستخدم مستخدم بالفعل' : 'Username is already taken', 'warning');
-      return false;
-    }
-    if (users.some((u) => u.email && u.email.toLowerCase() === cleanEmail)) {
-      showToast(language === 'ar' ? 'البريد الإلكتروني مسجل مسبقاً' : 'Email is already registered', 'warning');
+      showToast(
+        language === 'ar' ? 'اسم المستخدم يجب أن يحتوي على 3 أحرف على الأقل' : 'Username must contain at least 3 characters',
+        'warning'
+      );
       return false;
     }
 
-    try {
-      const credential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
-      const newUser: User = {
-        id: credential.user.uid,
-        username: cleanUsername,
-        displayName: displayName.trim() || cleanUsername,
-        email: cleanEmail,
-        avatar: avatarUrl || DEFAULT_USER_AVATAR,
-        banner: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
-        bio: '',
-        status: 'online',
-        customStatus: '',
-        badges: [language === 'ar' ? 'عضو' : language === 'fr' ? 'Membre' : 'Member'],
-        karma: 0,
-        joinedDate: language === 'ar' ? 'انضم اليوم' : language === 'fr' ? "Aujourd’hui" : 'Joined today',
-        followersCount: 0,
-        followingCount: 0,
-        isFollowing: false,
-      };
-      setUsers((prev) => [newUser, ...prev]);
-      setCurrentUser(newUser);
-      await firebaseSync.saveUser(newUser);
-      setAuthModalOpenState(false);
-      showToast(language === 'ar' ? `أهلاً بك في DZCORE، ${newUser.displayName}!` : language === 'fr' ? `Bienvenue sur DZCORE, ${newUser.displayName} !` : `Welcome to DZCORE, ${newUser.displayName}!`, 'success');
-      return true;
-    } catch (error: any) {
-      const message = error?.code === 'auth/email-already-in-use'
-        ? (language === 'ar' ? 'البريد الإلكتروني مستخدم بالفعل' : 'Email is already in use')
-        : (language === 'ar' ? 'تعذر إنشاء الحساب. تحقق من البريد وكلمة المرور.' : 'Could not create the account. Check the email and password.');
-      showToast(message, 'warning');
+    if (users.some((u) => u.username.toLowerCase() === cleanUsername)) {
+      showToast(
+        language === 'ar' ? 'اسم المستخدم مستخدم بالفعل' : 'Username is already taken, choose another',
+        'warning'
+      );
       return false;
     }
+
+    if (email && users.some((u) => u.email && u.email.toLowerCase() === email.trim().toLowerCase())) {
+      showToast(
+        language === 'ar' ? 'البريد الإلكتروني مسجل مسبقاً' : 'Email is already registered with another account',
+        'warning'
+      );
+      return false;
+    }
+
+    const newUser: User = {
+      id: `user_${Date.now()}`,
+      username: cleanUsername,
+      displayName: displayName.trim() || cleanUsername,
+      email: email.trim(),
+      password,
+      avatar: avatarUrl || DEFAULT_USER_AVATAR,
+      banner:
+        'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+      bio: '',
+      status: 'online',
+      customStatus: '',
+      badges: [language === 'ar' ? 'عضو موثق' : 'Member'],
+      karma: 10,
+      joinedDate: language === 'ar' ? 'انضم اليوم' : 'Joined today',
+      followersCount: 0,
+      followingCount: 0,
+      isFollowing: false,
+    };
+
+    setUsers((prev) => [newUser, ...prev]);
+    setCurrentUser(newUser);
+
+    // Save user to cloud database
+    firebaseSync.saveUser(newUser);
+
+    setAuthModalOpenState(false);
+    showToast(
+      language === 'ar' ? `أهلاً بك في DZCORE، ${newUser.displayName}! 🎉` : `Welcome to DZCORE, ${newUser.displayName}! 🎉`,
+      'success'
+    );
+    return true;
   };
 
-  const logout = async () => {
-    await signOut(auth).catch(() => {});
+  const logout = () => {
     setCurrentUser(null);
-    showToast(language === 'ar' ? 'تم تسجيل الخروج بنجاح' : language === 'fr' ? 'Déconnexion réussie' : 'Signed out successfully', 'info');
+    showToast(language === 'ar' ? 'تم تسجيل الخروج بنجاح' : 'Signed out successfully', 'info');
   };
 
   const switchUser = (userId: string) => {
