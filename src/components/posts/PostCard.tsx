@@ -42,6 +42,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
 
   const [imageError, setImageError] = useState(false);
   const netScore = post.upvotes - post.downvotes;
+  const activeVote = currentUser ? (post.votes?.[currentUser.id] ?? null) : null;
 
   const postCommentsList = comments[post.id];
   const displayCommentCount =
@@ -78,20 +79,20 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
           <button
             onClick={() => upvotePost(post.id)}
             className={`p-1.5 rounded-lg transition-colors min-h-[32px] min-w-[32px] flex items-center justify-center cursor-pointer ${
-              post.userVote === 1
+              activeVote === 1
                 ? 'text-emerald-500 bg-emerald-500/10'
                 : 'text-neutral-400 hover:text-emerald-400 hover:bg-white/5'
             }`}
             title={t.upvote}
             aria-label={t.upvote}
           >
-            <ArrowBigUp className={`w-5 h-5 ${post.userVote === 1 ? 'fill-current' : ''}`} />
+            <ArrowBigUp className={`w-5 h-5 ${activeVote === 1 ? 'fill-current' : ''}`} />
           </button>
           <span
             className={`text-xs font-mono font-bold my-0.5 tabular-nums ${
-              post.userVote === 1
+              activeVote === 1
                 ? 'text-emerald-400'
-                : post.userVote === -1
+                : activeVote === -1
                 ? 'text-rose-400'
                 : 'text-neutral-300'
             }`}
@@ -102,14 +103,14 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
           <button
             onClick={() => downvotePost(post.id)}
             className={`p-1.5 rounded-lg transition-colors min-h-[32px] min-w-[32px] flex items-center justify-center cursor-pointer ${
-              post.userVote === -1
+              activeVote === -1
                 ? 'text-rose-400 bg-rose-500/10'
                 : 'text-neutral-400 hover:text-rose-400 hover:bg-white/5'
             }`}
             title={t.downvote}
             aria-label={t.downvote}
           >
-            <ArrowBigDown className={`w-5 h-5 ${post.userVote === -1 ? 'fill-current' : ''}`} />
+            <ArrowBigDown className={`w-5 h-5 ${activeVote === -1 ? 'fill-current' : ''}`} />
           </button>
         </div>
 
@@ -230,19 +231,19 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
               <button
                 onClick={() => upvotePost(post.id)}
                 className={`p-1.5 rounded min-h-[36px] min-w-[36px] flex items-center justify-center ${
-                  post.userVote === 1 ? 'text-emerald-500' : 'text-neutral-400'
+                  activeVote === 1 ? 'text-emerald-500' : 'text-neutral-400'
                 }`}
               >
-                <ArrowBigUp className={`w-4 h-4 ${post.userVote === 1 ? 'fill-current' : ''}`} />
+                <ArrowBigUp className={`w-4 h-4 ${activeVote === 1 ? 'fill-current' : ''}`} />
               </button>
               <span className="text-xs font-mono font-bold px-1 tabular-nums">{netScore}</span>
               <button
                 onClick={() => downvotePost(post.id)}
                 className={`p-1.5 rounded min-h-[36px] min-w-[36px] flex items-center justify-center ${
-                  post.userVote === -1 ? 'text-rose-400' : 'text-neutral-400'
+                  activeVote === -1 ? 'text-rose-400' : 'text-neutral-400'
                 }`}
               >
-                <ArrowBigDown className={`w-4 h-4 ${post.userVote === -1 ? 'fill-current' : ''}`} />
+                <ArrowBigDown className={`w-4 h-4 ${activeVote === -1 ? 'fill-current' : ''}`} />
               </button>
             </div>
 
