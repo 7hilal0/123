@@ -1242,9 +1242,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       avatar: avatarUrl || DEFAULT_USER_AVATAR,
       banner:
         'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
-      bio: language === 'ar' ? 'عضو جديد في مجتمع DZCORE 🚀' : 'New member of DZCORE community 🚀',
+      bio: '',
       status: 'online',
-      customStatus: language === 'ar' ? 'مرحباً بالجميع في DZCORE!' : 'Excited to be on DZCORE!',
+      customStatus: '',
       badges: [language === 'ar' ? 'عضو موثق' : 'Member'],
       karma: 10,
       joinedDate: language === 'ar' ? 'انضم اليوم' : 'Joined today',
