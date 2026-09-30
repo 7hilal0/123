@@ -1154,12 +1154,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             followersCount: nextFollowing ? u.followersCount + 1 : Math.max(0, u.followersCount - 1),
           };
           firebaseSync.saveUser(updated);
-          showToast(
-            nextFollowing
-              ? (language === 'ar' ? `تابعت الآن @${u.username}` : `Following @${u.username}`)
-              : (language === 'ar' ? `ألغيت متابعة @${u.username}` : `Unfollowed @${u.username}`),
-            'info'
-          );
           return updated;
         }
         return u;
