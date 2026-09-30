@@ -71,7 +71,6 @@ export const SearchView: React.FC = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t.searchPlaceholder}
             className="w-full h-12 ps-12 pe-10 rounded-2xl bg-neutral-900 border border-white/10 text-sm text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-lg shadow-black/20 text-start"
-            autoFocus
           />
           {searchQuery && (
             <button

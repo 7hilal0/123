@@ -176,6 +176,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedCommunitySlug, setSelectedCommunitySlug] = useState<string | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const historyInitializedRef = useRef(false);
+  const restoringHistoryRef = useRef(false);
 
   const [posts, setPosts] = useState<Post[]>(() => {
     const raw = storage.getPosts();
@@ -255,6 +257,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
   const [editProfileModalOpen, setEditProfileModalOpen] = useState<boolean>(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState<boolean>(false);
+
+  // Keep the browser Back button inside the SPA instead of leaving the app or
+  // resetting the user to the feed.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const snapshot = {
+      dzcore: true,
+      activeTab,
+      feedSort,
+      selectedCommunitySlug,
+      selectedPostId,
+      selectedUserId,
+      isInsideChat,
+      activeConversationId,
+    };
+
+    if (!historyInitializedRef.current) {
+      window.history.replaceState(snapshot, '', window.location.href);
+      historyInitializedRef.current = true;
+      return;
+    }
+
+    if (restoringHistoryRef.current) {
+      restoringHistoryRef.current = false;
+      return;
+    }
+
+    window.history.pushState(snapshot, '', window.location.href);
+  }, [activeTab, feedSort, selectedCommunitySlug, selectedPostId, selectedUserId, isInsideChat, activeConversationId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const restoreFromHistory = (event: PopStateEvent) => {
+      const state = event.state;
+      if (!state?.dzcore) return;
+      restoringHistoryRef.current = true;
+      setActiveTab(state.activeTab || 'feed');
+      setFeedSort(state.feedSort || 'hot');
+      setSelectedCommunitySlug(state.selectedCommunitySlug ?? null);
+      setSelectedPostId(state.selectedPostId ?? null);
+      setSelectedUserId(state.selectedUserId ?? null);
+      setIsInsideChat(Boolean(state.isInsideChat));
+      setActiveConversationId(state.activeConversationId ?? null);
+    };
+    window.addEventListener('popstate', restoreFromHistory);
+    return () => window.removeEventListener('popstate', restoreFromHistory);
+  }, []);
 
   // --- Real-time Cloud Synchronization (Firestore) ---
   useEffect(() => {
