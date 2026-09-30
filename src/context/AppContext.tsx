@@ -15,6 +15,8 @@ import { storage } from '../utils/storage';
 import { translations, Language, Translations } from '../locales/translations';
 import { firebaseSync } from '../services/firebaseSync';
 import { DEFAULT_USER_AVATAR } from '../utils/avatarConstants';
+import { resolvePostForUser, resolveCommentForUser } from '../utils/voting';
+import { resolveConversationForUser } from '../utils/conversationUtils';
 
 export interface ToastMessage {
   id: string;
@@ -132,7 +134,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return 'en';
   });
 
-  const dir: 'ltr' | 'rtl' = language === 'ar' ? 'rtl' : 'ltr';
+  // Keep layout orientation fixed to LTR so the entire interface does not flip/mirror when switching to Arabic
+  const dir: 'ltr' | 'rtl' = 'ltr';
   const t: Translations = translations[language];
 
   const setLanguage = (newLang: Language) => {
@@ -140,7 +143,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (typeof window !== 'undefined') {
       localStorage.setItem('nova_primary_language', newLang);
       document.documentElement.lang = newLang;
-      document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
+      document.documentElement.dir = 'ltr';
     }
     showToast(newLang === 'en' ? 'Language switched to English' : 'تم تغيير اللغة إلى العربية', 'success');
   };
@@ -148,9 +151,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       document.documentElement.lang = language;
-      document.documentElement.dir = dir;
+      document.documentElement.dir = 'ltr';
     }
-  }, [language, dir]);
+  }, [language]);
 
   // Initial data loaded from storage (with cloud sync)
   const [users, setUsers] = useState<User[]>(() => storage.getUsers());
@@ -166,7 +169,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
-  const [posts, setPosts] = useState<Post[]>(() => storage.getPosts());
+  const [posts, setPosts] = useState<Post[]>(() => {
+    const raw = storage.getPosts();
+    const currentId = storage.getCurrentUserId();
+    return raw.map((p) => resolvePostForUser(p, currentId));
+  });
   const [communities, setCommunities] = useState<Community[]>(() => storage.getCommunities());
   const [comments, setComments] = useState<Record<string, Comment[]>>(() => storage.getComments());
   const [conversations, setConversations] = useState<Conversation[]>(() => storage.getConversations());
@@ -180,6 +187,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Keeps optimistic deletions out of a stale Firestore snapshot while the delete request settles.
   const deletedPostIdsRef = useRef<Set<string>>(new Set());
   const deletedCommentIdsRef = useRef<Set<string>>(new Set());
+
+  // Dynamically re-resolve personal vote highlights whenever the active user changes
+  useEffect(() => {
+    setPosts((prev) => prev.map((p) => resolvePostForUser(p, currentUser?.id)));
+    setComments((prev) => {
+      const updated: Record<string, Comment[]> = {};
+      for (const [postId, list] of Object.entries(prev)) {
+        updated[postId] = list.map((c) => resolveCommentForUser(c, currentUser?.id));
+      }
+      return updated;
+    });
+  }, [currentUser?.id]);
+
+  // --- Real-time Cloud Conversations Subscription ---
+  useEffect(() => {
+    if (!currentUser?.id) {
+      setConversations([]);
+      setActiveConversationId(null);
+      return;
+    }
+
+    const unsubConvs = firebaseSync.subscribeConversations(currentUser.id, (remoteConvs) => {
+      const resolved = remoteConvs.map((c) => resolveConversationForUser(c, currentUser, users));
+      resolved.sort((a, b) => (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0));
+      setConversations(resolved);
+
+      setActiveConversationId((currentActive) => {
+        if (!currentActive && resolved.length > 0) {
+          return resolved[0].id;
+        }
+        return currentActive;
+      });
+    });
+
+    return () => {
+      unsubConvs();
+    };
+  }, [currentUser?.id, users]);
+
+  // --- Real-time Cloud Direct Messages Subscription for Active Conversation ---
+  useEffect(() => {
+    if (!activeConversationId) return;
+
+    const unsubMsgs = firebaseSync.subscribeMessages(activeConversationId, (remoteMsgs) => {
+      setDirectMessages((prev) => ({
+        ...prev,
+        [activeConversationId]: remoteMsgs,
+      }));
+    });
+
+    return () => {
+      unsubMsgs();
+    };
+  }, [activeConversationId]);
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -200,12 +261,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (remotePosts) {
         setPosts((local) => {
           const remoteIds = new Set(remotePosts.map((p) => p.id));
-          const cleanRemote = remotePosts.filter(
-            (p) => p.id !== 'post_official_welcome' && !p.deleted && !deletedPostIdsRef.current.has(p.id)
-          );
-          const localOnly = local.filter(
-            (p) => !remoteIds.has(p.id) && p.id !== 'post_official_welcome' && !deletedPostIdsRef.current.has(p.id)
-          );
+          const cleanRemote = remotePosts
+            .filter(
+              (p) => p.id !== 'post_official_welcome' && !p.deleted && !deletedPostIdsRef.current.has(p.id)
+            )
+            .map((p) => resolvePostForUser(p, currentUser?.id));
+
+          const localOnly = local
+            .filter(
+              (p) => !remoteIds.has(p.id) && p.id !== 'post_official_welcome' && !deletedPostIdsRef.current.has(p.id)
+            )
+            .map((p) => resolvePostForUser(p, currentUser?.id));
 
           // Immediately sync any local posts that are not yet on Firestore so everyone can see them
           for (const lp of localOnly) {
@@ -226,13 +292,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubPosts = firebaseSync.subscribePosts((remotePosts) => {
       if (remotePosts) {
         const remoteIds = new Set(remotePosts.map((p) => p.id));
-        const cleanRemote = remotePosts.filter(
-          (p) => p.id !== 'post_official_welcome' && !p.deleted && !deletedPostIdsRef.current.has(p.id)
-        );
+        const cleanRemote = remotePosts
+          .filter(
+            (p) => p.id !== 'post_official_welcome' && !p.deleted && !deletedPostIdsRef.current.has(p.id)
+          )
+          .map((p) => resolvePostForUser(p, currentUser?.id));
+
         setPosts((currentLocal) => {
-          const localPending = currentLocal.filter(
-            (p) => !remoteIds.has(p.id) && p.id !== 'post_official_welcome' && !deletedPostIdsRef.current.has(p.id)
-          );
+          const localPending = currentLocal
+            .filter(
+              (p) => !remoteIds.has(p.id) && p.id !== 'post_official_welcome' && !deletedPostIdsRef.current.has(p.id)
+            )
+            .map((p) => resolvePostForUser(p, currentUser?.id));
           return [...cleanRemote, ...localPending];
         });
       }
@@ -319,10 +390,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Sync remote comments for this post
     firebaseSync.fetchComments(postId).then((remoteComments) => {
-      const cleanRemote = remoteComments.filter((comment) => !deletedCommentIdsRef.current.has(comment.id));
+      const cleanRemote = remoteComments
+        .filter((comment) => !deletedCommentIdsRef.current.has(comment.id))
+        .map((comment) => resolveCommentForUser(comment, currentUser?.id));
       // Firestore is authoritative after a refresh. Do not merge stale localStorage
       // comments back into the post, otherwise another device can see deleted data.
       setComments((prev) => ({ ...prev, [postId]: cleanRemote }));
+
+      // Keep post.commentCount in exact alignment with actual existing comments
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.id === postId && p.commentCount !== cleanRemote.length) {
+            const updated = { ...p, commentCount: cleanRemote.length };
+            firebaseSync.savePost(updated);
+            return updated;
+          }
+          return p;
+        })
+      );
     }).catch(() => {
       // Keep the current local view only when the cloud request genuinely fails.
     });
@@ -379,18 +464,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
+    const userId = currentUser.id;
+
     setPosts((prevPosts) =>
       prevPosts.map((p) => {
         if (p.id !== postId) return p;
 
-        let updated: Post;
-        if (p.userVote === 1) {
-          updated = { ...p, upvotes: p.upvotes - 1, userVote: null };
-        } else if (p.userVote === -1) {
-          updated = { ...p, upvotes: p.upvotes + 1, downvotes: p.downvotes - 1, userVote: 1 };
+        const currentVotes: Record<string, 1 | -1> = { ...(p.votes || {}) };
+        const myCurrentVote = currentVotes[userId] ?? (p.userVote === 1 ? 1 : p.userVote === -1 ? -1 : null);
+
+        if (myCurrentVote === 1) {
+          // Toggle off like
+          delete currentVotes[userId];
         } else {
-          updated = { ...p, upvotes: p.upvotes + 1, userVote: 1 };
+          // Add upvote
+          currentVotes[userId] = 1;
         }
+
+        const upvotes = Object.values(currentVotes).filter((v) => v === 1).length;
+        const downvotes = Object.values(currentVotes).filter((v) => v === -1).length;
+        const nextUserVote: 1 | -1 | null = currentVotes[userId] ?? null;
+
+        const updated: Post = {
+          ...p,
+          votes: currentVotes,
+          upvotes,
+          downvotes,
+          userVote: nextUserVote,
+        };
+
         firebaseSync.savePost(updated);
         return updated;
       })
@@ -403,18 +505,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
+    const userId = currentUser.id;
+
     setPosts((prevPosts) =>
       prevPosts.map((p) => {
         if (p.id !== postId) return p;
 
-        let updated: Post;
-        if (p.userVote === -1) {
-          updated = { ...p, downvotes: p.downvotes - 1, userVote: null };
-        } else if (p.userVote === 1) {
-          updated = { ...p, downvotes: p.downvotes + 1, upvotes: p.upvotes - 1, userVote: -1 };
+        const currentVotes: Record<string, 1 | -1> = { ...(p.votes || {}) };
+        const myCurrentVote = currentVotes[userId] ?? (p.userVote === 1 ? 1 : p.userVote === -1 ? -1 : null);
+
+        if (myCurrentVote === -1) {
+          // Toggle off downvote
+          delete currentVotes[userId];
         } else {
-          updated = { ...p, downvotes: p.downvotes + 1, userVote: -1 };
+          // Add downvote
+          currentVotes[userId] = -1;
         }
+
+        const upvotes = Object.values(currentVotes).filter((v) => v === 1).length;
+        const downvotes = Object.values(currentVotes).filter((v) => v === -1).length;
+        const nextUserVote: 1 | -1 | null = currentVotes[userId] ?? null;
+
+        const updated: Post = {
+          ...p,
+          votes: currentVotes,
+          upvotes,
+          downvotes,
+          userVote: nextUserVote,
+        };
+
         firebaseSync.savePost(updated);
         return updated;
       })
@@ -491,9 +610,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       mediaType: postData.mediaType,
       mediaUrl: postData.mediaUrl || '',
       linkUrl: postData.linkUrl || '',
-      upvotes: 1,
+      upvotes: 0,
       downvotes: 0,
-      userVote: 1,
+      userVote: null,
+      votes: {},
       commentCount: 0,
       createdAt: language === 'ar' ? 'الآن' : 'Just now',
       timestamp: now,
@@ -554,9 +674,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       content,
       createdAt: language === 'ar' ? 'الآن' : 'Just now',
       timestamp: commentNow,
-      upvotes: 1,
+      upvotes: 0,
       downvotes: 0,
-      userVote: 1,
+      userVote: null,
+      votes: {},
       parentId,
       replies: [],
     };
@@ -642,7 +763,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPosts((prev) =>
       prev.map((p) => {
         if (p.id === postId) {
-          const updated = { ...p, commentCount: Math.max(0, p.commentCount - removedCount) };
+          const updated = { ...p, commentCount: Math.max(0, nextComments.length) };
           firebaseSync.savePost(updated);
           return updated;
         }
@@ -674,17 +795,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
+    const userId = currentUser.id;
+
     setComments((prev) => {
       const existing = prev[postId] || [];
       const updateVote = (list: Comment[]): Comment[] => {
         return list.map((c) => {
           if (c.id === commentId) {
-            const nextVote: 1 | null = c.userVote === 1 ? null : 1;
-            const upvoteDelta = c.userVote === 1 ? -1 : 1;
+            const currentVotes: Record<string, 1 | -1> = { ...(c.votes || {}) };
+            const myVote = currentVotes[userId] ?? (c.userVote === 1 ? 1 : c.userVote === -1 ? -1 : null);
+
+            if (myVote === 1) {
+              delete currentVotes[userId];
+            } else {
+              currentVotes[userId] = 1;
+            }
+
+            const upvotes = Object.values(currentVotes).filter((v) => v === 1).length;
+            const downvotes = Object.values(currentVotes).filter((v) => v === -1).length;
+            const nextUserVote: 1 | -1 | null = currentVotes[userId] ?? null;
+
             const updated: Comment = {
               ...c,
-              upvotes: c.upvotes + upvoteDelta,
-              userVote: nextVote,
+              votes: currentVotes,
+              upvotes,
+              downvotes,
+              userVote: nextUserVote,
             };
             firebaseSync.saveComment(postId, updated);
             return updated;
@@ -810,7 +946,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const startConversationWithUser = (targetUserId: string) => {
+  const startConversationWithUser = async (targetUserId: string) => {
     if (!currentUser) {
       setAuthModalOpen(true, 'login');
       return;
@@ -824,38 +960,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    const existingConv = conversations.find((c) => c.participant.id === targetUserId);
-    if (existingConv) {
-      setActiveConversationId(existingConv.id);
-      setActiveTab('messages');
-      return;
-    }
-
     const targetUser = users.find((u) => u.id === targetUserId);
     if (!targetUser) {
       showToast(language === 'ar' ? 'المستخدم غير موجود' : 'User not found', 'warning');
       return;
     }
 
-    const newConvId = `conv_${Date.now()}`;
+    // Canonical conversation ID based on sorted user IDs
+    const convId = `dm_${[currentUser.id, targetUserId].sort().join('__')}`;
+
+    const existingConv = conversations.find(
+      (c) => c.id === convId || c.participant?.id === targetUserId
+    );
+    if (existingConv) {
+      setActiveConversationId(existingConv.id);
+      setActiveTab('messages');
+      return;
+    }
+
+    const now = Date.now();
+    const formattedTime = new Date(now).toLocaleTimeString(language === 'ar' ? 'ar-DZ' : 'en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
     const newConv: Conversation = {
-      id: newConvId,
+      id: convId,
+      participantIds: [currentUser.id, targetUserId],
+      participants: {
+        [currentUser.id]: currentUser,
+        [targetUserId]: targetUser,
+      },
       participant: targetUser,
       lastMessage: language === 'ar' ? 'محادثة جديدة' : 'New conversation',
-      lastMessageTime: language === 'ar' ? 'الآن' : 'Just now',
+      lastMessageTime: formattedTime,
+      lastMessageTimestamp: now,
       unreadCount: 0,
     };
 
-    setConversations((prev) => [newConv, ...prev]);
-    setDirectMessages((prev) => ({ ...prev, [newConvId]: [] }));
+    setConversations((prev) => [newConv, ...prev.filter((c) => c.id !== convId)]);
+    setDirectMessages((prev) => ({ ...prev, [convId]: [] }));
 
-    firebaseSync.saveConversation(newConv);
+    await firebaseSync.saveConversation(newConv);
 
-    setActiveConversationId(newConvId);
+    setActiveConversationId(convId);
     setActiveTab('messages');
   };
 
-  const sendDirectMessage = (text: string, mediaUrl?: string) => {
+  const sendDirectMessage = async (text: string, mediaUrl?: string) => {
     if (!currentUser) {
       setAuthModalOpen(true, 'login');
       return;
@@ -865,34 +1017,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const currentConv = conversations.find((c) => c.id === activeConversationId);
     if (!currentConv) return;
 
+    const now = Date.now();
+    const formattedTime = new Date(now).toLocaleTimeString(language === 'ar' ? 'ar-DZ' : 'en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
     const newMsg: DirectMessage = {
-      id: `dm_${Date.now()}`,
+      id: `msg_${now}_${Math.random().toString(36).substring(2, 7)}`,
       conversationId: activeConversationId,
       senderId: currentUser.id,
       text,
-      timestamp: language === 'ar' ? 'الآن' : 'Just now',
+      timestamp: formattedTime,
+      createdAt: now,
       mediaUrl,
-      isRead: true,
+      isRead: false,
     };
 
+    // Optimistic local state update
     setDirectMessages((prev) => ({
       ...prev,
       [activeConversationId]: [...(prev[activeConversationId] || []), newMsg],
     }));
 
-    setConversations((prev) =>
-      prev.map((c) => {
-        if (c.id === activeConversationId) {
-          const updated = { ...c, lastMessage: text, lastMessageTime: language === 'ar' ? 'الآن' : 'Just now' };
-          firebaseSync.saveConversation(updated);
-          return updated;
-        }
-        return c;
-      })
-    );
+    const otherUser = currentConv.participant;
+    const participantIds = currentConv.participantIds || [currentUser.id, otherUser.id];
+    const participants = currentConv.participants || {
+      [currentUser.id]: currentUser,
+      [otherUser.id]: otherUser,
+    };
 
-    // Save message to Cloud Firestore
-    firebaseSync.saveDirectMessage(activeConversationId, newMsg);
+    const updatedConv: Conversation = {
+      ...currentConv,
+      participantIds,
+      participants,
+      lastMessage: text,
+      lastMessageTime: formattedTime,
+      lastMessageTimestamp: now,
+      lastSenderId: currentUser.id,
+      unreadCount: 0,
+    };
+
+    setConversations((prev) => [
+      updatedConv,
+      ...prev.filter((c) => c.id !== activeConversationId),
+    ]);
+
+    // Save message and updated conversation to Cloud Firestore in real time
+    await firebaseSync.saveDirectMessage(activeConversationId, newMsg);
+    await firebaseSync.saveConversation(updatedConv);
   };
 
   // Follow user

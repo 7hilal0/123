@@ -98,7 +98,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                       العربية (Arabic)
                     </div>
                     <div className="text-[11px] text-neutral-400 font-mono">
-                      من اليمين لليسار (RTL)
+                      واجهة عربية مع اتجاه ثابت
                     </div>
                   </div>
                 </div>

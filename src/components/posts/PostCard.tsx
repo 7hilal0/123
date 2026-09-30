@@ -30,6 +30,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
     navigateToCommunity,
     navigateToProfile,
     showToast,
+    comments,
     t,
   } = useApp();
 
@@ -42,6 +43,9 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
   const [imageError, setImageError] = useState(false);
 
   const netScore = post.upvotes - post.downvotes;
+  const postCommentsList = comments[post.id];
+  const displayCommentCount =
+    postCommentsList !== undefined ? postCommentsList.length : (post.commentCount || 0);
 
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -251,7 +255,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-white/5 hover:text-neutral-200 transition-colors cursor-pointer"
             >
               <MessageSquare className="w-4 h-4" />
-              <span>{post.commentCount} {t.commentsCount}</span>
+              <span>{displayCommentCount} {t.commentsCount}</span>
             </button>
 
             {/* Share */}

@@ -28,6 +28,7 @@ export const DirectMessagesView: React.FC = () => {
     navigateToProfile,
     setAuthModalOpen,
     t,
+    language,
     dir,
   } = useApp();
 
@@ -258,7 +259,9 @@ export const DirectMessagesView: React.FC = () => {
                   {activeConv.participant.displayName}
                 </h3>
                 <p className="text-xs text-neutral-400 max-w-sm mx-auto leading-relaxed">
-                  Start of conversation with @{activeConv.participant.username}. Messages are private and saved locally.
+                  {language === 'ar'
+                    ? `بداية المحادثة المباشرة مع @${activeConv.participant.username}. المحادثات خاصة وفورية ومشفرة سحابياً.`
+                    : `Start of conversation with @${activeConv.participant.username}. Messages are private and synced in real-time.`}
                 </p>
               </div>
 

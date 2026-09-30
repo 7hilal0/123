@@ -64,6 +64,7 @@ export interface Post {
   upvotes: number;
   downvotes: number;
   userVote: 1 | -1 | null;
+  votes?: Record<string, 1 | -1>;
   commentCount: number;
   createdAt: string;
   timestamp?: number;
@@ -85,6 +86,7 @@ export interface Comment {
   upvotes: number;
   downvotes: number;
   userVote: 1 | -1 | null;
+  votes?: Record<string, 1 | -1>;
   parentId?: string;
   replies?: Comment[];
 }
@@ -95,6 +97,7 @@ export interface DirectMessage {
   senderId: string;
   text: string;
   timestamp: string;
+  createdAt?: number;
   mediaUrl?: string;
   isRead: boolean;
 }
@@ -102,8 +105,12 @@ export interface DirectMessage {
 export interface Conversation {
   id: string;
   participant: User;
+  participantIds?: string[];
+  participants?: Record<string, User>;
   lastMessage: string;
   lastMessageTime: string;
+  lastMessageTimestamp?: number;
+  lastSenderId?: string;
   unreadCount: number;
   pinned?: boolean;
 }

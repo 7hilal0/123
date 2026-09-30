@@ -180,6 +180,7 @@ export const PostDetail: React.FC = () => {
     currentUser,
     setAuthModalOpen,
     t,
+    language,
     dir,
   } = useApp();
 
@@ -283,7 +284,7 @@ export const PostDetail: React.FC = () => {
 
           {postComments.length === 0 && (
             <div className="py-8 text-center text-xs text-neutral-500">
-              No comments yet. Share your thoughts!
+              {language === 'ar' ? 'لا توجد تعليقات حتى الآن. شارك برأيك أولاً!' : 'No comments yet. Share your thoughts!'}
             </div>
           )}
         </div>

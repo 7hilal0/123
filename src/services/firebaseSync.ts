@@ -180,8 +180,20 @@ export const firebaseSync = {
       console.log(`[Firestore] Deleted ${commentIds.length} comment document(s) from ${postId}`);
       return true;
     } catch (err) {
-      console.error('[Firestore] Error deleting comments from Firestore:', err);
-      return false;
+      console.warn('[Firestore] Batch delete failed, attempting direct updates:', err);
+      try {
+        for (const cid of commentIds) {
+          await setDoc(doc(db, 'posts', postId, 'comments', cid), {
+            commentId: cid,
+            deleted: true,
+            deletedAt: Date.now(),
+          }, { merge: true });
+        }
+        return true;
+      } catch (fallbackErr) {
+        console.error('[Firestore] Fallback delete also failed:', fallbackErr);
+        return false;
+      }
     }
   },
 
@@ -210,8 +222,58 @@ export const firebaseSync = {
       const convRef = doc(db, 'conversations', conv.id);
       const cleanData = stripUndefined(conv);
       await setDoc(convRef, cleanData, { merge: true });
+      console.log(`[Firestore] Saved conversation: ${conv.id}`);
     } catch (err) {
       console.error('[Firestore] Error saving conversation to Firestore:', err);
+    }
+  },
+
+  async fetchConversations(userId: string): Promise<Conversation[]> {
+    try {
+      const snap = await getDocs(collection(db, 'conversations'));
+      const list: Conversation[] = [];
+      snap.forEach((d) => {
+        const data = d.data() as Conversation;
+        if (
+          data.participantIds?.includes(userId) ||
+          data.id.includes(userId) ||
+          data.participant?.id === userId
+        ) {
+          list.push(data);
+        }
+      });
+      return list;
+    } catch (err) {
+      console.error('[Firestore] Error fetching conversations:', err);
+      return [];
+    }
+  },
+
+  subscribeConversations(userId: string, callback: (conversations: Conversation[]) => void) {
+    try {
+      return onSnapshot(
+        collection(db, 'conversations'),
+        (snapshot) => {
+          const list: Conversation[] = [];
+          snapshot.forEach((d) => {
+            const data = d.data() as Conversation;
+            if (
+              data.participantIds?.includes(userId) ||
+              data.id.includes(userId) ||
+              data.participant?.id === userId
+            ) {
+              list.push(data);
+            }
+          });
+          callback(list);
+        },
+        (error) => {
+          console.error('[Firestore] Conversations subscription error:', error);
+        }
+      );
+    } catch (err) {
+      console.error('[Firestore] Failed to subscribe to conversations:', err);
+      return () => {};
     }
   },
 
@@ -220,8 +282,22 @@ export const firebaseSync = {
       const msgRef = doc(db, 'conversations', conversationId, 'messages', message.id);
       const cleanData = stripUndefined(message);
       await setDoc(msgRef, cleanData, { merge: true });
+      console.log(`[Firestore] Saved message ${message.id} to conversation ${conversationId}`);
     } catch (err) {
       console.error('[Firestore] Error saving message to Firestore:', err);
+    }
+  },
+
+  async fetchMessages(conversationId: string): Promise<DirectMessage[]> {
+    try {
+      const snap = await getDocs(collection(db, 'conversations', conversationId, 'messages'));
+      const list: DirectMessage[] = [];
+      snap.forEach((d) => list.push(d.data() as DirectMessage));
+      list.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      return list;
+    } catch (err) {
+      console.error(`[Firestore] Error fetching messages for ${conversationId}:`, err);
+      return [];
     }
   },
 
@@ -232,6 +308,7 @@ export const firebaseSync = {
         (snapshot) => {
           const list: DirectMessage[] = [];
           snapshot.forEach((d) => list.push(d.data() as DirectMessage));
+          list.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
           callback(list);
         },
         (error) => {
