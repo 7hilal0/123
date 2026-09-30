@@ -468,7 +468,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     if (!currentUser?.id) { setNotifications([]); return; }
-    const unsubscribe = firebaseSync.subscribeNotifications(currentUser.id, (remote) => setNotifications(remote));
+    const unsubscribe = firebaseSync.subscribeNotifications(currentUser.id, (remote) => {
+      setNotifications((previous) => {
+        const merged = new Map(previous.map((item) => [item.id, item]));
+        remote.forEach((item) => merged.set(item.id, { ...merged.get(item.id), ...item }));
+        return Array.from(merged.values())
+          .sort((a, b) => b.id.localeCompare(a.id))
+          .slice(0, 100);
+      });
+    });
     return unsubscribe;
   }, [currentUser?.id]);
 
@@ -1121,6 +1129,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (userId === currentUser.id) return;
+
+    const target = users.find((u) => u.id === userId);
+    const nextFollowing = target ? !target.isFollowing : false;
+    if (target && nextFollowing) {
+      addActivityNotification(
+        userId,
+        'follow',
+        currentUser,
+        language === 'ar' ? 'متابع جديد' : language === 'fr' ? 'Nouvel abonné' : 'New follower',
+        language === 'ar' ? `بدأ @${currentUser.username} بمتابعتك` : language === 'fr' ? `@${currentUser.username} vous suit maintenant` : `@${currentUser.username} started following you`,
+        'profile',
+        currentUser.id
+      );
+    }
 
     setUsers((prev) =>
       prev.map((u) => {
