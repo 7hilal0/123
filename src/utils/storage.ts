@@ -9,7 +9,6 @@ import {
 } from '../types';
 import {
   ADMIN_USER,
-  MOCK_USERS,
   MOCK_COMMUNITIES,
   MOCK_POSTS,
   MOCK_CONVERSATIONS,
@@ -36,6 +35,7 @@ const STORAGE_KEYS = {
 // cached on phones and browsers; posts, users, and other data stay untouched.
 const COMMENT_RESET_VERSION = 'nova_dz_comments_reset_v1';
 const VOTE_RESET_VERSION = 'nova_dz_votes_reset_v1';
+const ACCOUNT_RESET_VERSION = 'nova_dz_accounts_reset_v1';
 if (typeof window !== 'undefined') {
   try {
     if (localStorage.getItem(COMMENT_RESET_VERSION) !== 'done') {
@@ -55,6 +55,11 @@ if (typeof window !== 'undefined') {
         }))));
       }
       localStorage.setItem(VOTE_RESET_VERSION, 'done');
+    }
+    if (localStorage.getItem(ACCOUNT_RESET_VERSION) !== 'done') {
+      localStorage.removeItem(STORAGE_KEYS.USERS);
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
+      localStorage.setItem(ACCOUNT_RESET_VERSION, 'done');
     }
   } catch (e) {
     console.warn('Local vote/comment cache reset skipped', e);
@@ -102,7 +107,7 @@ function safeSet(key: string, value: unknown): void {
 
 export const storage = {
   getUsers: (): User[] => {
-    const list = safeGet<User[]>(STORAGE_KEYS.USERS, MOCK_USERS);
+    const list = safeGet<User[]>(STORAGE_KEYS.USERS, []);
     return list.map((u) => {
       if (u.id === 'admin_dzcore') {
         return { ...u, avatar: OFFICIAL_DZCORE_AVATAR };

@@ -62,6 +62,10 @@ export const AuthModal: React.FC = () => {
         setErrorMessage('Please fill in all required fields');
         return;
       }
+      if (username.trim().replace(/[^a-zA-Z0-9_]/g, '').length < 3) {
+        setErrorMessage('Username must contain at least 3 letters or numbers');
+        return;
+      }
       const success = register(
         username.trim(),
         displayName.trim(),

@@ -1228,9 +1228,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ): boolean => {
     const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
 
-    if (!cleanUsername) {
+    if (cleanUsername.length < 3) {
       showToast(
-        language === 'ar' ? 'يرجى إدخال اسم مستخدم صحيح' : 'Please enter a valid username (alphanumeric)',
+        language === 'ar' ? 'اسم المستخدم يجب أن يحتوي على 3 أحرف على الأقل' : 'Username must contain at least 3 characters',
         'warning'
       );
       return false;
