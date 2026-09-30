@@ -261,26 +261,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     firebaseSync.fetchPosts().then((remotePosts) => {
       if (remotePosts) {
         setPosts((local) => {
-          const remoteIds = new Set(remotePosts.map((p) => p.id));
           const cleanRemote = remotePosts
             .filter(
               (p) => p.id !== 'post_official_welcome' && !p.deleted && !deletedPostIdsRef.current.has(p.id)
             )
             .map((p) => resolvePostForUser(p, currentUser?.id));
 
-          const localOnly = local
-            .filter(
-              (p) => !remoteIds.has(p.id) && p.id !== 'post_official_welcome' && !deletedPostIdsRef.current.has(p.id)
-            )
-            .map((p) => resolvePostForUser(p, currentUser?.id));
-
-          // Immediately sync any local posts that are not yet on Firestore so everyone can see them
-          for (const lp of localOnly) {
-            console.log(`[Cloud Sync] Uploading local post to Firestore: ${lp.id}`);
-            firebaseSync.savePost(lp);
-          }
-
-          return [...cleanRemote, ...localOnly];
+          // Firestore is authoritative. Never re-upload stale local/cache posts.
+          return cleanRemote;
         });
       }
       setCloudSyncStatus('connected');
@@ -292,21 +280,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 2. Subscribe to remote posts live
     const unsubPosts = firebaseSync.subscribePosts((remotePosts) => {
       if (remotePosts) {
-        const remoteIds = new Set(remotePosts.map((p) => p.id));
         const cleanRemote = remotePosts
           .filter(
             (p) => p.id !== 'post_official_welcome' && !p.deleted && !deletedPostIdsRef.current.has(p.id)
           )
           .map((p) => resolvePostForUser(p, currentUser?.id));
 
-        setPosts((currentLocal) => {
-          const localPending = currentLocal
-            .filter(
-              (p) => !remoteIds.has(p.id) && p.id !== 'post_official_welcome' && !deletedPostIdsRef.current.has(p.id)
-            )
-            .map((p) => resolvePostForUser(p, currentUser?.id));
-          return [...cleanRemote, ...localPending];
-        });
+        // Firestore is authoritative. Do not merge old local posts into the feed.
+        setPosts(cleanRemote);
       }
     });
 

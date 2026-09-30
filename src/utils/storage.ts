@@ -10,7 +10,6 @@ import {
 import {
   ADMIN_USER,
   MOCK_COMMUNITIES,
-  MOCK_POSTS,
   MOCK_CONVERSATIONS,
   MOCK_DIRECT_MESSAGES,
   MOCK_NOTIFICATIONS,
@@ -36,7 +35,7 @@ const STORAGE_KEYS = {
 const COMMENT_RESET_VERSION = 'nova_dz_comments_reset_v1';
 const VOTE_RESET_VERSION = 'nova_dz_votes_reset_v1';
 const ACCOUNT_RESET_VERSION = 'nova_dz_accounts_reset_v1';
-const POST_RESET_VERSION = 'nova_dz_posts_reset_v1';
+const POST_RESET_VERSION = 'nova_dz_posts_reset_v2';
 if (typeof window !== 'undefined') {
   try {
     if (localStorage.getItem(COMMENT_RESET_VERSION) !== 'done') {
@@ -138,7 +137,8 @@ export const storage = {
   },
 
   getPosts: (): Post[] => {
-    const list = safeGet<Post[]>(STORAGE_KEYS.POSTS, MOCK_POSTS);
+    // Firestore is the only source of truth for posts. Never seed old demo posts.
+    const list = safeGet<Post[]>(STORAGE_KEYS.POSTS, []);
     const users = storage.getUsers();
     const userMap = new Map(users.map((u) => [u.id, u]));
 
