@@ -1,18 +1,13 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { Sparkles, Bell, Settings } from 'lucide-react';
+import { Sparkles, Settings } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
   const {
-    activeTab,
     navigateToSettings,
-    navigateToNotifications,
     navigateToFeed,
-    unreadCount,
     t,
   } = useApp();
-
-  const isProfilePage = activeTab === 'profile';
 
   return (
     <header className="sticky top-0 z-30 h-16 w-full bg-neutral-950/85 backdrop-blur-xl border-b border-white/5 px-4 md:px-6 relative flex items-center justify-center">
@@ -30,30 +25,16 @@ export const TopBar: React.FC = () => {
         </span>
       </button>
 
-      {/* Far Right: Profile -> Settings Gear (with Language Settings), Other tabs -> Notifications Bell */}
+      {/* Far Right: Settings */}
       <div className="absolute right-4 md:right-6 flex items-center">
-        {isProfilePage ? (
-          <button
-            onClick={navigateToSettings}
-            className="relative p-2.5 text-neutral-300 hover:text-white rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/5 transition-all cursor-pointer group"
-            title={t.settingsTitle}
-            aria-label={t.settingsTitle}
-          >
-            <Settings className="w-5 h-5 text-neutral-200 group-hover:rotate-45 transition-transform duration-300" />
-          </button>
-        ) : (
-          <button
-            onClick={navigateToNotifications}
-            className="relative p-2.5 text-neutral-300 hover:text-white rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/5 transition-all cursor-pointer"
-            title={t.navNotifications}
-            aria-label={t.navNotifications}
-          >
-            <Bell className="w-5 h-5 text-neutral-200" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-neutral-950 animate-pulse" />
-            )}
-          </button>
-        )}
+        <button
+          onClick={navigateToSettings}
+          className="relative p-2.5 text-neutral-300 hover:text-white rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/5 transition-all cursor-pointer group"
+          title={t.settingsTitle}
+          aria-label={t.settingsTitle}
+        >
+          <Settings className="w-5 h-5 text-neutral-200 group-hover:rotate-45 transition-transform duration-300" />
+        </button>
       </div>
     </header>
   );

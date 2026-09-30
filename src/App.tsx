@@ -14,7 +14,6 @@ import { PostDetail } from './components/posts/PostDetail';
 import { CreatePostView } from './components/create/CreatePostView';
 import { DirectMessagesView } from './components/messages/DirectMessagesView';
 import { UserProfileView } from './components/profile/UserProfileView';
-import { NotificationsView } from './components/notifications/NotificationsView';
 import { SearchView } from './components/search/SearchView';
 
 const MainContent: React.FC = () => {
@@ -37,7 +36,6 @@ const MainContent: React.FC = () => {
       {activeTab === 'create' && <CreatePostView />}
       {activeTab === 'messages' && <DirectMessagesView />}
       {activeTab === 'profile' && <UserProfileView />}
-      {activeTab === 'notifications' && <NotificationsView />}
       {activeTab === 'search' && <SearchView />}
       {activeTab === 'settings' && <SettingsView />}
     </main>

@@ -6,7 +6,6 @@ import {
   Comment,
   Conversation,
   DirectMessage,
-  NotificationItem,
   ActiveTab,
   FeedSortOption,
   UserStatus
@@ -40,7 +39,6 @@ interface AppContextType {
   conversations: Conversation[];
   activeConversationId: string | null;
   directMessages: Record<string, DirectMessage[]>;
-  notifications: NotificationItem[];
   searchQuery: string;
   toasts: ToastMessage[];
   authModalOpen: boolean;
@@ -70,7 +68,6 @@ interface AppContextType {
   navigateToProfile: (userId: string) => void;
   navigateToMessages: (userIdOrConvId?: string) => void;
   navigateToCreatePost: (communitySlug?: string) => void;
-  navigateToNotifications: () => void;
   navigateToSettings: () => void;
   navigateToSearch: (query?: string) => void;
 
@@ -112,10 +109,6 @@ interface AppContextType {
   updateCurrentUserProfile: (updates: Partial<User>) => void;
   updateUserStatus: (status: UserStatus, customStatus?: string) => void;
 
-  // Notifications
-  markAllNotificationsRead: () => void;
-  markNotificationRead: (notificationId: string) => void;
-  unreadCount: number;
 
   // Auth
   login: (usernameOrEmail: string, password?: string) => boolean;
@@ -188,7 +181,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [isInsideChat, setIsInsideChat] = useState<boolean>(false);
   const [directMessages, setDirectMessages] = useState<Record<string, DirectMessage[]>>(() => storage.getDirectMessages());
-  const [notifications, setNotifications] = useState<NotificationItem[]>(() => storage.getNotifications());
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'connected' | 'syncing' | 'offline'>('connected');
   // Keeps optimistic deletions out of a stale Firestore snapshot while the delete request settles.
   const deletedPostIdsRef = useRef<Set<string>>(new Set());
@@ -337,7 +329,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => { storage.saveComments(comments); }, [comments]);
   useEffect(() => { storage.saveConversations(conversations); }, [conversations]);
   useEffect(() => { storage.saveDirectMessages(directMessages); }, [directMessages]);
-  useEffect(() => { storage.saveNotifications(notifications); }, [notifications]);
 
   // Auto toast dismiss
   useEffect(() => {
@@ -447,10 +438,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const navigateToNotifications = () => {
-    setIsInsideChat(false);
-    setActiveTab('notifications');
-  };
+
 
   const navigateToSettings = () => {
     setIsInsideChat(false);
@@ -466,27 +454,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveTab('search');
   };
 
-  useEffect(() => {
-    if (!currentUser?.id) { setNotifications([]); return; }
-    const unsubscribe = firebaseSync.subscribeNotifications(currentUser.id, (remote) => {
-      setNotifications((previous) => {
-        const merged = new Map(previous.map((item) => [item.id, item]));
-        remote.forEach((item) => merged.set(item.id, { ...merged.get(item.id), ...item }));
-        return Array.from(merged.values())
-          .sort((a, b) => b.id.localeCompare(a.id))
-          .slice(0, 100);
-      });
-    });
-    return unsubscribe;
-  }, [currentUser?.id]);
 
   // Interactions (Upvote/Downvote/Save)
-  const addActivityNotification = (recipientId: string | undefined, type: NotificationItem['type'], actor: User, title: string, message: string, targetType: NotificationItem['targetType'], targetId: string) => {
-    if (!currentUser || !recipientId || recipientId === actor.id || !actor) return;
-    const item: NotificationItem = { id: `notification_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, recipientId, type, actor, title, message, timestamp: language === 'ar' ? 'الآن' : language === 'fr' ? 'À l’instant' : 'Just now', isRead: false, targetType, targetId };
-    firebaseSync.saveNotification(item).catch((error) => console.error('[Firestore] Notification save failed', error));
-    if (recipientId === currentUser.id) setNotifications((prev) => [item, ...prev].slice(0, 100));
-  };
 
   const upvotePost = (postId: string) => {
     if (!currentUser) {
@@ -527,7 +496,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
 
         pendingVoteSavesRef.current[p.id] = updated;
-        if (nextUserVote === 1 && p.author.id !== currentUser.id) addActivityNotification(p.author.id, 'upvote', currentUser, language === 'ar' ? 'إعجاب جديد بمنشورك' : language === 'fr' ? 'Nouveau j’aime' : 'New like on your post', language === 'ar' ? `أعجب @${currentUser.username} بمنشورك` : language === 'fr' ? `@${currentUser.username} a aimé votre publication` : `@${currentUser.username} liked your post`, 'post', p.id);
         return updated;
       })
     );
@@ -572,7 +540,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
 
         pendingVoteSavesRef.current[p.id] = updated;
-        if (nextUserVote === -1 && p.author.id !== currentUser.id) addActivityNotification(p.author.id, 'downvote', currentUser, language === 'ar' ? 'عدم إعجاب بمنشورك' : language === 'fr' ? 'Nouveau je n’aime pas' : 'New dislike on your post', language === 'ar' ? `لم يعجب @${currentUser.username} بمنشورك` : language === 'fr' ? `@${currentUser.username} n’a pas aimé votre publication` : `@${currentUser.username} disliked your post`, 'post', p.id);
         return updated;
       })
     );
@@ -767,7 +734,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const targetPost = posts.find((p) => p.id === postId);
     const targetComment = parentId ? (comments[postId] || []).flatMap((c) => [c, ...(c.replies || [])]).find((c) => c.id === parentId) : null;
     const recipientId = parentId ? targetComment?.author.id : targetPost?.author.id;
-    addActivityNotification(recipientId, parentId ? 'reply' : 'comment', currentUser, parentId ? (language === 'ar' ? 'رد جديد على تعليقك' : language === 'fr' ? 'Nouvelle réponse' : 'New reply') : (language === 'ar' ? 'تعليق جديد على منشورك' : language === 'fr' ? 'Nouveau commentaire' : 'New comment'), parentId ? `@${currentUser.username} replied to your comment` : `@${currentUser.username} commented on your post`, 'post', postId);
 
     showToast(language === 'ar' ? 'تمت إضافة التعليق وحفظه سحابياً' : 'Comment saved to cloud', 'success');
   };
@@ -1130,20 +1096,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (userId === currentUser.id) return;
 
-    const target = users.find((u) => u.id === userId);
-    const nextFollowing = target ? !target.isFollowing : false;
-    if (target && nextFollowing) {
-      addActivityNotification(
-        userId,
-        'follow',
-        currentUser,
-        language === 'ar' ? 'متابع جديد' : language === 'fr' ? 'Nouvel abonné' : 'New follower',
-        language === 'ar' ? `بدأ @${currentUser.username} بمتابعتك` : language === 'fr' ? `@${currentUser.username} vous suit maintenant` : `@${currentUser.username} started following you`,
-        'profile',
-        currentUser.id
-      );
-    }
-
     setUsers((prev) =>
       prev.map((u) => {
         if (u.id === userId) {
@@ -1221,22 +1173,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  // Notifications
-  const markAllNotificationsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    showToast(
-      language === 'ar' ? 'تم تحديد جميع الإشعارات كمقروءة' : 'All notifications marked as read',
-      'info'
-    );
-  };
-
-  const markNotificationRead = (notificationId: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
-    );
-  };
-
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   // Real Authentication
   const login = (usernameOrEmail: string, password?: string): boolean => {
@@ -1409,7 +1345,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setComments(storage.getComments());
     setConversations(storage.getConversations());
     setDirectMessages(storage.getDirectMessages());
-    setNotifications(storage.getNotifications());
     showToast(
       language === 'ar' ? 'تمت إعادة ضبط البيانات إلى الحالة الأصلية' : 'Data reset to clean defaults',
       'info'
@@ -1432,7 +1367,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         conversations,
         activeConversationId,
         directMessages,
-        notifications,
         searchQuery,
         toasts,
         authModalOpen,
@@ -1459,7 +1393,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         navigateToProfile,
         navigateToMessages,
         navigateToCreatePost,
-        navigateToNotifications,
         navigateToSettings,
         navigateToSearch,
 
@@ -1488,9 +1421,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateCurrentUserProfile,
         updateUserStatus,
 
-        markAllNotificationsRead,
-        markNotificationRead,
-        unreadCount,
 
       login,
       register,

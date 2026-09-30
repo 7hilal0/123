@@ -11,7 +11,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { User, Community, Post, Comment, Conversation, DirectMessage, NotificationItem } from '../types';
+import { User, Community, Post, Comment, Conversation, DirectMessage } from '../types';
 
 /**
  * Deeply strips undefined properties from an object so Firestore setDoc does not reject it.
@@ -299,25 +299,6 @@ export const firebaseSync = {
     } catch (err) {
       console.error(`[Firestore] Error fetching messages for ${conversationId}:`, err);
       return [];
-    }
-  },
-
-  async saveNotification(notification: NotificationItem): Promise<void> {
-    await setDoc(doc(db, 'notifications', notification.id), stripUndefined(notification), { merge: true });
-  },
-
-  subscribeNotifications(userId: string, callback: (notifications: NotificationItem[]) => void) {
-    try {
-      const q = query(collection(db, 'notifications'), where('recipientId', '==', userId), limit(100));
-      return onSnapshot(q, (snapshot) => {
-        const list: NotificationItem[] = [];
-        snapshot.forEach((d) => list.push(d.data() as NotificationItem));
-        list.sort((a, b) => (b.id || '').localeCompare(a.id || ''));
-        callback(list);
-      }, (error) => console.error('[Firestore] Notifications subscription error:', error));
-    } catch (err) {
-      console.error('[Firestore] Failed to subscribe to notifications:', err);
-      return () => {};
     }
   },
 
