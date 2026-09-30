@@ -193,6 +193,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Keeps optimistic deletions out of a stale Firestore snapshot while the delete request settles.
   const deletedPostIdsRef = useRef<Set<string>>(new Set());
   const deletedCommentIdsRef = useRef<Set<string>>(new Set());
+  const pendingVoteSavesRef = useRef<Record<string, Post>>({});
 
   // Dynamically re-resolve personal vote highlights whenever the active user changes
   useEffect(() => {
@@ -327,6 +328,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => { storage.saveUsers(users); }, [users]);
   useEffect(() => { storage.saveCurrentUserId(currentUser ? currentUser.id : null); }, [currentUser]);
   useEffect(() => { storage.savePosts(posts); }, [posts]);
+  useEffect(() => {
+    const pending = pendingVoteSavesRef.current;
+    pendingVoteSavesRef.current = {};
+    Object.values(pending).forEach((post) => { void firebaseSync.savePost(post); });
+  }, [posts]);
   useEffect(() => { storage.saveCommunities(communities); }, [communities]);
   useEffect(() => { storage.saveComments(comments); }, [comments]);
   useEffect(() => { storage.saveConversations(conversations); }, [conversations]);
@@ -487,10 +493,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (p.id !== postId) return p;
 
         const currentVotes: Record<string, 1 | -1> = { ...(p.votes || {}) };
-        const myCurrentVote = currentVotes[userId] ?? (p.userVote === 1 ? 1 : p.userVote === -1 ? -1 : null);
+        const myCurrentVote = currentVotes[userId] ?? null;
 
         if (myCurrentVote === 1) {
           // Toggle off like
+          delete currentVotes[userId];
+        } else if (myCurrentVote === -1) {
+          // Remove the dislike first so one click never changes the score by two.
           delete currentVotes[userId];
         } else {
           // Add upvote
@@ -509,7 +518,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           userVote: nextUserVote,
         };
 
-        firebaseSync.savePost(updated);
+        pendingVoteSavesRef.current[p.id] = updated;
         if (nextUserVote === 1 && p.author.id !== currentUser.id) addActivityNotification(p.author.id, 'upvote', currentUser, language === 'ar' ? 'إعجاب جديد بمنشورك' : language === 'fr' ? 'Nouveau j’aime' : 'New like on your post', language === 'ar' ? `أعجب @${currentUser.username} بمنشورك` : language === 'fr' ? `@${currentUser.username} a aimé votre publication` : `@${currentUser.username} liked your post`, 'post', p.id);
         return updated;
       })
@@ -529,10 +538,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (p.id !== postId) return p;
 
         const currentVotes: Record<string, 1 | -1> = { ...(p.votes || {}) };
-        const myCurrentVote = currentVotes[userId] ?? (p.userVote === 1 ? 1 : p.userVote === -1 ? -1 : null);
+        const myCurrentVote = currentVotes[userId] ?? null;
 
         if (myCurrentVote === -1) {
           // Toggle off downvote
+          delete currentVotes[userId];
+        } else if (myCurrentVote === 1) {
+          // Remove the like first so one click never changes the score by two.
           delete currentVotes[userId];
         } else {
           // Add downvote
@@ -551,7 +563,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           userVote: nextUserVote,
         };
 
-        firebaseSync.savePost(updated);
+        pendingVoteSavesRef.current[p.id] = updated;
         if (nextUserVote === -1 && p.author.id !== currentUser.id) addActivityNotification(p.author.id, 'downvote', currentUser, language === 'ar' ? 'عدم إعجاب بمنشورك' : language === 'fr' ? 'Nouveau je n’aime pas' : 'New dislike on your post', language === 'ar' ? `لم يعجب @${currentUser.username} بمنشورك` : language === 'fr' ? `@${currentUser.username} n’a pas aimé votre publication` : `@${currentUser.username} disliked your post`, 'post', p.id);
         return updated;
       })
