@@ -35,14 +35,29 @@ const STORAGE_KEYS = {
 // One-time cleanup after the global comment reset. This removes stale comments
 // cached on phones and browsers; posts, users, and other data stay untouched.
 const COMMENT_RESET_VERSION = 'nova_dz_comments_reset_v1';
+const VOTE_RESET_VERSION = 'nova_dz_votes_reset_v1';
 if (typeof window !== 'undefined') {
   try {
     if (localStorage.getItem(COMMENT_RESET_VERSION) !== 'done') {
       localStorage.removeItem(STORAGE_KEYS.COMMENTS);
       localStorage.setItem(COMMENT_RESET_VERSION, 'done');
     }
+    if (localStorage.getItem(VOTE_RESET_VERSION) !== 'done') {
+      const rawPosts = localStorage.getItem(STORAGE_KEYS.POSTS);
+      if (rawPosts) {
+        const posts = JSON.parse(rawPosts) as Post[];
+        localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(posts.map((post) => ({
+          ...post,
+          upvotes: 0,
+          downvotes: 0,
+          userVote: null,
+          votes: {},
+        }))));
+      }
+      localStorage.setItem(VOTE_RESET_VERSION, 'done');
+    }
   } catch (e) {
-    console.warn('Comment cache reset skipped', e);
+    console.warn('Local vote/comment cache reset skipped', e);
   }
 }
 
