@@ -20,6 +20,7 @@ export const CreatePostView: React.FC = () => {
     createPost,
     navigateToFeed,
     currentUser,
+    communities,
     setAuthModalOpen,
     t,
     dir,
@@ -32,6 +33,7 @@ export const CreatePostView: React.FC = () => {
   const [linkUrl, setLinkUrl] = useState('');
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>(['dzcore', 'عام']);
+  const [communitySlug, setCommunitySlug] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -73,9 +75,18 @@ export const CreatePostView: React.FC = () => {
       setAuthModalOpen(true, 'login');
       return;
     }
-    if (!title.trim()) return;
+    if (title.trim().length < 5) {
+      setUploadError(dir === 'rtl' ? 'العنوان يجب أن يحتوي على 5 أحرف على الأقل.' : 'The title must contain at least 5 characters.');
+      return;
+    }
+    if (mediaType === 'image' && !mediaUrl.trim()) {
+      setUploadError(dir === 'rtl' ? 'أضف صورة قبل النشر.' : 'Add an image before publishing.');
+      return;
+    }
+    setUploadError('');
 
     createPost({
+      communitySlug: communitySlug || undefined,
       title: title.trim(),
       content: content.trim(),
       mediaType,
@@ -168,6 +179,31 @@ export const CreatePostView: React.FC = () => {
 
         {/* Form Body Container */}
         <div className="bg-neutral-900/60 border border-white/5 rounded-2xl p-4 md:p-6 space-y-4">
+          {/* Community */}
+          <div>
+            <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
+              {t.targetCommunity}
+            </label>
+            <select
+              value={communitySlug}
+              onChange={(e) => setCommunitySlug(e.target.value)}
+              className="w-full bg-neutral-950 border border-white/10 rounded-xl px-4 py-2.5 text-xs md:text-sm text-neutral-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-start"
+            >
+              <option value="">DZCORE · عام</option>
+              {communities.map((community) => (
+                <option key={community.id} value={community.slug}>
+                  {community.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {uploadError && (
+            <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+              {uploadError}
+            </div>
+          )}
+
           {/* Title */}
           <div>
             <div className="flex items-center justify-between mb-1.5">

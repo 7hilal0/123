@@ -36,6 +36,7 @@ const STORAGE_KEYS = {
 const COMMENT_RESET_VERSION = 'nova_dz_comments_reset_v1';
 const VOTE_RESET_VERSION = 'nova_dz_votes_reset_v1';
 const ACCOUNT_RESET_VERSION = 'nova_dz_accounts_reset_v1';
+const POST_RESET_VERSION = 'nova_dz_posts_reset_v1';
 if (typeof window !== 'undefined') {
   try {
     if (localStorage.getItem(COMMENT_RESET_VERSION) !== 'done') {
@@ -60,6 +61,11 @@ if (typeof window !== 'undefined') {
       localStorage.removeItem(STORAGE_KEYS.USERS);
       localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
       localStorage.setItem(ACCOUNT_RESET_VERSION, 'done');
+    }
+    if (localStorage.getItem(POST_RESET_VERSION) !== 'done') {
+      localStorage.removeItem(STORAGE_KEYS.POSTS);
+      localStorage.removeItem(STORAGE_KEYS.COMMENTS);
+      localStorage.setItem(POST_RESET_VERSION, 'done');
     }
   } catch (e) {
     console.warn('Local vote/comment cache reset skipped', e);
