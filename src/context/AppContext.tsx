@@ -488,95 +488,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (recipientId === currentUser.id) setNotifications((prev) => [item, ...prev].slice(0, 100));
   };
 
-  const upvotePost = (postId: string) => {
+  const applyPostVote = (postId: string, desiredVote: 1 | -1) => {
     if (!currentUser) {
       setAuthModalOpen(true, 'login');
       return;
     }
 
+    const existing = posts.find((post) => post.id === postId);
+    if (!existing) return;
+
     const userId = currentUser.id;
-
-    setPosts((prevPosts) =>
-      prevPosts.map((p) => {
-        if (p.id !== postId) return p;
-
-        const currentVotes: Record<string, 1 | -1> = { ...(p.votes || {}) };
-        const myCurrentVote = currentVotes[userId] ?? null;
-
-        if (myCurrentVote === 1) {
-          // Toggle off like
-          delete currentVotes[userId];
-        } else if (myCurrentVote === -1) {
-          // Remove the dislike first so one click never changes the score by two.
-          delete currentVotes[userId];
-        } else {
-          // Add upvote
-          currentVotes[userId] = 1;
-        }
-
-        const upvotes = Object.values(currentVotes).filter((v) => v === 1).length;
-        const downvotes = Object.values(currentVotes).filter((v) => v === -1).length;
-        const nextUserVote: 1 | -1 | null = currentVotes[userId] ?? null;
-
-        const updated: Post = {
-          ...p,
-          votes: currentVotes,
-          upvotes,
-          downvotes,
-          userVote: nextUserVote,
-        };
-
-        pendingVoteSavesRef.current[p.id] = updated;
-        if (nextUserVote === 1 && p.author.id !== currentUser.id) addActivityNotification(p.author.id, 'upvote', currentUser, language === 'ar' ? 'إعجاب جديد بمنشورك' : language === 'fr' ? 'Nouveau j’aime' : 'New like on your post', language === 'ar' ? `أعجب @${currentUser.username} بمنشورك` : language === 'fr' ? `@${currentUser.username} a aimé votre publication` : `@${currentUser.username} liked your post`, 'post', p.id);
-        return updated;
-      })
-    );
-  };
-
-  const downvotePost = (postId: string) => {
-    if (!currentUser) {
-      setAuthModalOpen(true, 'login');
-      return;
+    const votes: Record<string, 1 | -1> = { ...(existing.votes || {}) };
+    const currentVote = votes[userId] ?? null;
+    // Clicking the active arrow removes the vote. Clicking the opposite arrow
+    // removes the old vote first, so one action changes the score by one.
+    if (currentVote === desiredVote || (currentVote !== null && currentVote !== desiredVote)) {
+      delete votes[userId];
+    } else {
+      votes[userId] = desiredVote;
     }
 
-    const userId = currentUser.id;
+    const updated: Post = {
+      ...existing,
+      votes,
+      upvotes: Object.values(votes).filter((vote) => vote === 1).length,
+      downvotes: Object.values(votes).filter((vote) => vote === -1).length,
+      userVote: votes[userId] ?? null,
+    };
 
-    setPosts((prevPosts) =>
-      prevPosts.map((p) => {
-        if (p.id !== postId) return p;
+    setPosts((previous) => previous.map((post) => (post.id === postId ? updated : post)));
+    // Save immediately, including an empty votes map after removing a vote.
+    void firebaseSync.savePost(updated);
 
-        const currentVotes: Record<string, 1 | -1> = { ...(p.votes || {}) };
-        const myCurrentVote = currentVotes[userId] ?? null;
-
-        if (myCurrentVote === -1) {
-          // Toggle off downvote
-          delete currentVotes[userId];
-        } else if (myCurrentVote === 1) {
-          // Remove the like first so one click never changes the score by two.
-          delete currentVotes[userId];
-        } else {
-          // Add downvote
-          currentVotes[userId] = -1;
-        }
-
-        const upvotes = Object.values(currentVotes).filter((v) => v === 1).length;
-        const downvotes = Object.values(currentVotes).filter((v) => v === -1).length;
-        const nextUserVote: 1 | -1 | null = currentVotes[userId] ?? null;
-
-        const updated: Post = {
-          ...p,
-          votes: currentVotes,
-          upvotes,
-          downvotes,
-          userVote: nextUserVote,
-        };
-
-        pendingVoteSavesRef.current[p.id] = updated;
-        if (nextUserVote === -1 && p.author.id !== currentUser.id) addActivityNotification(p.author.id, 'downvote', currentUser, language === 'ar' ? 'عدم إعجاب بمنشورك' : language === 'fr' ? 'Nouveau je n’aime pas' : 'New dislike on your post', language === 'ar' ? `لم يعجب @${currentUser.username} بمنشورك` : language === 'fr' ? `@${currentUser.username} n’a pas aimé votre publication` : `@${currentUser.username} disliked your post`, 'post', p.id);
-        return updated;
-      })
-    );
+    if (updated.userVote === desiredVote && existing.author.id !== currentUser.id) {
+      addActivityNotification(
+        existing.author.id,
+        desiredVote === 1 ? 'upvote' : 'downvote',
+        currentUser,
+        desiredVote === 1
+          ? (language === 'ar' ? 'إعجاب جديد بمنشورك' : language === 'fr' ? 'Nouveau j’aime' : 'New like on your post')
+          : (language === 'ar' ? 'عدم إعجاب بمنشورك' : language === 'fr' ? 'Nouveau je n’aime pas' : 'New dislike on your post'),
+        desiredVote === 1
+          ? (language === 'ar' ? `أعجب @${currentUser.username} بمنشورك` : language === 'fr' ? `@${currentUser.username} a aimé votre publication` : `@${currentUser.username} liked your post`)
+          : (language === 'ar' ? `لم يعجب @${currentUser.username} بمنشورك` : language === 'fr' ? `@${currentUser.username} n’a pas aimé votre publication` : `@${currentUser.username} disliked your post`),
+        'post',
+        postId
+      );
+    }
   };
+
+  const upvotePost = (postId: string) => applyPostVote(postId, 1);
+  const downvotePost = (postId: string) => applyPostVote(postId, -1);
 
   const toggleSavePost = (postId: string) => {
     if (!currentUser) {
