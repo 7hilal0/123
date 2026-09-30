@@ -579,14 +579,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPosts((prevPosts) =>
       prevPosts.map((p) => {
         if (p.id === postId) {
-          const nextSaved = !p.isSaved;
+          const savedBy = { ...(p.savedBy || {}) };
+          const nextSaved = !Boolean(savedBy[currentUser.id]);
+          if (nextSaved) savedBy[currentUser.id] = true;
+          else delete savedBy[currentUser.id];
           showToast(
             nextSaved
               ? (language === 'ar' ? 'تم حفظ المنشور في قائمتك' : 'Post saved to your list')
               : (language === 'ar' ? 'تمت إزالة المنشور من المحفوظات' : 'Post removed from saved'),
             'info'
           );
-          return { ...p, isSaved: nextSaved };
+          const updated = { ...p, savedBy, isSaved: nextSaved };
+          pendingVoteSavesRef.current[p.id] = updated;
+          return updated;
         }
         return p;
       })
@@ -647,8 +652,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       commentCount: 0,
       createdAt: language === 'ar' ? 'الآن' : 'Just now',
       timestamp: now,
-      tags: postData.tags || [],
+      tags: postData.tags,
       isSaved: false,
+      savedBy: {},
     };
 
     setPosts((prev) => [newPost, ...prev]);

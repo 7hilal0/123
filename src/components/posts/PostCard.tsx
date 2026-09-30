@@ -10,7 +10,9 @@ import {
   Bookmark,
   ExternalLink,
   Trash2,
-  ImageOff
+  ImageOff,
+  UserPlus,
+  UserCheck
 } from 'lucide-react';
 
 interface PostCardProps {
@@ -26,6 +28,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
     downvotePost,
     toggleSavePost,
     deletePost,
+    toggleFollowUser,
     navigateToPost,
     navigateToCommunity,
     navigateToProfile,
@@ -141,6 +144,24 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
                 </span>
               </div>
             </button>
+
+            {currentUser && author.id !== currentUser.id && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFollowUser(author.id);
+                }}
+                className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold transition-colors cursor-pointer ${
+                  author.isFollowing
+                    ? 'border-white/10 bg-white/5 text-neutral-300 hover:border-rose-400/30 hover:text-rose-300'
+                    : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
+                }`}
+                title={author.isFollowing ? t.following : t.follow}
+              >
+                {author.isFollowing ? <UserCheck className="h-3 w-3" /> : <UserPlus className="h-3 w-3" />}
+                <span>{author.isFollowing ? t.following : t.follow}</span>
+              </button>
+            )}
 
             <span aria-hidden="true" className="text-neutral-600">·</span>
             <span className="text-[11px] text-neutral-400">{post.createdAt}</span>

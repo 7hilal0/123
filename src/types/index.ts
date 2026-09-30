@@ -71,6 +71,7 @@ export interface Post {
   lastCommentTimestamp?: number;
   tags: string[];
   isSaved: boolean;
+  savedBy?: Record<string, boolean>;
   isPinned?: boolean;
   deleted?: boolean;
   deletedAt?: number;

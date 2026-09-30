@@ -22,6 +22,7 @@ export function resolvePostForUser(post: Post, currentUserId?: string | null): P
 
   // Personal vote state for the viewing user
   const userVote: 1 | -1 | null = currentUserId ? (votes[currentUserId] ?? null) : null;
+  const savedBy = post.savedBy || {};
 
   return {
     ...post,
@@ -29,6 +30,8 @@ export function resolvePostForUser(post: Post, currentUserId?: string | null): P
     downvotes,
     userVote,
     votes,
+    savedBy,
+    isSaved: currentUserId ? Boolean(savedBy[currentUserId]) : false,
   };
 }
 
