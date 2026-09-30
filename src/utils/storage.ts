@@ -32,10 +32,10 @@ const STORAGE_KEYS = {
 
 // One-time cleanup after the global comment reset. This removes stale comments
 // cached on phones and browsers; posts, users, and other data stay untouched.
-const COMMENT_RESET_VERSION = 'nova_dz_comments_reset_v1';
-const VOTE_RESET_VERSION = 'nova_dz_votes_reset_v1';
-const ACCOUNT_RESET_VERSION = 'nova_dz_accounts_reset_v1';
-const POST_RESET_VERSION = 'nova_dz_posts_reset_v3';
+const COMMENT_RESET_VERSION = `${STORAGE_PREFIX}comments_reset_v1`;
+const VOTE_RESET_VERSION = `${STORAGE_PREFIX}votes_reset_v1`;
+const ACCOUNT_RESET_VERSION = `${STORAGE_PREFIX}accounts_reset_v2`;
+const POST_RESET_VERSION = `${STORAGE_PREFIX}posts_reset_v4`;
 if (typeof window !== 'undefined') {
   try {
     if (localStorage.getItem(COMMENT_RESET_VERSION) !== 'done') {
@@ -57,8 +57,8 @@ if (typeof window !== 'undefined') {
       localStorage.setItem(VOTE_RESET_VERSION, 'done');
     }
     if (localStorage.getItem(ACCOUNT_RESET_VERSION) !== 'done') {
-      localStorage.removeItem(STORAGE_KEYS.USERS);
-      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
+      // The global account purge has already been completed. Do not clear a
+      // valid local session during normal refreshes or after a new deployment.
       localStorage.setItem(ACCOUNT_RESET_VERSION, 'done');
     }
     if (localStorage.getItem(POST_RESET_VERSION) !== 'done') {
