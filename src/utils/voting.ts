@@ -8,7 +8,10 @@ import { Post, Comment } from '../types';
  * 3. Freshly created posts start with 0 likes and no automatic like by default.
  */
 export function resolvePostForUser(post: Post, currentUserId?: string | null): Post {
-  const votes = post.votes || {};
+  const voteState = post.voteState || {};
+  const votes = Object.fromEntries(
+    Object.entries(post.votes || {}).filter(([userId]) => voteState[userId] !== 0)
+  ) as Record<string, 1 | -1>;
   const voteEntries = Object.entries(votes);
 
   let upvotes = post.upvotes || 0;
@@ -30,6 +33,7 @@ export function resolvePostForUser(post: Post, currentUserId?: string | null): P
     downvotes,
     userVote,
     votes,
+    voteState,
     savedBy,
     isSaved: currentUserId ? Boolean(savedBy[currentUserId]) : false,
   };

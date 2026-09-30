@@ -65,6 +65,7 @@ export interface Post {
   downvotes: number;
   userVote: 1 | -1 | null;
   votes?: Record<string, 1 | -1>;
+  voteState?: Record<string, 1 | -1 | 0>;
   commentCount: number;
   createdAt: string;
   timestamp?: number;

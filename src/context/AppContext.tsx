@@ -499,18 +499,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const userId = currentUser.id;
     const votes: Record<string, 1 | -1> = { ...(existing.votes || {}) };
-    const currentVote = votes[userId] ?? null;
+    const voteState: Record<string, 1 | -1 | 0> = { ...(existing.voteState || {}) };
+    const currentVote = voteState[userId] === 0 ? null : (votes[userId] ?? null);
     // Clicking the active arrow removes the vote. Clicking the opposite arrow
     // removes the old vote first, so one action changes the score by one.
     if (currentVote === desiredVote || (currentVote !== null && currentVote !== desiredVote)) {
       delete votes[userId];
+      voteState[userId] = 0;
     } else {
       votes[userId] = desiredVote;
+      voteState[userId] = desiredVote;
     }
 
     const updated: Post = {
       ...existing,
       votes,
+      voteState,
       upvotes: Object.values(votes).filter((vote) => vote === 1).length,
       downvotes: Object.values(votes).filter((vote) => vote === -1).length,
       userVote: votes[userId] ?? null,
