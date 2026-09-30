@@ -1,10 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { X, Sparkles, User as UserIcon, Lock, Mail, ArrowRight, ArrowLeft, Upload, CheckCircle } from 'lucide-react';
+import { X, Sparkles, User as UserIcon, Lock, Mail, ArrowRight, ArrowLeft, Upload } from 'lucide-react';
 import { readImageFile } from '../../utils/fileUpload';
 import { DEFAULT_USER_AVATAR, PRESET_AVATARS } from '../../utils/avatarConstants';
 
-const VERIFICATION_API_BASE = (import.meta.env.VITE_VERIFICATION_API_URL || 'https://123-wheat-eight.vercel.app').replace(/\/$/, '');
 
 export const AuthModal: React.FC = () => {
   const {
@@ -25,9 +24,6 @@ export const AuthModal: React.FC = () => {
   const [avatarPreview, setAvatarPreview] = useState<string>('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [verificationStep, setVerificationStep] = useState<'details' | 'code'>('details');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [verificationToken, setVerificationToken] = useState('');
   const [verificationBusy, setVerificationBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,7 +55,7 @@ export const AuthModal: React.FC = () => {
         setErrorMessage('Please enter your username or email');
         return;
       }
-      const success = login(username.trim(), password.trim() || undefined);
+      const success = await login(username.trim(), password.trim() || undefined);
       if (!success) {
         setErrorMessage('Invalid username or password');
       }
@@ -79,40 +75,9 @@ export const AuthModal: React.FC = () => {
 
       setVerificationBusy(true);
       try {
-        if (verificationStep === 'details') {
-          const response = await fetch(`${VERIFICATION_API_BASE}/api/send-code`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: email.trim() }),
-          });
-          const result = await response.json().catch(() => ({}));
-          if (!response.ok) throw new Error(result.error || 'Could not send the verification code');
-          setVerificationToken(result.token);
-          setVerificationStep('code');
-          setErrorMessage('A 4-digit verification code was sent to your email.');
-          return;
-        }
-
-        const response = await fetch(`${VERIFICATION_API_BASE}/api/verify-code`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: verificationToken, code: verificationCode }),
-        });
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(result.error || 'The verification code is incorrect');
-
-      const success = register(
-        username.trim(),
-        displayName.trim(),
-        email.trim(),
-        password.trim() || 'password123',
-        avatarPreview || undefined
-      );
-      if (!success) {
-        setErrorMessage('Username or email is already taken');
-      }
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : 'Email verification failed');
+        const success = await register(username.trim(), displayName.trim(), email.trim(), password.trim(), avatarPreview || undefined);
+        if (success) setAuthModalOpen(false);
+        else setErrorMessage('Could not create the account. Check the fields and try again.');
       } finally {
         setVerificationBusy(false);
       }
@@ -155,8 +120,6 @@ export const AuthModal: React.FC = () => {
             onClick={() => {
               setMode('login');
               setErrorMessage('');
-              setVerificationStep('details');
-              setVerificationCode('');
             }}
             className={`flex-1 py-3 text-xs font-semibold text-center transition-colors relative cursor-pointer ${
               mode === 'login' ? 'text-white' : 'text-neutral-400 hover:text-neutral-200'
@@ -173,8 +136,6 @@ export const AuthModal: React.FC = () => {
             onClick={() => {
               setMode('register');
               setErrorMessage('');
-              setVerificationStep('details');
-              setVerificationCode('');
             }}
             className={`flex-1 py-3 text-xs font-semibold text-center transition-colors relative cursor-pointer ${
               mode === 'register' ? 'text-white' : 'text-neutral-400 hover:text-neutral-200'
@@ -338,27 +299,8 @@ export const AuthModal: React.FC = () => {
             </div>
           </div>
 
-          {mode === 'register' && verificationStep === 'code' && (
-            <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4 space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <label className="text-xs font-semibold text-emerald-200">4-digit email code</label>
-                <span className="text-[10px] text-emerald-300/70">Expires in 10 minutes</span>
-              </div>
-              <input
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]{4}"
-                maxLength={4}
-                required
-                autoFocus
-                value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                placeholder="0000"
-                className="w-full rounded-xl border border-emerald-500/30 bg-neutral-950 px-4 py-3 text-center text-xl font-mono tracking-[0.6em] text-white placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
-              <p className="text-[11px] text-neutral-400">Check your inbox and enter the code to finish creating your account.</p>
-            </div>
+          {mode === 'register' && (
+            <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-[11px] text-emerald-200">After registration, Firebase will send a verification link to your email.</p>
           )}
 
           <button
@@ -366,7 +308,7 @@ export const AuthModal: React.FC = () => {
             disabled={verificationBusy}
             className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-60 disabled:cursor-wait text-white font-semibold text-xs md:text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer"
           >
-            <span>{mode === 'login' ? t.loginBtn : verificationStep === 'code' ? 'Verify email code' : 'Send verification code'}</span>
+            <span>{mode === 'login' ? t.loginBtn : 'Create account and send verification email'}</span>
             <SubmitArrow className="w-4 h-4" />
           </button>
 
