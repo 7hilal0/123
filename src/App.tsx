@@ -5,7 +5,7 @@ import { TopBar } from './components/navigation/TopBar';
 import { MobileNav } from './components/navigation/MobileNav';
 import { ToastContainer } from './components/common/ToastContainer';
 import { AuthModal } from './components/auth/AuthModal';
-import { SettingsModal } from './components/settings/SettingsModal';
+import { SettingsView } from './components/settings/SettingsView';
 
 import { FeedView } from './components/feed/FeedView';
 import { CommunityDetail } from './components/communities/CommunityDetail';
@@ -39,12 +39,13 @@ const MainContent: React.FC = () => {
       {activeTab === 'profile' && <UserProfileView />}
       {activeTab === 'notifications' && <NotificationsView />}
       {activeTab === 'search' && <SearchView />}
+      {activeTab === 'settings' && <SettingsView />}
     </main>
   );
 };
 
 const AppLayout: React.FC = () => {
-  const { dir, settingsModalOpen, setSettingsModalOpen, isInsideChat } = useApp();
+  const { dir, isInsideChat } = useApp();
 
   return (
     <div
@@ -65,10 +66,6 @@ const AppLayout: React.FC = () => {
 
       {/* Modals & Dialogs */}
       <AuthModal />
-      <SettingsModal
-        isOpen={settingsModalOpen}
-        onClose={() => setSettingsModalOpen(false)}
-      />
       <ToastContainer />
     </div>
   );

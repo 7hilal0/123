@@ -31,7 +31,7 @@ export const Sidebar: React.FC = () => {
     navigateToProfile,
     navigateToSearch,
     setAuthModalOpen,
-    setSettingsModalOpen,
+    navigateToSettings,
     logout,
     updateUserStatus,
     t,
@@ -185,7 +185,7 @@ export const Sidebar: React.FC = () => {
           )}
 
           <button
-            onClick={() => setSettingsModalOpen(true)}
+            onClick={navigateToSettings}
             className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-300 hover:bg-white/5 hover:text-white transition-all"
           >
             <div className="flex items-center gap-3">

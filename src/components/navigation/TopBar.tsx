@@ -5,7 +5,7 @@ import { Sparkles, Bell, Settings } from 'lucide-react';
 export const TopBar: React.FC = () => {
   const {
     activeTab,
-    setSettingsModalOpen,
+    navigateToSettings,
     navigateToNotifications,
     navigateToFeed,
     unreadCount,
@@ -34,7 +34,7 @@ export const TopBar: React.FC = () => {
       <div className="absolute right-4 md:right-6 flex items-center">
         {isProfilePage ? (
           <button
-            onClick={() => setSettingsModalOpen(true)}
+            onClick={navigateToSettings}
             className="relative p-2.5 text-neutral-300 hover:text-white rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/5 transition-all cursor-pointer group"
             title={t.settingsTitle}
             aria-label={t.settingsTitle}

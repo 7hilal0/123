@@ -138,5 +138,6 @@ export type ActiveTab =
   | 'messages'
   | 'profile'
   | 'notifications'
-  | 'search';
+  | 'search'
+  | 'settings';
 export type FeedSortOption = 'hot' | 'new' | 'top' | 'following';

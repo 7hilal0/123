@@ -69,6 +69,7 @@ interface AppContextType {
   navigateToMessages: (userIdOrConvId?: string) => void;
   navigateToCreatePost: (communitySlug?: string) => void;
   navigateToNotifications: () => void;
+  navigateToSettings: () => void;
   navigateToSearch: (query?: string) => void;
 
   // Interactions
@@ -439,6 +440,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const navigateToNotifications = () => {
     setIsInsideChat(false);
     setActiveTab('notifications');
+  };
+
+  const navigateToSettings = () => {
+    setIsInsideChat(false);
+    setActiveTab('settings');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const navigateToSearch = (query?: string) => {
@@ -1340,6 +1347,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         navigateToMessages,
         navigateToCreatePost,
         navigateToNotifications,
+        navigateToSettings,
         navigateToSearch,
 
         upvotePost,
