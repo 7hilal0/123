@@ -42,7 +42,6 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
 
   const [imageError, setImageError] = useState(false);
 
-  const netScore = post.upvotes - post.downvotes;
   const postCommentsList = comments[post.id];
   const displayCommentCount =
     postCommentsList !== undefined ? postCommentsList.length : (post.commentCount || 0);
@@ -87,18 +86,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
           >
             <ArrowBigUp className={`w-5 h-5 ${post.userVote === 1 ? 'fill-current' : ''}`} />
           </button>
-
-          <span
-            className={`text-xs font-mono font-bold my-0.5 tabular-nums ${
-              post.userVote === 1
-                ? 'text-emerald-400'
-                : post.userVote === -1
-                ? 'text-rose-400'
-                : 'text-neutral-300'
-            }`}
-          >
-            {netScore}
-          </span>
+          <span className="text-[10px] font-mono font-bold text-emerald-400 tabular-nums">{post.upvotes}</span>
 
           <button
             onClick={() => downvotePost(post.id)}
@@ -112,6 +100,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
           >
             <ArrowBigDown className={`w-5 h-5 ${post.userVote === -1 ? 'fill-current' : ''}`} />
           </button>
+          <span className="text-[10px] font-mono font-bold text-rose-400 tabular-nums">{post.downvotes}</span>
         </div>
 
         {/* Post Main Body */}
@@ -235,10 +224,8 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
                 }`}
               >
                 <ArrowBigUp className={`w-4 h-4 ${post.userVote === 1 ? 'fill-current' : ''}`} />
+                <span className="text-[10px] font-mono text-emerald-400 tabular-nums">{post.upvotes}</span>
               </button>
-              <span className="text-xs font-mono font-bold px-1 tabular-nums">
-                {netScore}
-              </span>
               <button
                 onClick={() => downvotePost(post.id)}
                 className={`p-1.5 rounded min-h-[36px] min-w-[36px] flex items-center justify-center ${
@@ -246,6 +233,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
                 }`}
               >
                 <ArrowBigDown className={`w-4 h-4 ${post.userVote === -1 ? 'fill-current' : ''}`} />
+                <span className="text-[10px] font-mono text-rose-400 tabular-nums">{post.downvotes}</span>
               </button>
             </div>
 
