@@ -313,28 +313,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Proactively purge welcome post from Firestore
     firebaseSync.deletePost('post_official_welcome').catch(() => {});
 
-    // 1. Fetch remote posts
-    firebaseSync.fetchPosts().then((remotePosts) => {
-      if (remotePosts) {
-        setPosts((local) => {
-          const cleanRemote = remotePosts
-            .filter(
-              (p) => p.id !== 'post_official_welcome' && !p.deleted && !deletedPostIdsRef.current.has(p.id)
-            )
-            .map((p) => resolvePostForUser(p, currentUser?.id));
-
-          // Firestore is authoritative. Never re-upload stale local/cache posts.
-          return cleanRemote;
-        });
-      }
-      setCloudSyncStatus('connected');
-    }).catch((err) => {
-      console.error('[Cloud Sync] fetchPosts error:', err);
-      setCloudSyncStatus('connected');
-    });
-
-    // 2. Subscribe to remote posts live
+    // Subscribe to remote posts live. This is the single initial post read;
+    // a separate fetch here would double Firestore reads and exhaust quotas.
     const unsubPosts = firebaseSync.subscribePosts((remotePosts) => {
+      setCloudSyncStatus('connected');
       if (remotePosts) {
         const cleanRemote = remotePosts
           .filter(

@@ -111,7 +111,7 @@ export const firebaseSync = {
     }
   },
 
-  async fetchPosts(): Promise<Post[]> {
+  async fetchPosts(): Promise<Post[] | null> {
     try {
       const q = query(collection(db, 'posts'), limit(150));
       const snap = await getDocs(q);
@@ -121,7 +121,8 @@ export const firebaseSync = {
       return list;
     } catch (err) {
       console.error('[Firestore] Error fetching posts from Firestore:', err);
-      return [];
+      // null means the cloud read failed; keep cached posts in the UI.
+      return null;
     }
   },
 
