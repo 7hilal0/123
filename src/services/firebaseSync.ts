@@ -41,7 +41,8 @@ export const firebaseSync = {
   async saveUser(user: User): Promise<void> {
     try {
       const userRef = doc(db, 'users', user.id);
-      const cleanData = stripUndefined(user);
+      const { password: _legacyPassword, ...safeUser } = user;
+      const cleanData = stripUndefined(safeUser);
       await setDoc(userRef, cleanData, { merge: true });
       console.log(`[Firestore] Saved user ${user.id}`);
     } catch (err) {

@@ -114,18 +114,19 @@ export const storage = {
   getUsers: (): User[] => {
     const list = safeGet<User[]>(STORAGE_KEYS.USERS, []);
     return list.map((u) => {
+      const { password: _legacyPassword, ...safeUser } = u;
       if (u.id === 'admin_dzcore') {
-        return { ...u, avatar: OFFICIAL_DZCORE_AVATAR };
+        return { ...safeUser, avatar: OFFICIAL_DZCORE_AVATAR };
       }
       if (!u.avatar || u.avatar.includes('photo-1534528741775-53994a69daeb')) {
-        return { ...u, avatar: DEFAULT_USER_AVATAR };
+        return { ...safeUser, avatar: DEFAULT_USER_AVATAR };
       }
-      return u;
+      return safeUser;
     });
   },
 
   saveUsers: (users: User[]): void => {
-    safeSet(STORAGE_KEYS.USERS, users);
+    safeSet(STORAGE_KEYS.USERS, users.map(({ password: _legacyPassword, ...safeUser }) => safeUser));
   },
 
   getCurrentUserId: (): string | null => {
