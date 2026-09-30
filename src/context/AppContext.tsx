@@ -18,7 +18,7 @@ import { DEFAULT_USER_AVATAR } from '../utils/avatarConstants';
 import { resolvePostForUser, resolveCommentForUser } from '../utils/voting';
 import { resolveConversationForUser } from '../utils/conversationUtils';
 import { auth } from '../lib/firebase';
-import { onAuthStateChanged, sendEmailVerification, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, reload, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { onAuthStateChanged, sendEmailVerification, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, reload } from 'firebase/auth';
 
 export interface ToastMessage {
   id: string;
@@ -119,7 +119,6 @@ interface AppContextType {
 
   // Auth
   login: (usernameOrEmail: string, password?: string) => Promise<boolean>;
-  loginWithGoogle: () => Promise<boolean>;
   register: (username: string, displayName: string, email: string, password?: string, avatarUrl?: string) => Promise<boolean>;
   logout: () => void;
   switchUser: (userId: string) => void;
@@ -1214,41 +1213,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const loginWithGoogle = async (): Promise<boolean> => {
-    try {
-      const credential = await signInWithPopup(auth, new GoogleAuthProvider());
-      const googleUser = credential.user;
-      const existing = users.find((u) => u.id === googleUser.uid || u.email?.toLowerCase() === googleUser.email?.toLowerCase());
-      if (existing) {
-        setCurrentUser({ ...existing, id: googleUser.uid });
-        setAuthModalOpenState(false);
-        showToast(language === 'ar' ? `مرحباً ${existing.displayName}!` : `Welcome, ${existing.displayName}!`, 'success');
-        return true;
-      }
-      const base = (googleUser.email?.split('@')[0] || 'user').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24) || 'user';
-      let username = base;
-      let suffix = 1;
-      while (users.some((u) => u.username.toLowerCase() === username.toLowerCase())) username = `${base}${suffix++}`;
-      const profile: User = {
-        id: googleUser.uid, username, displayName: googleUser.displayName || username,
-        email: googleUser.email || '', password: '', avatar: googleUser.photoURL || DEFAULT_USER_AVATAR,
-        banner: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
-        bio: '', status: 'online', customStatus: '', badges: [language === 'ar' ? 'عضو Google' : 'Google member'], karma: 10,
-        joinedDate: language === 'ar' ? 'انضم اليوم' : 'Joined today', followersCount: 0, followingCount: 0, isFollowing: false,
-      };
-      await firebaseSync.saveUser(profile);
-      setUsers((prev) => [profile, ...prev]);
-      setCurrentUser(profile);
-      setAuthModalOpenState(false);
-      showToast(language === 'ar' ? `أهلاً بك في DZCORE، ${profile.displayName}!` : `Welcome to DZCORE, ${profile.displayName}!`, 'success');
-      return true;
-    } catch (error) {
-      console.error('[Firebase Auth] Google sign-in failed', error);
-      showToast(language === 'ar' ? 'تعذر التسجيل باستخدام Google' : 'Google sign-in was cancelled or failed', 'warning');
-      return false;
-    }
-  };
-
   const register = async (username: string, displayName: string, email: string, password = '', avatarUrl?: string): Promise<boolean> => {
     const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
     const cleanEmail = email.trim().toLowerCase();
@@ -1381,7 +1345,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unreadCount,
 
         login,
-        loginWithGoogle,
         register,
         logout,
         switchUser,

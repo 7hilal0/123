@@ -11,7 +11,6 @@ export const AuthModal: React.FC = () => {
     authModalMode,
     setAuthModalOpen,
     login,
-    loginWithGoogle,
     register,
     t,
     dir,
@@ -302,22 +301,6 @@ export const AuthModal: React.FC = () => {
 
           {mode === 'register' && (
             <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-[11px] text-emerald-200">After registration, Firebase will send a verification link to your email.</p>
-          )}
-
-          {mode === 'login' && (
-            <button
-              type="button"
-              onClick={async () => {
-                setVerificationBusy(true);
-                await loginWithGoogle();
-                setVerificationBusy(false);
-              }}
-              disabled={verificationBusy}
-              className="w-full py-2.5 px-4 rounded-xl bg-white text-neutral-900 hover:bg-neutral-100 disabled:opacity-60 font-semibold text-xs md:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <span className="font-bold text-base">G</span>
-              <span>Continue with Google</span>
-            </button>
           )}
 
           <button
