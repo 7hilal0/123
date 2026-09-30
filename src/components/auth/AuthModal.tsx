@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { X, Sparkles, User as UserIcon, Lock, Mail, ArrowRight, ArrowLeft, Upload } from 'lucide-react';
+import { X, Sparkles, User as UserIcon, Lock, Mail, ArrowRight, ArrowLeft, Upload, Chrome } from 'lucide-react';
 import { readImageFile } from '../../utils/fileUpload';
 import { DEFAULT_USER_AVATAR, PRESET_AVATARS } from '../../utils/avatarConstants';
 
@@ -12,6 +12,7 @@ export const AuthModal: React.FC = () => {
     setAuthModalOpen,
     login,
     register,
+    signInWithGoogle,
     t,
     dir,
   } = useApp();
@@ -153,6 +154,21 @@ export const AuthModal: React.FC = () => {
             <span>{errorMessage}</span>
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={async () => {
+            setErrorMessage('');
+            setVerificationBusy(true);
+            await signInWithGoogle();
+            setVerificationBusy(false);
+          }}
+          disabled={verificationBusy}
+          className="mx-5 md:mx-6 w-[calc(100%-2.5rem)] md:w-[calc(100%-3rem)] flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:opacity-60"
+        >
+          <Chrome className="h-4 w-4" />
+          <span>{verificationBusy ? 'Connecting…' : 'Continue with Google'}</span>
+        </button>
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-5 md:p-6 space-y-4 max-h-[75vh] overflow-y-auto">

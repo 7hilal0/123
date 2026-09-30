@@ -17,6 +17,8 @@ import { firebaseSync } from '../services/firebaseSync';
 import { DEFAULT_USER_AVATAR } from '../utils/avatarConstants';
 import { resolvePostForUser, resolveCommentForUser } from '../utils/voting';
 import { resolveConversationForUser } from '../utils/conversationUtils';
+import { auth } from '../lib/firebase';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 export interface ToastMessage {
   id: string;
@@ -118,6 +120,7 @@ interface AppContextType {
   // Auth
   login: (usernameOrEmail: string, password?: string) => boolean;
   register: (username: string, displayName: string, email: string, password?: string, avatarUrl?: string) => boolean;
+  signInWithGoogle: () => Promise<boolean>;
   logout: () => void;
   switchUser: (userId: string) => void;
 
@@ -1294,6 +1297,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
+  const signInWithGoogle = async (): Promise<boolean> => {
+    try {
+      const credential = await signInWithPopup(auth, new GoogleAuthProvider());
+      const googleUser = credential.user;
+      const existing = users.find((u) => u.id === googleUser.uid || (u.email && u.email.toLowerCase() === (googleUser.email || '').toLowerCase()));
+      if (existing) {
+        setCurrentUser({ ...existing, id: googleUser.uid, email: googleUser.email || existing.email });
+        setAuthModalOpenState(false);
+        return true;
+      }
+
+      const baseUsername = (googleUser.email || googleUser.displayName || 'member')
+        .split('@')[0]
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, '')
+        .slice(0, 18) || 'member';
+      const username = users.some((u) => u.username === baseUsername)
+        ? `${baseUsername}_${Date.now().toString().slice(-4)}`
+        : baseUsername;
+      const profile: User = {
+        id: googleUser.uid,
+        username,
+        displayName: googleUser.displayName || username,
+        email: googleUser.email || '',
+        avatar: googleUser.photoURL || DEFAULT_USER_AVATAR,
+        banner: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+        bio: '',
+        status: 'online',
+        customStatus: '',
+        badges: ['Google member'],
+        karma: 0,
+        joinedDate: 'Joined today',
+        followersCount: 0,
+        followingCount: 0,
+        isFollowing: false,
+      };
+      setUsers((prev) => [profile, ...prev]);
+      setCurrentUser(profile);
+      firebaseSync.saveUser(profile);
+      setAuthModalOpenState(false);
+      showToast(`Welcome to DZCORE, ${profile.displayName}!`, 'success');
+      return true;
+    } catch (error: any) {
+      if (error?.code !== 'auth/popup-closed-by-user') {
+        showToast('Google sign-in could not be completed.', 'warning');
+      }
+      return false;
+    }
+  };
+
   const logout = () => {
     setCurrentUser(null);
     showToast(language === 'ar' ? 'تم تسجيل الخروج بنجاح' : 'Signed out successfully', 'info');
@@ -1399,9 +1452,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         markNotificationRead,
         unreadCount,
 
-        login,
-        register,
-        logout,
+      login,
+      register,
+      signInWithGoogle,
+      logout,
         switchUser,
 
         showToast,
