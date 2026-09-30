@@ -1,4 +1,4 @@
-import { User, Community, Post, Comment, Conversation, DirectMessage } from '../types';
+import { User, Community, Post, Comment, Conversation, DirectMessage, NotificationItem } from '../types';
 import { OFFICIAL_DZCORE_AVATAR } from '../utils/avatarConstants';
 
 export const ADMIN_USER: User = {
@@ -152,3 +152,4 @@ export const MOCK_COMMENTS: Record<string, Comment[]> = {};
 export const MOCK_CONVERSATIONS: Conversation[] = [];
 export const MOCK_DIRECT_MESSAGES: Record<string, DirectMessage[]> = {};
 
+export const MOCK_NOTIFICATIONS: NotificationItem[] = [];

@@ -4,6 +4,7 @@ import { Avatar } from '../common/Avatar';
 import {
   Sparkles,
   MessageSquare,
+  Bell,
   User,
   Plus,
   LogOut,
@@ -21,10 +22,12 @@ export const Sidebar: React.FC = () => {
     currentUser,
     activeTab,
     selectedCommunitySlug,
+    unreadCount,
     conversations,
     navigateToFeed,
     navigateToCreatePost,
     navigateToMessages,
+    navigateToNotifications,
     navigateToProfile,
     navigateToSearch,
     setAuthModalOpen,
@@ -142,6 +145,25 @@ export const Sidebar: React.FC = () => {
             {totalUnreadMessages > 0 && (
               <span className="px-2 py-0.5 text-[11px] font-bold bg-emerald-600 text-white rounded-full">
                 {totalUnreadMessages}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => navigateToNotifications()}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+              activeTab === 'notifications'
+                ? 'bg-emerald-600/15 text-emerald-400 ring-1 ring-emerald-500/30 font-semibold'
+                : 'text-neutral-300 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Bell className="w-4 h-4" />
+              <span>{t.navNotifications}</span>
+            </div>
+            {unreadCount > 0 && (
+              <span className="px-2 py-0.5 text-[11px] font-bold bg-rose-600 text-white rounded-full">
+                {unreadCount}
               </span>
             )}
           </button>

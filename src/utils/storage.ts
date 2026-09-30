@@ -5,12 +5,14 @@ import {
   Comment,
   Conversation,
   DirectMessage,
+  NotificationItem,
 } from '../types';
 import {
   ADMIN_USER,
   MOCK_COMMUNITIES,
   MOCK_CONVERSATIONS,
   MOCK_DIRECT_MESSAGES,
+  MOCK_NOTIFICATIONS,
 } from '../data/mockData';
 import { DEFAULT_USER_AVATAR, OFFICIAL_DZCORE_AVATAR } from './avatarConstants';
 
@@ -25,6 +27,7 @@ const STORAGE_KEYS = {
   COMMUNITIES: `${STORAGE_PREFIX}communities`,
   CONVERSATIONS: `${STORAGE_PREFIX}conversations`,
   DIRECT_MESSAGES: `${STORAGE_PREFIX}direct_messages`,
+  NOTIFICATIONS: `${STORAGE_PREFIX}notifications`,
 };
 
 // One-time cleanup after the global comment reset. This removes stale comments
@@ -193,6 +196,14 @@ export const storage = {
     safeSet(STORAGE_KEYS.DIRECT_MESSAGES, messages);
   },
 
+  getNotifications: (): NotificationItem[] => {
+    const list = safeGet<NotificationItem[]>(STORAGE_KEYS.NOTIFICATIONS, MOCK_NOTIFICATIONS);
+    return list.filter((n) => n.id !== 'notif_welcome' && n.targetId !== 'post_official_welcome');
+  },
+
+  saveNotifications: (notifications: NotificationItem[]): void => {
+    safeSet(STORAGE_KEYS.NOTIFICATIONS, notifications);
+  },
 
   // Reset all local storage to fresh initial state
   resetAll: (): void => {

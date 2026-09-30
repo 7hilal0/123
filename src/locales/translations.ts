@@ -22,6 +22,7 @@ export interface Translations {
   navExplore: string;
   navCommunities: string;
   navMessages: string;
+  navNotifications: string;
   navProfile: string;
   navSettings: string;
   navCreate: string;
@@ -176,6 +177,7 @@ export const translations: Record<Language, Translations> = {
     navExplore: 'Explore',
     navCommunities: 'Communities',
     navMessages: 'Direct Messages',
+    navNotifications: 'Notifications',
     navProfile: 'Profile',
     navSettings: 'Settings',
     navCreate: 'New Post',
@@ -329,6 +331,7 @@ export const translations: Record<Language, Translations> = {
     navExplore: 'Explorer',
     navCommunities: 'Communautés',
     navMessages: 'Messages privés',
+    navNotifications: 'Notifications',
     navProfile: 'Profil',
     navSettings: 'Paramètres',
     navCreate: 'Nouvelle publication',
@@ -482,6 +485,7 @@ export const translations: Record<Language, Translations> = {
     navExplore: 'استكشاف وبحث',
     navCommunities: 'المجتمعات',
     navMessages: 'المحادثات الخاصة',
+    navNotifications: 'الإشعارات',
     navProfile: 'ملفي الشخصي',
     navSettings: 'الإعدادات',
     navCreate: 'نشر',

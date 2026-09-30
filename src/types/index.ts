@@ -116,6 +116,21 @@ export interface Conversation {
   pinned?: boolean;
 }
 
+export type NotificationType = 'upvote' | 'downvote' | 'comment' | 'reply' | 'follow' | 'mention' | 'community';
+
+export interface NotificationItem {
+  id: string;
+  recipientId?: string;
+  type: NotificationType;
+  actor: User;
+  title: string;
+  message: string;
+  timestamp: string;
+  isRead: boolean;
+  targetType: 'post' | 'comment' | 'profile' | 'community';
+  targetId: string;
+}
+
 export type ActiveTab =
   | 'feed'
   | 'communities'
@@ -124,6 +139,7 @@ export type ActiveTab =
   | 'create'
   | 'messages'
   | 'profile'
+  | 'notifications'
   | 'search'
   | 'settings';
 export type FeedSortOption = 'hot' | 'new' | 'top' | 'following';
