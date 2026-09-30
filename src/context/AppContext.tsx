@@ -130,9 +130,10 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Language: Default to English ('en')
+  const LANGUAGE_STORAGE_KEY = 'dzcore_language';
   const [language, setLanguageState] = useState<Language>(() => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('nova_primary_language');
+      const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
       if (stored === 'en' || stored === 'ar' || stored === 'fr') return stored;
     }
     return 'en';
@@ -145,7 +146,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setLanguage = (newLang: Language) => {
     setLanguageState(newLang);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('nova_primary_language', newLang);
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, newLang);
       document.documentElement.lang = newLang;
       document.documentElement.dir = 'ltr';
     }
