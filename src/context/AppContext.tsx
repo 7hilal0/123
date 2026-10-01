@@ -119,6 +119,8 @@ interface AppContextType {
   // Auth
   login: (usernameOrEmail: string, password?: string) => Promise<boolean>;
   register: (username: string, displayName: string, email: string, password?: string, avatarUrl?: string) => Promise<boolean>;
+  updateAccountEmail: (email: string, currentPassword: string) => Promise<boolean>;
+  updateAccountPassword: (newPassword: string, currentPassword: string) => Promise<boolean>;
   logout: () => void;
   switchUser: (userId: string) => void;
 
@@ -1413,6 +1415,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateAccountEmail = async (email: string, currentPassword: string) => {
+    if (!currentUser) return false;
+    try {
+      const normalizedEmail = email.trim();
+      await account.updateEmail(normalizedEmail, currentPassword);
+      const updatedUser = { ...currentUser, email: normalizedEmail };
+      setCurrentUser(updatedUser);
+      setUsers((prev) => prev.map((user) => user.id === updatedUser.id ? updatedUser : user));
+      storage.saveUsers(users.map((user) => user.id === updatedUser.id ? updatedUser : user));
+      showToast(language === 'ar' ? 'تم تحديث البريد الإلكتروني بنجاح' : 'Email updated successfully', 'success');
+      return true;
+    } catch (error: any) {
+      console.error('[Appwrite] Email update failed:', error);
+      showToast(language === 'ar' ? 'تعذر تغيير البريد الإلكتروني. تحقق من كلمة المرور والبريد.' : 'Could not update email. Check your password and email.', 'warning');
+      return false;
+    }
+  };
+  const updateAccountPassword = async (newPassword: string, currentPassword: string) => {
+    if (!currentUser) return false;
+    try {
+      await account.updatePassword(newPassword, currentPassword);
+      showToast(language === 'ar' ? 'تم تغيير كلمة المرور بنجاح' : 'Password updated successfully', 'success');
+      return true;
+    } catch (error: any) {
+      console.error('[Appwrite] Password update failed:', error);
+      showToast(language === 'ar' ? 'تعذر تغيير كلمة المرور. تحقق من كلمة المرور الحالية.' : 'Could not update password. Check your current password.', 'warning');
+      return false;
+    }
+  };
   const logout = async () => {
     try { await account.deleteSession({ sessionId: 'current' }); } catch { /* already signed out */ }
     setCurrentUser(null);
@@ -1521,6 +1552,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       login,
       register,
+      updateAccountEmail,
+      updateAccountPassword,
       logout,
         switchUser,
 

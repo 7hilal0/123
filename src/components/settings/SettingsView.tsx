@@ -1,5 +1,5 @@
-import React from 'react';
-import { Check, ChevronLeft, Globe, LogOut, Settings, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { Check, ChevronLeft, Globe, KeyRound, LogOut, Mail, Settings, ShieldCheck } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const SettingsView: React.FC = () => {
@@ -10,7 +10,15 @@ export const SettingsView: React.FC = () => {
     logout,
     setActiveTab,
     currentUser,
+    updateAccountEmail,
+    updateAccountPassword,
   } = useApp();
+
+  const [newEmail, setNewEmail] = useState(currentUser?.email || '');
+  const [emailPassword, setEmailPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const goBack = () => setActiveTab(currentUser ? 'profile' : 'feed');
 
@@ -80,6 +88,38 @@ export const SettingsView: React.FC = () => {
               ))}
             </div>
           </div>
+
+          {currentUser && (
+            <div className="rounded-3xl border border-white/10 bg-neutral-900/70 p-5 shadow-xl shadow-black/10 md:col-span-2">
+              <div className="mb-5 flex items-center gap-3">
+                <div className="rounded-xl bg-violet-500/10 p-2 text-violet-300"><KeyRound className="h-5 w-5" /></div>
+                <div>
+                  <h2 className="text-sm font-bold text-white">{language === 'ar' ? 'معلومات الحساب' : 'Account information'}</h2>
+                  <p className="text-xs text-neutral-500">{language === 'ar' ? 'غيّر البريد الإلكتروني أو كلمة المرور بأمان.' : 'Securely update your email or password.'}</p>
+                </div>
+              </div>
+              <div className="mb-5 rounded-2xl border border-white/10 bg-neutral-950/50 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">{language === 'ar' ? 'اسم المستخدم' : 'Username'}</p>
+                <p className="mt-1 font-mono text-sm text-white">@{currentUser.username}</p>
+                <p className="mt-2 text-[11px] text-neutral-500">{language === 'ar' ? 'اسم المستخدم لا يتغير من هنا.' : 'Your username cannot be changed here.'}</p>
+              </div>
+              <div className="grid gap-5 lg:grid-cols-2">
+                <form onSubmit={async (event) => { event.preventDefault(); if (!newEmail.trim() || !emailPassword) return; if (await updateAccountEmail(newEmail, emailPassword)) setEmailPassword(''); }} className="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-white"><Mail className="h-4 w-4 text-sky-400" />{language === 'ar' ? 'تغيير البريد الإلكتروني' : 'Change email'}</div>
+                  <input type="email" required value={newEmail} onChange={(event) => setNewEmail(event.target.value)} placeholder="name@example.com" className="w-full rounded-xl border border-white/10 bg-neutral-950 px-3 py-2.5 text-sm text-white outline-none focus:border-sky-400/60" />
+                  <input type="password" required value={emailPassword} onChange={(event) => setEmailPassword(event.target.value)} placeholder={language === 'ar' ? 'كلمة المرور الحالية للتأكيد' : 'Current password to confirm'} className="w-full rounded-xl border border-white/10 bg-neutral-950 px-3 py-2.5 text-sm text-white outline-none focus:border-sky-400/60" />
+                  <button type="submit" className="rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-sky-500">{language === 'ar' ? 'حفظ البريد' : 'Save email'}</button>
+                </form>
+                <form onSubmit={async (event) => { event.preventDefault(); if (newPassword.length < 8 || newPassword !== confirmPassword || !currentPassword) return; if (await updateAccountPassword(newPassword, currentPassword)) { setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); } }} className="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-white"><KeyRound className="h-4 w-4 text-violet-300" />{language === 'ar' ? 'تغيير كلمة المرور' : 'Change password'}</div>
+                  <input type="password" required value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} placeholder={language === 'ar' ? 'كلمة المرور الحالية' : 'Current password'} className="w-full rounded-xl border border-white/10 bg-neutral-950 px-3 py-2.5 text-sm text-white outline-none focus:border-violet-400/60" />
+                  <input type="password" required minLength={8} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder={language === 'ar' ? 'كلمة المرور الجديدة (8 أحرف على الأقل)' : 'New password (8+ characters)'} className="w-full rounded-xl border border-white/10 bg-neutral-950 px-3 py-2.5 text-sm text-white outline-none focus:border-violet-400/60" />
+                  <input type="password" required minLength={8} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder={language === 'ar' ? 'تأكيد كلمة المرور الجديدة' : 'Confirm new password'} className="w-full rounded-xl border border-white/10 bg-neutral-950 px-3 py-2.5 text-sm text-white outline-none focus:border-violet-400/60" />
+                  <button type="submit" className="rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-violet-500">{language === 'ar' ? 'حفظ كلمة المرور' : 'Save password'}</button>
+                </form>
+              </div>
+            </div>
+          )}
 
 
           <div className="rounded-3xl border border-white/10 bg-neutral-900/70 p-5 shadow-xl shadow-black/10">
