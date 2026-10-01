@@ -213,22 +213,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     account.get().then(async (sessionUser) => {
       if (!active) return;
       const remoteUsers = await appwriteSync.fetchUsers().catch(() => [] as User[]);
-      const profile = remoteUsers.find((user) => user.id === sessionUser.$id) || {
+      const cachedProfile = storage.getUsers().find((user) => user.id === sessionUser.$id);
+      const remoteProfile = remoteUsers.find((user) => user.id === sessionUser.$id);
+      const profile = remoteProfile ? {
+        ...remoteProfile,
+        // Keep a locally cached GIF if an older/large Appwrite row omitted the media field.
+        avatar: remoteProfile.avatar && remoteProfile.avatar !== DEFAULT_USER_AVATAR
+          ? remoteProfile.avatar
+          : cachedProfile?.avatar || remoteProfile.avatar || DEFAULT_USER_AVATAR,
+        banner: remoteProfile.banner || cachedProfile?.banner || '',
+        profileColor: remoteProfile.profileColor || cachedProfile?.profileColor,
+      } : {
         id: sessionUser.$id,
         username: sessionUser.email.split('@')[0],
         displayName: sessionUser.name || sessionUser.email.split('@')[0],
         email: sessionUser.email,
-        avatar: DEFAULT_USER_AVATAR,
-        banner: '',
-        bio: '',
-        status: 'online' as UserStatus,
-        customStatus: '',
-        badges: ['Member'],
-        karma: 0,
-        joinedDate: 'Joined today',
-        followersCount: 0,
-        followingCount: 0,
-        isFollowing: false,
+        avatar: cachedProfile?.avatar || DEFAULT_USER_AVATAR,
+        banner: cachedProfile?.banner || '',
+        bio: cachedProfile?.bio || '',
+        status: cachedProfile?.status || 'online' as UserStatus,
+        customStatus: cachedProfile?.customStatus || '',
+        profileColor: cachedProfile?.profileColor,
+        badges: cachedProfile?.badges || ['Member'],
+        karma: cachedProfile?.karma || 0,
+        joinedDate: cachedProfile?.joinedDate || 'Joined today',
+        followersCount: cachedProfile?.followersCount || 0,
+        followingCount: cachedProfile?.followingCount || 0,
+        isFollowing: cachedProfile?.isFollowing || false,
       };
       setUsers((previous) => previous.some((user) => user.id === profile.id) ? previous.map((user) => user.id === profile.id ? profile : user) : [profile, ...previous]);
       setCurrentUser(profile);
@@ -1217,8 +1228,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return newComments;
     });
 
-    // Save to Cloud Firestore
-    appwriteSync.saveUser(updated);
+    // Save to Appwrite and surface failures instead of silently losing media updates.
+    void appwriteSync.saveUser(updated).catch((error) => {
+      console.error('[Appwrite] Profile save failed:', error);
+      showToast(
+        language === 'ar'
+          ? 'تم حفظ التعديل على هذا الجهاز، لكن تعذر رفع الصورة للسحابة. جرّب GIF أصغر.'
+          : 'Saved on this device, but cloud upload failed. Try a smaller GIF.',
+        'warning'
+      );
+    });
 
     showToast(
       language === 'ar' ? 'تم تحديث ملفك وحفظه في السيرفر' : 'Profile updated and saved to cloud',

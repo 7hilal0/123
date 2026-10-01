@@ -1,13 +1,19 @@
 import React, { useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Camera, Check, Palette, Save, Upload, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Camera, Palette, Save, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { UserStatus } from '../../types';
 import { readImageFile } from '../../utils/fileUpload';
-import { DEFAULT_USER_AVATAR, PRESET_AVATARS } from '../../utils/avatarConstants';
+import { DEFAULT_USER_AVATAR } from '../../utils/avatarConstants';
 
 interface EditProfileModalProps {
   onClose: () => void;
 }
+
+const PROFILE_COLORS = [
+  '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',
+  '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1',
+  '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#64748b',
+];
 
 export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) => {
   const { currentUser, updateCurrentUserProfile, t, dir } = useApp();
@@ -207,31 +213,23 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                     />
                   </label>
                 </div>
+                <div className="mt-3 grid grid-cols-9 gap-2">
+                  {PROFILE_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setProfileColor(color)}
+                      aria-label={`Choose ${color}`}
+                      className={`h-7 w-7 rounded-full border-2 transition hover:scale-110 ${profileColor.toLowerCase() === color ? 'border-white ring-2 ring-white/30' : 'border-transparent'}`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+                <p className="mt-3 text-[11px] text-neutral-500">اختر من الألوان أو اضغط على المربع لاختيار أي درجة وتشبع.</p>
               </section>
             </div>
 
             <aside className="space-y-5">
-              <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-4 sm:p-5">
-                <h3 className="mb-3 text-sm font-bold text-white">Avatar presets</h3>
-                <div className="grid grid-cols-5 gap-2">
-                  {PRESET_AVATARS.map((preset) => {
-                    const selected = (avatarUrl || DEFAULT_USER_AVATAR) === preset.url;
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => setAvatarUrl(preset.url)}
-                        className={`relative aspect-square overflow-hidden rounded-xl border-2 transition hover:scale-105 ${selected ? 'border-emerald-400' : 'border-transparent'}`}
-                        title={preset.name}
-                      >
-                        <img src={preset.url} alt={preset.name} className="h-full w-full object-cover" />
-                        {selected && <Check className="absolute bottom-1 end-1 h-3.5 w-3.5 rounded-full bg-emerald-500 p-0.5 text-white" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-
               <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-4 sm:p-5">
                 <h3 className="mb-3 text-sm font-bold text-white">Presence</h3>
                 <select
