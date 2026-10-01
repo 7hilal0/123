@@ -7,6 +7,7 @@ export interface User {
   avatar: string;
   banner: string;
   profileColor?: string;
+  displayNameColor?: string;
   bio: string;
   status: UserStatus;
   customStatus?: string;

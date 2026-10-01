@@ -56,7 +56,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
   const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatar || '');
   const [bannerUrl, setBannerUrl] = useState(currentUser?.banner || '');
   const [profileColor, setProfileColor] = useState(currentUser?.profileColor || '#10b981');
+  const [displayNameColor, setDisplayNameColor] = useState(currentUser?.displayNameColor || '#ffffff');
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const [colorPickerTarget, setColorPickerTarget] = useState<'profile' | 'name'>('profile');
   const [pickerHue, setPickerHue] = useState(() => hexToHsl(currentUser?.profileColor || '#10b981')[0]);
   const [pickerSaturation, setPickerSaturation] = useState(() => hexToHsl(currentUser?.profileColor || '#10b981')[1]);
   const [pickerLightness, setPickerLightness] = useState(() => hexToHsl(currentUser?.profileColor || '#10b981')[2]);
@@ -67,8 +69,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
 
   if (!currentUser) return null;
 
-  const openColorPicker = () => {
-    const [hue, saturation, lightness] = hexToHsl(profileColor);
+  const openColorPicker = (target: 'profile' | 'name') => {
+    const source = target === 'name' ? displayNameColor : profileColor;
+    setColorPickerTarget(target);
+    const [hue, saturation, lightness] = hexToHsl(source);
     setPickerHue(hue);
     setPickerSaturation(saturation);
     setPickerLightness(lightness);
@@ -84,7 +88,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
   };
 
   const confirmColor = () => {
-    setProfileColor(hslToHex(pickerHue, pickerSaturation, pickerLightness));
+    const color = hslToHex(pickerHue, pickerSaturation, pickerLightness);
+    if (colorPickerTarget === 'name') setDisplayNameColor(color);
+    else setProfileColor(color);
     setColorPickerOpen(false);
   };
 
@@ -113,6 +119,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
       avatar: avatarUrl,
       banner: bannerUrl,
       profileColor,
+      displayNameColor,
       status,
     });
     onClose();
@@ -198,7 +205,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                 />
               </div>
               <div className="pb-2">
-                <h2 className="text-2xl font-bold tracking-tight text-white">{displayName || currentUser.username}</h2>
+                <h2 className="text-2xl font-bold tracking-tight" style={{ color: displayNameColor }}>{displayName || currentUser.username}</h2>
                 <p className="font-mono text-sm" style={{ color: `${profileColor}cc` }}>@{currentUser.username}</p>
               </div>
             </div>
@@ -263,7 +270,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                   </div>
                   <button
                     type="button"
-                    onClick={openColorPicker}
+                    onClick={() => openColorPicker('profile')}
                     className="relative h-10 w-14 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-white/20 transition hover:scale-105"
                     style={{ backgroundColor: profileColor }}
                     aria-label="Open profile background color picker"
@@ -282,6 +289,19 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                   ))}
                 </div>
                 <p className="mt-3 text-[11px] text-neutral-500">اختر من الألوان أو اضغط على المربع لاختيار أي درجة وتشبع.</p>
+                <div className="mt-4 flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-black/20 p-3">
+                  <div>
+                    <p className="text-xs font-semibold text-neutral-200">لون الاسم الظاهر</p>
+                    <p className="mt-1 text-[11px] text-neutral-500">لون مستقل عن اسم المستخدم</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openColorPicker('name')}
+                    className="h-10 w-14 shrink-0 rounded-xl border border-white/20 transition hover:scale-105"
+                    style={{ backgroundColor: displayNameColor }}
+                    aria-label="Open display name color picker"
+                  />
+                </div>
               </section>
             </div>
 
@@ -330,7 +350,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                 value={hslToHex(pickerHue, pickerSaturation, pickerLightness)}
                 onChange={(event) => {
                   const value = event.target.value;
-                  setProfileColor(value);
+                  if (colorPickerTarget === 'name') setDisplayNameColor(value);
+                  else setProfileColor(value);
                   if (/^#[0-9a-f]{6}$/i.test(value)) {
                     const [hue, saturation, lightness] = hexToHsl(value);
                     setPickerHue(hue);

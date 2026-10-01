@@ -55,6 +55,7 @@ export const UserProfileView: React.FC = () => {
 
   const isSelf = currentUser && currentUser.id === user.id;
   const profileColor = user.profileColor || '#10b981';
+  const displayNameColor = user.displayNameColor || '#ffffff';
   const userPosts = posts.filter((p) => p.author.id === user.id);
   const savedPosts = posts.filter((p) => p.isSaved);
 
@@ -96,7 +97,7 @@ export const UserProfileView: React.FC = () => {
         <div className="relative flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-5 sm:pt-6">
           {/* Avatar & Identifiers */}
           <div className="flex items-end gap-4">
-            <div className="relative rounded-3xl p-1 bg-neutral-950 shadow-2xl">
+            <div className="relative rounded-full p-1 bg-transparent shadow-2xl">
               <Avatar
                 src={user.avatar}
                 alt={user.displayName}
@@ -107,7 +108,7 @@ export const UserProfileView: React.FC = () => {
 
             <div className="mb-2">
               <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-display font-bold text-white tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-display font-bold tracking-tight" style={{ color: displayNameColor }}>
                   {user.displayName}
                 </h1>
                 {user.badges && user.badges.length > 0 && (
@@ -116,7 +117,7 @@ export const UserProfileView: React.FC = () => {
                   </span>
                 )}
               </div>
-            <span className="text-xs sm:text-sm font-mono" style={{ color: `${profileColor}cc` }}>
+            <span className="text-xs sm:text-sm text-neutral-400 font-mono">
                 @{user.username}
               </span>
             </div>
