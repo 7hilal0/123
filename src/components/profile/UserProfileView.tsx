@@ -83,14 +83,18 @@ export const UserProfileView: React.FC = () => {
         </button>
       </div>
 
-      <div className="px-4 sm:px-6 relative -mt-16 sm:-mt-20">
+      <div
+        className="px-4 sm:px-6 relative -mt-16 sm:-mt-20 rounded-b-3xl border-x border-b"
+        style={{
+          backgroundColor: `${profileColor}14`,
+          borderColor: `${profileColor}30`,
+          boxShadow: `inset 0 -80px 120px ${profileColor}0d`,
+        }}
+      >
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           {/* Avatar & Identifiers */}
           <div className="flex items-end gap-4">
-            <div
-              className="relative rounded-3xl p-1 bg-neutral-950 shadow-2xl"
-              style={{ boxShadow: `0 0 0 2px ${profileColor}66, 0 20px 45px ${profileColor}33` }}
-            >
+            <div className="relative rounded-3xl p-1 bg-neutral-950 shadow-2xl">
               <Avatar
                 src={user.avatar}
                 alt={user.displayName}
@@ -101,22 +105,16 @@ export const UserProfileView: React.FC = () => {
 
             <div className="mb-2">
               <div className="flex items-center gap-2">
-                <h1
-                  className="text-xl sm:text-2xl font-display font-bold tracking-tight"
-                  style={{ color: profileColor }}
-                >
+                <h1 className="text-xl sm:text-2xl font-display font-bold text-white tracking-tight">
                   {user.displayName}
                 </h1>
                 {user.badges && user.badges.length > 0 && (
-                  <span
-                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full border"
-                    style={{ color: profileColor, backgroundColor: `${profileColor}22`, borderColor: `${profileColor}66` }}
-                  >
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-600/20 text-emerald-400 border border-emerald-500/30">
                     {user.badges[0]}
                   </span>
                 )}
               </div>
-            <span className="text-xs sm:text-sm font-mono" style={{ color: `${profileColor}bb` }}>
+            <span className="text-xs sm:text-sm text-neutral-400 font-mono">
                 @{user.username}
               </span>
             </div>

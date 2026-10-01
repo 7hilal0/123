@@ -177,17 +177,17 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
             <div className="flex items-center justify-between gap-3">
               <div>
                 <label htmlFor="profile-color" className="block text-xs font-semibold text-neutral-200">
-                  Account color
+                  لون خلفية الحساب
                 </label>
                 <p className="mt-1 text-[11px] text-neutral-500">
-                  يظهر حول ملفك واسمك في صفحتك الشخصية
+                  يظهر خلف معلومات الحساب وأزرار الملف الشخصي
                 </p>
               </div>
               <label
                 htmlFor="profile-color"
                 className="relative h-10 w-16 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-white/20 shadow-inner"
                 style={{ backgroundColor: profileColor }}
-                title="Choose account color"
+                title="اختيار لون خلفية الحساب"
               >
                 <input
                   id="profile-color"
