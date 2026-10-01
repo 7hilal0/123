@@ -9,7 +9,6 @@ import {
   TrendingUp,
   Users,
   ShieldCheck,
-  Hash,
   Sparkles,
   UserPlus,
   LogIn
@@ -188,16 +187,7 @@ export const FeedView: React.FC = () => {
   ];
 
   // Popular Trending Tags across posts
-  const popularTags = [
-    'برمجة',
-    'الجزائر',
-    'تقنية',
-    'تطوير',
-    'عمل_حر',
-    'ذكاء_اصطناعي',
-    'تصميم',
-    'نقاش',
-  ];
+
 
   // Suggested users to follow if following feed is empty
   const suggestedUsers = users
@@ -348,29 +338,6 @@ export const FeedView: React.FC = () => {
             >
               {t.startDiscussion}
             </button>
-          </div>
-
-          {/* Trending Topics / Tags */}
-          <div className="p-5 rounded-2xl bg-neutral-900/75 border border-white/[0.08] space-y-3.5 shadow-lg shadow-black/10">
-            <div className="flex items-center gap-2">
-              <Hash className="w-4 h-4 text-emerald-400" />
-              <h4 className="font-semibold text-xs text-white uppercase tracking-wider">
-                الوسوم الشائعة
-              </h4>
-            </div>
-
-            <div className="flex flex-wrap gap-2 pt-1">
-              {popularTags.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => navigateToSearch(tag)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-mono text-neutral-300 hover:text-emerald-400 transition-colors cursor-pointer"
-                >
-                  <span className="text-emerald-400">#</span>
-                  <span>{tag}</span>
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Community Guidelines Widget */}
