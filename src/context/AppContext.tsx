@@ -1294,9 +1294,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Appwrite Authentication
   const login = async (usernameOrEmail: string, password?: string): Promise<boolean> => {
     const term = usernameOrEmail.trim().toLowerCase();
-    const profile = users.find(
+    let profile = users.find(
       (u) => u.username.toLowerCase() === term || (u.email && u.email.toLowerCase() === term)
     );
+    if (!profile && !term.includes('@')) {
+      const remoteUsers = await appwriteSync.fetchUsers().catch(() => [] as User[]);
+      profile = remoteUsers.find((u) => u.username.toLowerCase() === term);
+      if (remoteUsers.length > 0) {
+        setUsers((local) => {
+          const remoteIds = new Set(remoteUsers.map((u) => u.id));
+          return [...remoteUsers, ...local.filter((u) => !remoteIds.has(u.id))];
+        });
+      }
+    }
     // A profile row may be unavailable while Appwrite is loading or after a
     // migration. If the user entered an email, authenticate directly instead
     // of requiring the profile document to exist first.
@@ -1346,8 +1356,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.error('[Appwrite] Login failed:', error);
       showToast(
         language === 'ar'
-          ? 'هذا الحساب القديم غير موجود في النظام الجديد. أنشئ حسابًا جديدًا من تبويب إنشاء حساب.'
-          : 'This old account is not in the new system. Create a new account from the Register tab.',
+          ? 'تعذر تسجيل الدخول. تحقق من البريد/اسم المستخدم وكلمة المرور.'
+          : 'Could not sign in. Check your email/username and password.',
         'warning'
       );
       return false;
@@ -1424,6 +1434,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentUser(updatedUser);
       setUsers((prev) => prev.map((user) => user.id === updatedUser.id ? updatedUser : user));
       storage.saveUsers(users.map((user) => user.id === updatedUser.id ? updatedUser : user));
+      await appwriteSync.saveUser(updatedUser);
       showToast(language === 'ar' ? 'تم تحديث البريد الإلكتروني بنجاح' : 'Email updated successfully', 'success');
       return true;
     } catch (error: any) {

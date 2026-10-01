@@ -55,9 +55,12 @@ export const AuthModal: React.FC = () => {
         setErrorMessage('Please enter your username or email');
         return;
       }
-      const success = await login(username.trim(), password.trim() || undefined);
-      if (!success) {
-        setErrorMessage('هذا الحساب غير موجود في النظام الجديد. افتح تبويب «إنشاء حساب» وسجّل حسابًا جديدًا.');
+      setVerificationBusy(true);
+      try {
+        const success = await login(username.trim(), password.trim() || undefined);
+        if (!success) setErrorMessage('تعذر تسجيل الدخول. تحقق من اسم المستخدم أو البريد وكلمة المرور.');
+      } finally {
+        setVerificationBusy(false);
       }
     } else {
       if (!username.trim() || !displayName.trim()) {
