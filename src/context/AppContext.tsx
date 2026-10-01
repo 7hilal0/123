@@ -13,12 +13,11 @@ import {
 } from '../types';
 import { storage } from '../utils/storage';
 import { translations, Language, Translations } from '../locales/translations';
-import { firebaseSync } from '../services/firebaseSync';
+import { appwriteSync } from '../services/appwriteSync';
 import { DEFAULT_USER_AVATAR } from '../utils/avatarConstants';
 import { resolvePostForUser, resolveCommentForUser } from '../utils/voting';
 import { resolveConversationForUser } from '../utils/conversationUtils';
-import { auth } from '../lib/firebase';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { account, ID, OAuthProvider } from '../lib/appwrite';
 
 export interface ToastMessage {
   id: string;
@@ -118,8 +117,8 @@ interface AppContextType {
   unreadCount: number;
 
   // Auth
-  login: (usernameOrEmail: string, password?: string) => boolean;
-  register: (username: string, displayName: string, email: string, password?: string, avatarUrl?: string) => boolean;
+  login: (usernameOrEmail: string, password?: string) => Promise<boolean>;
+  register: (username: string, displayName: string, email: string, password?: string, avatarUrl?: string) => Promise<boolean>;
   signInWithGoogle: () => Promise<boolean>;
   logout: () => void;
   switchUser: (userId: string) => void;
@@ -209,6 +208,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, [currentUser?.id]);
 
+  // Restore the Appwrite session after refresh. Legacy local sessions are not trusted.
+  useEffect(() => {
+    let active = true;
+    account.get().then(async (sessionUser) => {
+      if (!active) return;
+      const remoteUsers = await appwriteSync.fetchUsers().catch(() => [] as User[]);
+      const profile = remoteUsers.find((user) => user.id === sessionUser.$id) || {
+        id: sessionUser.$id,
+        username: sessionUser.email.split('@')[0],
+        displayName: sessionUser.name || sessionUser.email.split('@')[0],
+        email: sessionUser.email,
+        avatar: DEFAULT_USER_AVATAR,
+        banner: '',
+        bio: '',
+        status: 'online' as UserStatus,
+        customStatus: '',
+        badges: ['Member'],
+        karma: 0,
+        joinedDate: 'Joined today',
+        followersCount: 0,
+        followingCount: 0,
+        isFollowing: false,
+      };
+      setUsers((previous) => previous.some((user) => user.id === profile.id) ? previous.map((user) => user.id === profile.id ? profile : user) : [profile, ...previous]);
+      setCurrentUser(profile);
+    }).catch(() => {
+      if (active) setCurrentUser(null);
+    });
+    return () => { active = false; };
+  }, []);
+
   // --- Real-time Cloud Conversations Subscription ---
   useEffect(() => {
     if (!currentUser?.id) {
@@ -217,7 +247,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    const unsubConvs = firebaseSync.subscribeConversations(currentUser.id, (remoteConvs) => {
+    const unsubConvs = appwriteSync.subscribeConversations(currentUser.id, (remoteConvs) => {
       const resolved = remoteConvs.map((c) => resolveConversationForUser(c, currentUser, users));
       resolved.sort((a, b) => (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0));
       setConversations(resolved);
@@ -239,7 +269,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (!activeConversationId) return;
 
-    const unsubMsgs = firebaseSync.subscribeMessages(activeConversationId, (remoteMsgs) => {
+    const unsubMsgs = appwriteSync.subscribeMessages(activeConversationId, (remoteMsgs) => {
       setDirectMessages((prev) => ({
         ...prev,
         [activeConversationId]: remoteMsgs,
@@ -311,11 +341,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCloudSyncStatus('syncing');
 
     // Proactively purge welcome post from Firestore
-    firebaseSync.deletePost('post_official_welcome').catch(() => {});
+    appwriteSync.deletePost('post_official_welcome').catch(() => {});
 
     // Subscribe to remote posts live. This is the single initial post read;
     // a separate fetch here would double Firestore reads and exhaust quotas.
-    const unsubPosts = firebaseSync.subscribePosts((remotePosts) => {
+    const unsubPosts = appwriteSync.subscribePosts((remotePosts) => {
       setCloudSyncStatus('connected');
       if (remotePosts) {
         const cleanRemote = remotePosts
@@ -330,7 +360,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     // 3. Fetch communities
-    firebaseSync.fetchCommunities().then((remoteComms) => {
+    appwriteSync.fetchCommunities().then((remoteComms) => {
       if (remoteComms && remoteComms.length > 0) {
         setCommunities((local) => {
           const remoteIds = new Set(remoteComms.map((c) => c.id));
@@ -341,7 +371,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }).catch(() => {});
 
     // 4. Fetch users
-    firebaseSync.fetchUsers().then((remoteUsers) => {
+    appwriteSync.fetchUsers().then((remoteUsers) => {
       if (remoteUsers && remoteUsers.length > 0) {
         setUsers((local) => {
           const remoteIds = new Set(remoteUsers.map((u) => u.id));
@@ -363,7 +393,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const pending = pendingVoteSavesRef.current;
     pendingVoteSavesRef.current = {};
-    Object.values(pending).forEach((post) => { void firebaseSync.savePost(post); });
+    Object.values(pending).forEach((post) => { void appwriteSync.savePost(post); });
   }, [posts]);
   useEffect(() => { storage.saveCommunities(communities); }, [communities]);
   useEffect(() => { storage.saveComments(comments); }, [comments]);
@@ -417,7 +447,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     // Sync remote comments for this post
-    firebaseSync.fetchComments(postId).then((remoteComments) => {
+    appwriteSync.fetchComments(postId).then((remoteComments) => {
       const cleanRemote = remoteComments
         .filter((comment) => !deletedCommentIdsRef.current.has(comment.id))
         .map((comment) => resolveCommentForUser(comment, currentUser?.id));
@@ -430,7 +460,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         prev.map((p) => {
           if (p.id === postId && p.commentCount !== cleanRemote.length) {
             const updated = { ...p, commentCount: cleanRemote.length };
-            firebaseSync.savePost(updated);
+            appwriteSync.savePost(updated);
             return updated;
           }
           return p;
@@ -500,7 +530,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     if (!currentUser?.id) { setNotifications([]); return; }
-    const unsubscribe = firebaseSync.subscribeNotifications(currentUser.id, (remote) => {
+    const unsubscribe = appwriteSync.subscribeNotifications(currentUser.id, (remote) => {
       setNotifications((previous) => {
         const merged = new Map(previous.map((item) => [item.id, item]));
         remote.forEach((item) => merged.set(item.id, { ...merged.get(item.id), ...item }));
@@ -516,7 +546,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addActivityNotification = (recipientId: string | undefined, type: NotificationItem['type'], actor: User, title: string, message: string, targetType: NotificationItem['targetType'], targetId: string) => {
     if (!currentUser || !recipientId || recipientId === actor.id || !actor) return;
     const item: NotificationItem = { id: `notification_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, recipientId, type, actor, title, message, timestamp: language === 'ar' ? 'الآن' : language === 'fr' ? 'À l’instant' : 'Just now', isRead: false, targetType, targetId };
-    firebaseSync.saveNotification(item).catch((error) => console.error('[Firestore] Notification save failed', error));
+    appwriteSync.saveNotification(item).catch((error) => console.error('[Firestore] Notification save failed', error));
     if (recipientId === currentUser.id) setNotifications((prev) => [item, ...prev].slice(0, 100));
   };
 
@@ -554,7 +584,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setPosts((previous) => previous.map((post) => (post.id === postId ? updated : post)));
     // Save immediately, including an empty votes map after removing a vote.
-    void firebaseSync.savePost(updated);
+    void appwriteSync.savePost(updated);
 
     if (updated.userVote === desiredVote && existing.author.id !== currentUser.id) {
       addActivityNotification(
@@ -667,7 +697,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setComments((prev) => ({ ...prev, [newPostId]: [] }));
 
     // Real-time Cloud Save
-    firebaseSync.savePost(newPost);
+    appwriteSync.savePost(newPost);
 
     showToast(language === 'ar' ? 'تم نشر موضوعك وحفظه في السيرفر! 🚀' : 'Post published and saved to cloud! 🚀', 'success');
     navigateToPost(newPostId);
@@ -687,7 +717,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     // Cloud Delete. If it fails, restore the post instead of silently losing the user's data.
-    firebaseSync.deletePost(postId).then((deleted) => {
+    appwriteSync.deletePost(postId).then((deleted) => {
       if (deleted) {
         showToast(language === 'ar' ? 'تم حذف المنشور نهائياً' : 'Post permanently deleted', 'success');
         return;
@@ -753,7 +783,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             commentCount: p.commentCount + 1,
             lastCommentTimestamp: commentNow,
           };
-          firebaseSync.savePost(updated);
+          appwriteSync.savePost(updated);
           return updated;
         }
         return p;
@@ -761,7 +791,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     // Cloud Save Comment
-    firebaseSync.saveComment(postId, newComment);
+    appwriteSync.saveComment(postId, newComment);
     const targetPost = posts.find((p) => p.id === postId);
     const targetComment = parentId ? (comments[postId] || []).flatMap((c) => [c, ...(c.replies || [])]).find((c) => c.id === parentId) : null;
     const recipientId = parentId ? targetComment?.author.id : targetPost?.author.id;
@@ -810,7 +840,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((p) => {
         if (p.id === postId) {
           const updated = { ...p, commentCount: Math.max(0, nextComments.length) };
-          firebaseSync.savePost(updated);
+          appwriteSync.savePost(updated);
           return updated;
         }
         return p;
@@ -818,7 +848,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     // Delete the selected comment and all nested replies as one cloud operation.
-    firebaseSync.deleteComments(postId, idsToDelete).then((deleted) => {
+    appwriteSync.deleteComments(postId, idsToDelete).then((deleted) => {
       if (deleted) {
         showToast(language === 'ar' ? 'تم حذف التعليق نهائياً' : 'Comment permanently deleted', 'success');
         return;
@@ -868,7 +898,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               downvotes,
               userVote: nextUserVote,
             };
-            firebaseSync.saveComment(postId, updated);
+            appwriteSync.saveComment(postId, updated);
             return updated;
           }
           if (c.replies && c.replies.length > 0) {
@@ -892,7 +922,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((c) => {
         if (c.slug === slug) {
           const updated = { ...c, isMember: true, memberCount: c.memberCount + 1 };
-          firebaseSync.saveCommunity(updated);
+          appwriteSync.saveCommunity(updated);
           showToast(language === 'ar' ? `انضممت إلى مجتمع ${c.name}` : `Joined ${c.name}`, 'success');
           return updated;
         }
@@ -911,7 +941,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((c) => {
         if (c.slug === slug) {
           const updated = { ...c, isMember: false, memberCount: Math.max(0, c.memberCount - 1) };
-          firebaseSync.saveCommunity(updated);
+          appwriteSync.saveCommunity(updated);
           showToast(language === 'ar' ? `غادرت مجتمع ${c.name}` : `Left ${c.name}`, 'info');
           return updated;
         }
@@ -975,7 +1005,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCommunities((prev) => [newComm, ...prev]);
 
     // Cloud Save Community
-    firebaseSync.saveCommunity(newComm);
+    appwriteSync.saveCommunity(newComm);
 
     showToast(
       language === 'ar' ? `تم إنشاء المجتمع وحفظه سحابياً! 🎉` : `Community saved to cloud! 🎉`,
@@ -1049,7 +1079,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setConversations((prev) => [newConv, ...prev.filter((c) => c.id !== convId)]);
     setDirectMessages((prev) => ({ ...prev, [convId]: [] }));
 
-    await firebaseSync.saveConversation(newConv);
+    await appwriteSync.saveConversation(newConv);
 
     setActiveConversationId(convId);
     setIsInsideChat(true);
@@ -1115,8 +1145,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ]);
 
     // Save message and updated conversation to Cloud Firestore in real time
-    await firebaseSync.saveDirectMessage(activeConversationId, newMsg);
-    await firebaseSync.saveConversation(updatedConv);
+    await appwriteSync.saveDirectMessage(activeConversationId, newMsg);
+    await appwriteSync.saveConversation(updatedConv);
   };
 
   // Follow user
@@ -1151,7 +1181,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             isFollowing: nextFollowing,
             followersCount: nextFollowing ? u.followersCount + 1 : Math.max(0, u.followersCount - 1),
           };
-          firebaseSync.saveUser(updated);
+          appwriteSync.saveUser(updated);
           return updated;
         }
         return u;
@@ -1170,7 +1200,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((p) => {
         if (p.author.id === currentUser.id) {
           const updatedPost = { ...p, author: updated };
-          firebaseSync.savePost(updatedPost);
+          appwriteSync.savePost(updatedPost);
           return updatedPost;
         }
         return p;
@@ -1189,7 +1219,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     // Save to Cloud Firestore
-    firebaseSync.saveUser(updated);
+    appwriteSync.saveUser(updated);
 
     showToast(
       language === 'ar' ? 'تم تحديث ملفك وحفظه في السيرفر' : 'Profile updated and saved to cloud',
@@ -1206,7 +1236,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setCurrentUser(updated);
     setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updated : u)));
-    firebaseSync.saveUser(updated);
+    appwriteSync.saveUser(updated);
     showToast(
       language === 'ar' ? 'تم تحديث حالة التواجد' : 'Status presence updated',
       'info'
@@ -1230,162 +1260,146 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  // Real Authentication
-  const login = (usernameOrEmail: string, password?: string): boolean => {
+  // Appwrite Authentication
+  const login = async (usernameOrEmail: string, password?: string): Promise<boolean> => {
     const term = usernameOrEmail.trim().toLowerCase();
-    const existing = users.find(
+    const profile = users.find(
       (u) => u.username.toLowerCase() === term || (u.email && u.email.toLowerCase() === term)
     );
+    const email = profile?.email?.trim();
 
-    if (!existing) {
+    if (!email || !password) {
       showToast(
-        language === 'ar' ? 'اسم المستخدم أو البريد غير مسجل!' : 'Username or email not registered!',
+        language === 'ar' ? 'أدخل البريد الإلكتروني وكلمة المرور' : 'Enter your email and password',
         'warning'
       );
       return false;
     }
 
-    if (password && existing.password && existing.password !== password) {
+    try {
+      await account.createEmailPasswordSession({ email, password });
+      const sessionUser = await account.get();
+      const resolved = profile
+        ? { ...profile, id: sessionUser.$id, email: sessionUser.email }
+        : ({
+            id: sessionUser.$id,
+            username: sessionUser.email.split('@')[0],
+            displayName: sessionUser.name || sessionUser.email.split('@')[0],
+            email: sessionUser.email,
+            avatar: DEFAULT_USER_AVATAR,
+            banner: '',
+            bio: '',
+            status: 'online',
+            customStatus: '',
+            badges: ['Member'],
+            karma: 0,
+            joinedDate: 'Joined today',
+            followersCount: 0,
+            followingCount: 0,
+            isFollowing: false,
+          } as User);
+      setCurrentUser(resolved);
+      setUsers((previous) => previous.some((u) => u.id === resolved.id) ? previous.map((u) => u.id === resolved.id ? resolved : u) : [resolved, ...previous]);
+      setAuthModalOpenState(false);
       showToast(
-        language === 'ar' ? 'كلمة المرور غير صحيحة' : 'Incorrect password, please try again',
+        language === 'ar' ? `مرحباً بعودتك، ${resolved.displayName}!` : `Welcome back, ${resolved.displayName}!`,
+        'success'
+      );
+      return true;
+    } catch (error: any) {
+      console.error('[Appwrite] Login failed:', error);
+      showToast(
+        language === 'ar' ? 'بيانات الدخول غير صحيحة' : 'Invalid email or password',
         'warning'
       );
       return false;
     }
-
-    setCurrentUser(existing);
-    setAuthModalOpenState(false);
-    showToast(
-      language === 'ar' ? `مرحباً بعودتك، ${existing.displayName}! 👋` : `Welcome back, ${existing.displayName}! 👋`,
-      'success'
-    );
-    return true;
   };
 
-  const register = (
+  const register = async (
     username: string,
     displayName: string,
     email: string,
-    password = 'password123',
+    password = '',
     avatarUrl?: string
-  ): boolean => {
+  ): Promise<boolean> => {
     const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    const cleanEmail = email.trim().toLowerCase();
 
     if (cleanUsername.length < 3) {
-      showToast(
-        language === 'ar' ? 'اسم المستخدم يجب أن يحتوي على 3 أحرف على الأقل' : 'Username must contain at least 3 characters',
-        'warning'
-      );
+      showToast(language === 'ar' ? 'اسم المستخدم يجب أن يحتوي على 3 أحرف على الأقل' : 'Username must contain at least 3 characters', 'warning');
       return false;
     }
-
+    if (password.length < 8) {
+      showToast(language === 'ar' ? 'كلمة المرور يجب أن تحتوي على 8 أحرف على الأقل' : 'Password must contain at least 8 characters', 'warning');
+      return false;
+    }
     if (users.some((u) => u.username.toLowerCase() === cleanUsername)) {
-      showToast(
-        language === 'ar' ? 'اسم المستخدم مستخدم بالفعل' : 'Username is already taken, choose another',
-        'warning'
-      );
+      showToast(language === 'ar' ? 'اسم المستخدم مستخدم بالفعل' : 'Username is already taken', 'warning');
+      return false;
+    }
+    if (users.some((u) => u.email && u.email.toLowerCase() === cleanEmail)) {
+      showToast(language === 'ar' ? 'البريد الإلكتروني مسجل مسبقاً' : 'Email is already registered', 'warning');
       return false;
     }
 
-    if (email && users.some((u) => u.email && u.email.toLowerCase() === email.trim().toLowerCase())) {
-      showToast(
-        language === 'ar' ? 'البريد الإلكتروني مسجل مسبقاً' : 'Email is already registered with another account',
-        'warning'
-      );
-      return false;
-    }
-
-    const newUser: User = {
-      id: `user_${Date.now()}`,
-      username: cleanUsername,
-      displayName: displayName.trim() || cleanUsername,
-      email: email.trim(),
-      password,
-      avatar: avatarUrl || DEFAULT_USER_AVATAR,
-      banner:
-        'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
-      bio: '',
-      status: 'online',
-      customStatus: '',
-      badges: [language === 'ar' ? 'عضو موثق' : 'Member'],
-      karma: 10,
-      joinedDate: language === 'ar' ? 'انضم اليوم' : 'Joined today',
-      followersCount: 0,
-      followingCount: 0,
-      isFollowing: false,
-    };
-
-    setUsers((prev) => [newUser, ...prev]);
-    setCurrentUser(newUser);
-
-    // Save user to cloud database
-    firebaseSync.saveUser(newUser);
-
-    setAuthModalOpenState(false);
-    showToast(
-      language === 'ar' ? `أهلاً بك في DZCORE، ${newUser.displayName}! 🎉` : `Welcome to DZCORE, ${newUser.displayName}! 🎉`,
-      'success'
-    );
-    return true;
-  };
-
-  const signInWithGoogle = async (): Promise<boolean> => {
     try {
-      const credential = await signInWithPopup(auth, new GoogleAuthProvider());
-      const googleUser = credential.user;
-      const existing = users.find((u) => u.id === googleUser.uid || (u.email && u.email.toLowerCase() === (googleUser.email || '').toLowerCase()));
-      if (existing) {
-        setCurrentUser({ ...existing, id: googleUser.uid, email: googleUser.email || existing.email });
-        setAuthModalOpenState(false);
-        return true;
-      }
-
-      const baseUsername = (googleUser.email || googleUser.displayName || 'member')
-        .split('@')[0]
-        .toLowerCase()
-        .replace(/[^a-z0-9_]/g, '')
-        .slice(0, 18) || 'member';
-      const username = users.some((u) => u.username === baseUsername)
-        ? `${baseUsername}_${Date.now().toString().slice(-4)}`
-        : baseUsername;
-      const profile: User = {
-        id: googleUser.uid,
-        username,
-        displayName: googleUser.displayName || username,
-        email: googleUser.email || '',
-        avatar: googleUser.photoURL || DEFAULT_USER_AVATAR,
+      const created = await account.create({ userId: ID.unique(), email: cleanEmail, password, name: displayName.trim() || cleanUsername });
+      await account.createEmailPasswordSession({ email: cleanEmail, password });
+      const newUser: User = {
+        id: created.$id,
+        username: cleanUsername,
+        displayName: displayName.trim() || cleanUsername,
+        email: cleanEmail,
+        avatar: avatarUrl || DEFAULT_USER_AVATAR,
         banner: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
         bio: '',
         status: 'online',
         customStatus: '',
-        badges: ['Google member'],
+        badges: [language === 'ar' ? 'عضو جديد' : 'Member'],
         karma: 0,
-        joinedDate: 'Joined today',
+        joinedDate: language === 'ar' ? 'انضم اليوم' : 'Joined today',
         followersCount: 0,
         followingCount: 0,
         isFollowing: false,
       };
-      setUsers((prev) => [profile, ...prev]);
-      setCurrentUser(profile);
-      firebaseSync.saveUser(profile);
+      setUsers((prev) => [newUser, ...prev]);
+      setCurrentUser(newUser);
+      await appwriteSync.saveUser(newUser);
       setAuthModalOpenState(false);
-      showToast(`Welcome to DZCORE, ${profile.displayName}!`, 'success');
+      showToast(language === 'ar' ? `أهلاً بك في DZCORE، ${newUser.displayName}!` : `Welcome to DZCORE, ${newUser.displayName}!`, 'success');
       return true;
     } catch (error: any) {
-      if (error?.code !== 'auth/popup-closed-by-user') {
-        showToast('Google sign-in could not be completed.', 'warning');
-      }
+      console.error('[Appwrite] Registration failed:', error);
+      const message = error?.code === 409 ? 'Email is already registered' : 'Could not create the account';
+      showToast(language === 'ar' ? 'تعذر إنشاء الحساب، تحقق من البيانات' : message, 'warning');
       return false;
     }
   };
 
-  const logout = () => {
+  const signInWithGoogle = async (): Promise<boolean> => {
+    try {
+      await account.createOAuth2Session({
+        provider: OAuthProvider.Google,
+        success: window.location.origin,
+        failure: `${window.location.origin}/?auth=failed`,
+      });
+      return true;
+    } catch (error) {
+      console.error('[Appwrite] Google sign-in failed:', error);
+      showToast(language === 'ar' ? 'تعذر تسجيل الدخول بواسطة Google' : 'Google sign-in could not be completed', 'warning');
+      return false;
+    }
+  };
+
+  const logout = async () => {
+    try { await account.deleteSession({ sessionId: 'current' }); } catch { /* already signed out */ }
     setCurrentUser(null);
     showToast(language === 'ar' ? 'تم تسجيل الخروج بنجاح' : 'Signed out successfully', 'info');
   };
 
   const switchUser = (userId: string) => {
-    const userToSwitch = users.find((u) => u.id === userId);
+    const userToSwitch = users.find((user) => user.id === userId);
     if (userToSwitch) {
       setCurrentUser(userToSwitch);
       showToast(`Switched to @${userToSwitch.username}`, 'info');
