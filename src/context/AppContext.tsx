@@ -215,35 +215,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     cloudflareApi.me().then(async ({ user: sessionUser }) => {
       if (!active) return;
       if (!sessionUser) { setCurrentUser(null); return; }
-      const remoteUsers = await cloudSync.fetchUsers().catch(() => [] as User[]);
       const cachedProfile = storage.getUsers().find((user) => user.id === sessionUser.id);
       const cachedMedia = await storage.getProfileMediaBackup(sessionUser.id).catch(() => null);
-      const remoteProfile = remoteUsers.find((user) => user.id === sessionUser.id);
       const remoteMedia = await cloudSync.fetchUserMedia(sessionUser.id).catch(() => ({} as Partial<User>));
       const localAvatar = cachedMedia?.avatar || remoteMedia.avatar || cachedProfile?.avatar;
       const localBanner = cachedMedia?.banner || remoteMedia.banner || cachedProfile?.banner;
-      const profile = remoteProfile ? {
-        ...remoteProfile,
-        // Prefer the local IndexedDB copy for animated media when the cloud row
-        // is incomplete or still contains only a partial chunk upload.
-        avatar: localAvatar?.startsWith('data:image/gif') || !remoteProfile.avatar || remoteProfile.avatar === DEFAULT_USER_AVATAR
-          ? localAvatar || remoteProfile.avatar || DEFAULT_USER_AVATAR
-          : remoteProfile.avatar,
-        banner: localBanner?.startsWith('data:image/gif') || !remoteProfile.banner
-          ? localBanner || remoteProfile.banner || ''
-          : remoteProfile.banner,
-        profileColor: remoteProfile.profileColor || cachedProfile?.profileColor,
-      } : {
-        id: sessionUser.id,
-        username: sessionUser.username,
-        displayName: sessionUser.displayName || sessionUser.username,
-        email: sessionUser.email,
+      // Use the session response immediately. Public profiles and their media
+      // continue loading in the single background sync below.
+      const profile = {
+        ...sessionUser,
+        ...(cachedProfile || {}),
         avatar: localAvatar || DEFAULT_USER_AVATAR,
         banner: localBanner || '',
+        profileColor: cachedProfile?.profileColor,
+        displayNameColor: cachedProfile?.displayNameColor,
         bio: cachedProfile?.bio || '',
         status: cachedProfile?.status || 'online' as UserStatus,
         customStatus: cachedProfile?.customStatus || '',
-        profileColor: cachedProfile?.profileColor,
         badges: cachedProfile?.badges || ['Member'],
         karma: cachedProfile?.karma || 0,
         joinedDate: cachedProfile?.joinedDate || 'Joined today',
@@ -417,17 +405,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // Rehydrate follow state after the cookie session is restored.
-  useEffect(() => {
-    if (!currentUser?.id) return;
-    cloudSync.fetchUsers(currentUser.id).then((remoteUsers) => {
-      if (!remoteUsers.length) return;
-      setUsers((local) => remoteUsers.map((remote) => {
-        const cached = local.find((user) => user.id === remote.id);
-        return { ...cached, ...remote, avatar: remote.avatar || cached?.avatar || DEFAULT_USER_AVATAR, banner: remote.banner || cached?.banner || '' };
-      }));
-    }).catch(() => {});
-  }, [currentUser?.id]);
 
   // Sync to localStorage
   useEffect(() => { storage.saveUsers(users); }, [users]);
