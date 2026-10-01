@@ -86,8 +86,9 @@ export const UserProfileView: React.FC = () => {
       <div
         className="px-4 sm:px-6 relative -mt-14 sm:-mt-20 rounded-b-2xl border-x border-b overflow-hidden"
         style={{
-          backgroundImage: `linear-gradient(to bottom, transparent 0, transparent 5.5rem, ${profileColor}0c 5.5rem, ${profileColor}0c 100%)`,
-          borderColor: `${profileColor}24`,
+          backgroundImage: `linear-gradient(to bottom, transparent 0, transparent 5.5rem, ${profileColor}38 5.5rem, ${profileColor}24 100%)`,
+          borderColor: `${profileColor}80`,
+          boxShadow: `0 0 0 1px ${profileColor}26, 0 18px 50px ${profileColor}20`,
         }}
       >
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
@@ -113,7 +114,7 @@ export const UserProfileView: React.FC = () => {
                   </span>
                 )}
               </div>
-            <span className="text-xs sm:text-sm text-neutral-400 font-mono">
+            <span className="text-xs sm:text-sm font-mono" style={{ color: `${profileColor}cc` }}>
                 @{user.username}
               </span>
             </div>
@@ -124,7 +125,8 @@ export const UserProfileView: React.FC = () => {
             {isSelf ? (
               <button
                 onClick={() => setEditProfileModalOpen(true)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-white/10 hover:bg-white/15 text-white border border-white/10 transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-white border transition-colors cursor-pointer"
+                style={{ backgroundColor: `${profileColor}55`, borderColor: `${profileColor}99` }}
               >
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>{t.editProfile}</span>
@@ -208,7 +210,7 @@ export const UserProfileView: React.FC = () => {
           >
             <span>{t.profilePosts} ({userPosts.length})</span>
             {activeTab === 'posts' && (
-              <span className="absolute bottom-0 start-0 end-0 h-0.5 bg-emerald-500 rounded-full" />
+              <span className="absolute bottom-0 start-0 end-0 h-0.5 rounded-full" style={{ backgroundColor: profileColor }} />
             )}
           </button>
 
@@ -221,7 +223,7 @@ export const UserProfileView: React.FC = () => {
             >
               <span>{t.profileSaved} ({savedPosts.length})</span>
               {activeTab === 'saved' && (
-                <span className="absolute bottom-0 start-0 end-0 h-0.5 bg-emerald-500 rounded-full" />
+                <span className="absolute bottom-0 start-0 end-0 h-0.5 rounded-full" style={{ backgroundColor: profileColor }} />
               )}
             </button>
           )}
