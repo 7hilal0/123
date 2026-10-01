@@ -10,13 +10,34 @@ type EntityType =
   | 'comment'
   | 'conversation'
   | 'message'
-  | 'notification';
+  | 'notification'
+  | 'profileMedia';
 
 type StoredRow = {
   entityType: string;
   ownerId?: string;
   payload: string;
 };
+
+type ProfileMediaChunk = {
+  id: string;
+  userId: string;
+  field: 'avatar' | 'banner';
+  index: number;
+  total: number;
+  value: string;
+};
+
+const MEDIA_CHUNK_SIZE = 48_000;
+
+function splitMedia(value: string): string[] {
+  if (!value) return [''];
+  const chunks: string[] = [];
+  for (let index = 0; index < value.length; index += MEDIA_CHUNK_SIZE) {
+    chunks.push(value.slice(index, index + MEDIA_CHUNK_SIZE));
+  }
+  return chunks;
+}
 
 function stripUndefined<T>(value: T): T {
   if (value === undefined || value === null) return value;
@@ -113,10 +134,51 @@ function subscribePoll<T>(fetcher: () => Promise<T[]>, callback: (items: T[]) =>
 
 export const appwriteSync = {
   async saveUser(user: User): Promise<void> {
-    await saveEntity('user', user);
+    // Keep large animated GIF data out of the user row. Appwrite text columns
+    // can reject a large base64 GIF even though a compressed JPG succeeds.
+    const { avatar, banner, ...profile } = user;
+    await saveEntity('user', profile as User);
+
+    const media = [
+      { field: 'avatar' as const, value: avatar || '' },
+      { field: 'banner' as const, value: banner || '' },
+    ];
+    for (const item of media) {
+      const chunks = splitMedia(item.value);
+      await Promise.all(chunks.map((value, index) => saveEntity('profileMedia', {
+        id: `${user.id}:${item.field}:${index}`,
+        userId: user.id,
+        field: item.field,
+        index,
+        total: chunks.length,
+        value,
+      } as ProfileMediaChunk)));
+    }
   },
-  fetchUsers(): Promise<User[]> {
-    return fetchType<User>('user');
+  async fetchUsers(): Promise<User[]> {
+    const users = await fetchType<User>('user');
+    const media = await fetchType<ProfileMediaChunk>('profileMedia');
+    const mediaByUser = new Map<string, Partial<Record<'avatar' | 'banner', string>>>();
+
+    for (const field of ['avatar', 'banner'] as const) {
+      const groups = new Map<string, ProfileMediaChunk[]>();
+      for (const item of media) {
+        if (item.field !== field) continue;
+        const key = `${item.userId}:${item.total}`;
+        groups.set(key, [...(groups.get(key) || []), item]);
+      }
+      for (const [key, chunks] of groups) {
+        const [userId, totalText] = key.split(':');
+        const total = Number(totalText);
+        if (!Number.isFinite(total) || chunks.length < total) continue;
+        const value = chunks.sort((a, b) => a.index - b.index).slice(0, total).map((item) => item.value).join('');
+        const current = mediaByUser.get(userId) || {};
+        current[field] = value;
+        mediaByUser.set(userId, current);
+      }
+    }
+
+    return users.map((user) => ({ ...user, ...(mediaByUser.get(user.id) || {}) }));
   },
 
   async saveCommunity(community: Community): Promise<void> {
