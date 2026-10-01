@@ -108,7 +108,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
               className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 cursor-pointer"
             >
               <Upload className="w-3.5 h-3.5" />
-              <span>{t.bannerUpload}</span>
+              <span>{t.bannerUpload} · GIF متحرك</span>
             </button>
           </div>
 
@@ -139,7 +139,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                   className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-semibold text-neutral-200 transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   <Upload className="w-3.5 h-3.5" />
-                  <span>{t.avatarUpload}</span>
+                  <span>{t.avatarUpload} · GIF متحرك</span>
                 </button>
               </div>
             </div>

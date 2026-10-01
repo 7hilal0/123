@@ -25,8 +25,10 @@ export const readImageFile = (
         return;
       }
 
-      // If SVG or small file (< 80KB), return as is without canvas re-compression
-      if (file.type === 'image/svg+xml' || file.size < 80 * 1024) {
+      // Never draw GIFs on a canvas: that would keep only the first frame.
+      // Returning the original data URL preserves the animation for avatars
+      // and banners while still allowing regular images to be optimized.
+      if (file.type === 'image/gif' || file.type === 'image/svg+xml' || file.size < 80 * 1024) {
         resolve(result);
         return;
       }
