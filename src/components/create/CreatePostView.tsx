@@ -26,6 +26,7 @@ export const CreatePostView: React.FC = () => {
   } = useApp();
 
   const [mediaType, setMediaType] = useState<PostMediaType>('text');
+  const [postFormat, setPostFormat] = useState<'discussion' | 'article' | 'image' | 'link'>('discussion');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
@@ -73,12 +74,18 @@ export const CreatePostView: React.FC = () => {
       setAuthModalOpen(true, 'login');
       return;
     }
-    if (title.trim().length < 5) {
-      setUploadError(dir === 'rtl' ? 'العنوان يجب أن يحتوي على 5 أحرف على الأقل.' : 'The title must contain at least 5 characters.');
+    const hasImage = mediaType === 'image' && Boolean(mediaUrl.trim());
+    const hasExternalUrl = mediaType === 'link' && Boolean(linkUrl.trim());
+    if (mediaType === 'image' && !hasImage) {
+      setUploadError(dir === 'rtl' ? 'أضف صورة قبل النشر.' : 'Add an image before publishing.');
       return;
     }
-    if (mediaType === 'image' && !mediaUrl.trim()) {
-      setUploadError(dir === 'rtl' ? 'أضف صورة قبل النشر.' : 'Add an image before publishing.');
+    if (mediaType === 'link' && !hasExternalUrl) {
+      setUploadError(dir === 'rtl' ? 'أضف رابطًا أو رابط فيديو قبل النشر.' : 'Add a link or video URL before publishing.');
+      return;
+    }
+    if (!title.trim() && !content.trim() && !hasImage && !hasExternalUrl) {
+      setUploadError(dir === 'rtl' ? 'اكتب نصًا أو أضف صورة أو رابطًا قبل النشر.' : 'Write something or add an image or link before publishing.');
       return;
     }
     setUploadError('');
@@ -133,64 +140,36 @@ export const CreatePostView: React.FC = () => {
       {/* Main Form */}
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Unified Post Type Selector */}
-        <div className="rounded-2xl border border-white/10 bg-neutral-900/70 p-3 shadow-xl shadow-black/10">
-          <div className="flex items-center justify-between px-1 mb-2.5">
-            <div>
-              <p className="text-xs font-semibold text-neutral-200">{dir === 'rtl' ? 'نوع المنشور' : 'Post format'}</p>
-              <p className="text-[10px] text-neutral-500">{dir === 'rtl' ? 'اختر الصيغة المناسبة لمحتواك' : 'Choose the format that fits your content'}</p>
-            </div>
-            <span className="rounded-full bg-white/5 px-2 py-1 text-[10px] text-neutral-500">3 formats</span>
+      <div className="rounded-2xl border border-white/10 bg-neutral-900/70 p-3 shadow-xl shadow-black/10">
+        <div className="flex items-center justify-between px-1 mb-2.5">
+          <div>
+            <p className="text-xs font-semibold text-neutral-200">{dir === 'rtl' ? 'ماذا تريد أن تنشر؟' : 'What do you want to share?'}</p>
+            <p className="text-[10px] text-neutral-500">{dir === 'rtl' ? 'اختر نوعًا واحدًا، ويمكنك ترك العنوان فارغًا' : 'Choose a format; the title is optional'}</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <button
-            type="button"
-            onClick={() => setMediaType('text')}
-            aria-pressed={mediaType === 'text'}
-            className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-start transition-all cursor-pointer ${
-              mediaType === 'text'
-                ? 'bg-emerald-500/10 text-white border-emerald-500/40 shadow-sm'
-                : 'bg-neutral-950/40 text-neutral-400 border-white/5 hover:border-white/15 hover:text-white'
-            }`}
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10">
-              <FileText className="w-4 h-4 text-emerald-400" />
-            </span>
-            <span className="min-w-0"><span className="block text-xs font-semibold truncate">{t.postTypeDiscussion}</span><span className="block text-[10px] text-neutral-500 mt-0.5">{dir === 'rtl' ? 'فكرة أو سؤال' : 'Ideas & questions'}</span></span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setMediaType('image')}
-            aria-pressed={mediaType === 'image'}
-            className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-start transition-all cursor-pointer ${
-              mediaType === 'image'
-                ? 'bg-teal-500/10 text-white border-teal-500/40 shadow-sm'
-                : 'bg-neutral-950/40 text-neutral-400 border-white/5 hover:border-white/15 hover:text-white'
-            }`}
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-500/10">
-              <ImageIcon className="w-4 h-4 text-teal-400" />
-            </span>
-            <span className="min-w-0"><span className="block text-xs font-semibold truncate">{t.postTypeImage}</span><span className="block text-[10px] text-neutral-500 mt-0.5">{dir === 'rtl' ? 'صور وأعمال' : 'Visual content'}</span></span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setMediaType('link')}
-            aria-pressed={mediaType === 'link'}
-            className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-start transition-all cursor-pointer ${
-              mediaType === 'link'
-                ? 'bg-indigo-500/10 text-white border-indigo-500/40 shadow-sm'
-                : 'bg-neutral-950/40 text-neutral-400 border-white/5 hover:border-white/15 hover:text-white'
-            }`}
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10">
-              <Link2 className="w-4 h-4 text-indigo-400" />
-            </span>
-            <span className="min-w-0"><span className="block text-xs font-semibold truncate">{t.postTypeLink}</span><span className="block text-[10px] text-neutral-500 mt-0.5">{dir === 'rtl' ? 'مصدر خارجي' : 'External source'}</span></span>
-          </button>
-          </div>
+          <span className="rounded-full bg-white/5 px-2 py-1 text-[10px] text-neutral-500">4 formats</span>
         </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+          {([
+            { id: 'discussion' as const, value: 'text' as PostMediaType, icon: FileText, label: dir === 'rtl' ? 'نقاش' : 'Discussion', hint: dir === 'rtl' ? 'فكرة أو سؤال' : 'Idea or question', active: 'bg-emerald-500/10 border-emerald-500/40', iconBg: 'bg-emerald-500/10', iconText: 'text-emerald-400' },
+            { id: 'article' as const, value: 'text' as PostMediaType, icon: FileText, label: dir === 'rtl' ? 'مقال' : 'Article', hint: dir === 'rtl' ? 'نص طويل أو شرح' : 'Long-form writing', active: 'bg-amber-500/10 border-amber-500/40', iconBg: 'bg-amber-500/10', iconText: 'text-amber-400' },
+            { id: 'image' as const, value: 'image' as PostMediaType, icon: ImageIcon, label: dir === 'rtl' ? 'صورة / عمل فني' : 'Image / Artwork', hint: dir === 'rtl' ? 'انشر صورة فقط' : 'Image-only posts', active: 'bg-teal-500/10 border-teal-500/40', iconBg: 'bg-teal-500/10', iconText: 'text-teal-400' },
+            { id: 'link' as const, value: 'link' as PostMediaType, icon: Link2, label: dir === 'rtl' ? 'رابط / فيديو' : 'Link / Video', hint: dir === 'rtl' ? 'مصدر خارجي أو فيديو' : 'External source or video', active: 'bg-indigo-500/10 border-indigo-500/40', iconBg: 'bg-indigo-500/10', iconText: 'text-indigo-400' },
+          ] as const).map((format, index) => {
+            const active = postFormat === format.id;
+            const Icon = format.icon;
+            return (
+              <button key={format.id} type="button" onClick={() => {
+                setPostFormat(format.id);
+                setMediaType(format.value);
+              }} aria-pressed={active}
+                className={`flex items-center gap-2 rounded-xl border px-3 py-3 text-start transition-all cursor-pointer ${active ? `${format.active} text-white shadow-sm` : 'bg-neutral-950/40 text-neutral-400 border-white/5 hover:border-white/15 hover:text-white'}`}>
+                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${format.iconBg}`}><Icon className={`w-4 h-4 ${format.iconText}`} /></span>
+                <span className="min-w-0"><span className="block text-[11px] font-semibold truncate">{format.label}</span><span className="block text-[10px] text-neutral-500 mt-0.5 truncate">{format.hint}</span></span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
         {/* Form Body Container */}
         <div className="bg-neutral-900/60 border border-white/5 rounded-2xl p-4 md:p-6 space-y-4">
@@ -204,7 +183,7 @@ export const CreatePostView: React.FC = () => {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-semibold text-neutral-300">
-                {t.postTitleLabel} <span className="text-rose-400">*</span>
+                {t.postTitleLabel} <span className="text-[10px] text-neutral-500 font-normal">({dir === 'rtl' ? 'اختياري' : 'optional'})</span>
               </label>
               <span className="text-[10px] text-neutral-500 font-mono">
                 {title.length}/300
@@ -212,7 +191,6 @@ export const CreatePostView: React.FC = () => {
             </div>
             <input
               type="text"
-              required
               maxLength={300}
               placeholder={t.postTitlePlaceholder}
               value={title}
@@ -297,12 +275,11 @@ export const CreatePostView: React.FC = () => {
           {mediaType === 'link' && (
             <div>
               <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
-                {t.postLinkUrlLabel}
+                {dir === 'rtl' ? 'الرابط أو رابط الفيديو' : 'Link or video URL'}
               </label>
               <input
                 type="url"
-                required
-                placeholder="https://example.com"
+                placeholder="https://example.com أو https://youtube.com/..."
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
                 className="w-full bg-neutral-950 border border-white/10 rounded-xl px-4 py-2.5 text-xs md:text-sm text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-start font-mono"
@@ -400,7 +377,7 @@ export const CreatePostView: React.FC = () => {
               <span className="text-[11px] text-neutral-400">الآن</span>
             </div>
 
-            <div className="text-lg font-bold text-white">{title || 'Sample Post Title'}</div>
+            {title && <div className="text-lg font-bold text-white">{title}</div>}
             {content && <p className="text-xs md:text-sm text-neutral-300 whitespace-pre-line">{content}</p>}
             {mediaUrl && (
               <div className="rounded-xl overflow-hidden max-h-72 bg-neutral-950 flex items-center justify-center">

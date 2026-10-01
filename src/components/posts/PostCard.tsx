@@ -175,14 +175,16 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
           </div>
 
           {/* Title */}
-          <h2
-            className={`font-semibold text-neutral-100 group-hover:text-white transition-colors leading-snug tracking-tight mb-2.5 ${
-              isDetailedView ? 'text-xl md:text-2xl font-bold' : 'text-base md:text-lg'
-            }`}
-            style={{ textWrap: 'balance' }}
-          >
-            {post.title}
-          </h2>
+          {post.title?.trim() && (
+            <h2
+              className={`font-display text-white mb-2 ${
+                isDetailedView ? 'text-xl md:text-2xl font-bold' : 'text-base md:text-lg'
+              }`}
+              style={{ textWrap: 'balance' }}
+            >
+              {post.title}
+            </h2>
+          )}
 
           {/* Content Text */}
           {post.content && (
