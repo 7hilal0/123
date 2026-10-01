@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { Sparkles, Bell, Settings } from 'lucide-react';
+import { Bell, Settings } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
   const {
@@ -22,8 +22,8 @@ export const TopBar: React.FC = () => {
         className="flex items-center gap-2.5 rounded-2xl px-3 py-1.5 group focus:outline-none cursor-pointer select-none transition-colors hover:bg-white/[0.04]"
         title="DZCORE"
       >
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-600/30 group-hover:scale-105 transition-transform">
-          <Sparkles className="w-4 h-4 text-white" />
+        <div className="w-10 h-8 rounded-xl overflow-hidden bg-neutral-900 border border-white/10 flex items-center justify-center shadow-md shadow-emerald-600/20 group-hover:scale-105 transition-transform">
+          <img src="/dzcore-logo.jpg" alt="DZCORE logo" className="h-full w-full object-contain" />
         </div>
         <span className="font-display font-bold text-lg md:text-xl tracking-wide text-white">
           <span className="text-emerald-500 font-extrabold">D</span>ZCORE

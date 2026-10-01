@@ -71,8 +71,8 @@ export const Sidebar: React.FC = () => {
           onClick={() => navigateToFeed('hot')}
           className="flex items-center gap-2.5 group text-start focus:outline-none"
         >
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 via-teal-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform duration-200">
-            <Sparkles className="w-4 h-4 text-white" />
+          <div className="w-10 h-8 rounded-xl overflow-hidden bg-neutral-900 border border-white/10 flex items-center justify-center shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform duration-200">
+            <img src="/dzcore-logo.jpg" alt="DZCORE logo" className="h-full w-full object-contain" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
