@@ -9,7 +9,7 @@ function json(data, status = 200, origin = '*', extra = {}) {
       'content-type': 'application/json; charset=utf-8',
       'access-control-allow-origin': origin,
       'access-control-allow-credentials': 'true',
-      'access-control-allow-headers': 'content-type',
+      'access-control-allow-headers': 'content-type, x-dzcore-admin-secret',
       'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
       ...extra,
     },
@@ -131,7 +131,7 @@ async function saveAdminEntity(env, type, id, payload, ownerId = null) {
 export default {
   async fetch(request, env) {
     const origin = originFor(request);
-    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'access-control-allow-origin': origin, 'access-control-allow-credentials': 'true', 'access-control-allow-headers': 'content-type', 'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS' } });
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'access-control-allow-origin': origin, 'access-control-allow-credentials': 'true', 'access-control-allow-headers': 'content-type, x-dzcore-admin-secret', 'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS' } });
     const url = new URL(request.url);
     try {
       if (url.pathname === '/api/health') return json({ ok: true, service: 'dzcore-cloudflare-api' }, 200, origin);
