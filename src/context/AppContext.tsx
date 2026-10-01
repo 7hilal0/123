@@ -391,7 +391,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }).catch(() => {});
 
     // 4. Fetch users
-    cloudSync.fetchUsers().then((remoteUsers) => {
+    cloudSync.fetchUsers(currentUser?.id).then((remoteUsers) => {
       if (remoteUsers && remoteUsers.length > 0) {
         setUsers((local) => {
           const remoteIds = new Set(remoteUsers.map((u) => u.id));
@@ -416,6 +416,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubPosts();
     };
   }, []);
+
+  // Rehydrate follow state after the cookie session is restored.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    cloudSync.fetchUsers(currentUser.id).then((remoteUsers) => {
+      if (!remoteUsers.length) return;
+      setUsers((local) => remoteUsers.map((remote) => {
+        const cached = local.find((user) => user.id === remote.id);
+        return { ...cached, ...remote, avatar: remote.avatar || cached?.avatar || DEFAULT_USER_AVATAR, banner: remote.banner || cached?.banner || '' };
+      }));
+    }).catch(() => {});
+  }, [currentUser?.id]);
 
   // Sync to localStorage
   useEffect(() => { storage.saveUsers(users); }, [users]);
@@ -1212,7 +1224,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             isFollowing: nextFollowing,
             followersCount: nextFollowing ? u.followersCount + 1 : Math.max(0, u.followersCount - 1),
           };
-          cloudSync.saveUser(updated);
+          void cloudSync.saveFollow(currentUser.id, userId, nextFollowing).catch((error) => console.error('[Cloudflare] Follow save failed:', error));
+          void cloudSync.saveUser(updated).catch((error) => console.error('[Cloudflare] Follower count save failed:', error));
           return updated;
         }
         return u;

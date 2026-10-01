@@ -2,8 +2,9 @@ import { User, Community, Post, Comment, Conversation, DirectMessage, Notificati
 import { cloudflareApi } from './cloudflareApi';
 
 const MEDIA_CHUNK_SIZE = 48_000;
-type EntityType = 'user' | 'community' | 'post' | 'comment' | 'conversation' | 'message' | 'notification' | 'profileMedia';
+type EntityType = 'user' | 'community' | 'post' | 'comment' | 'conversation' | 'message' | 'notification' | 'profileMedia' | 'follow';
 type ProfileMediaChunk = { id: string; userId: string; field: 'avatar' | 'banner'; index: number; total: number; value: string };
+type FollowRecord = { id: string; followerId: string; followingId: string; following: boolean };
 
 const pause = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 function splitMedia(value: string): string[] { if (!value) return ['']; const chunks: string[] = []; for (let i = 0; i < value.length; i += MEDIA_CHUNK_SIZE) chunks.push(value.slice(i, i + MEDIA_CHUNK_SIZE)); return chunks; }
@@ -36,12 +37,21 @@ export const cloudSync = {
       for (let index = 0; index < rows.length; index += 20) { await saveMediaBatch(rows.slice(index, index + 20)); await pause(120); }
     }
   },
-  async fetchUsers(): Promise<User[]> {
+  async fetchUsers(currentUserId?: string): Promise<User[]> {
     const users = await fetchType<User>('user');
     // User profiles intentionally omit large avatar/banner data. Reassemble the
     // separately stored chunks here so other people's images survive a refresh,
     // not only the currently signed-in user's images.
     const mediaRows = await listRows('profileMedia');
+    const followRows = await listRows('follow');
+    const follows = followRows.map((row) => parse<FollowRecord>(row.payload)).filter((value): value is FollowRecord => Boolean(value));
+    const followerCounts = new Map<string, number>();
+    const followingByCurrentUser = new Set<string>();
+    for (const follow of follows) {
+      if (!follow.following) continue;
+      followerCounts.set(follow.followingId, (followerCounts.get(follow.followingId) || 0) + 1);
+      if (follow.followerId === currentUserId) followingByCurrentUser.add(follow.followingId);
+    }
     const mediaByUser = new Map<string, ProfileMediaChunk[]>();
     for (const row of mediaRows) {
       const media = parse<ProfileMediaChunk>(row.payload);
@@ -53,7 +63,11 @@ export const cloudSync = {
 
     return users.map((user) => {
       const media = mediaByUser.get(user.id) || [];
-      const hydrated = { ...user };
+      const hydrated = {
+        ...user,
+        ...(followerCounts.has(user.id) ? { followersCount: followerCounts.get(user.id) || 0 } : {}),
+        ...(currentUserId ? { isFollowing: followingByCurrentUser.has(user.id) } : {}),
+      };
       for (const field of ['avatar', 'banner'] as const) {
         const chunks = media.filter((item) => item.field === field).sort((a, b) => a.index - b.index);
         const total = chunks[0]?.total || 0;
@@ -63,6 +77,10 @@ export const cloudSync = {
       }
       return hydrated;
     });
+  },
+  async saveFollow(followerId: string, followingId: string, following: boolean): Promise<void> {
+    const record: FollowRecord = { id: `${followerId}:${followingId}`, followerId, followingId, following };
+    await saveEntity('follow', record, followerId);
   },
   async fetchUserMedia(userId: string): Promise<Partial<User>> {
     const rows = await listRows('profileMedia', userId);
