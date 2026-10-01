@@ -1,4 +1,5 @@
 const SESSION_COOKIE = 'dzcore_session';
+const ADMIN_COOKIE = 'dzcore_admin';
 const SESSION_DAYS = 30;
 
 function json(data, status = 200, origin = '*', extra = {}) {
@@ -17,7 +18,12 @@ function json(data, status = 200, origin = '*', extra = {}) {
 
 function originFor(request) {
   const origin = request.headers.get('Origin');
-  return origin && /^(https:\/\/)(dzcore\.pages\.dev|dzcore\.top)$/.test(origin) ? origin : 'https://dzcore.pages.dev';
+  if (!origin) return 'https://dzcore.pages.dev';
+  try {
+    const parsed = new URL(origin);
+    if (parsed.protocol === 'https:' || parsed.hostname === 'localhost') return origin;
+  } catch {}
+  return 'https://dzcore.pages.dev';
 }
 
 async function digest(value) {
@@ -56,14 +62,15 @@ function parseCookies(request) {
   }));
 }
 
-function cookie(value, maxAge) {
-  return `${SESSION_COOKIE}=${encodeURIComponent(value)}; Max-Age=${maxAge}; Path=/; HttpOnly; Secure; SameSite=None`;
+function cookie(value, maxAge, name = SESSION_COOKIE) {
+  return `${name}=${encodeURIComponent(value)}; Max-Age=${maxAge}; Path=/; HttpOnly; Secure; SameSite=None`;
 }
 
 function cleanUser(profile) {
   if (!profile) return null;
   const copy = { ...profile };
   delete copy.password;
+  delete copy.password_hash;
   return copy;
 }
 
@@ -76,6 +83,18 @@ async function currentUser(request, env) {
   const row = await env.DB.prepare('SELECT id, username, email, profile_json FROM auth_users WHERE id = ?').bind(session.user_id).first();
   if (!row) return null;
   return { ...JSON.parse(row.profile_json), id: row.id, username: row.username, email: row.email };
+}
+
+function adminKey(env) {
+  return String(env.ADMIN_PANEL_KEY || 'DZ123');
+}
+
+function isAdmin(request, env) {
+  return parseCookies(request)[ADMIN_COOKIE] === adminKey(env);
+}
+
+function adminRequired(request, env, origin) {
+  return isAdmin(request, env) ? null : json({ error: 'admin_unauthorized' }, 401, origin);
 }
 
 async function createSession(userId, env) {
@@ -99,6 +118,15 @@ async function entityList(url, env) {
   return result.results.filter((row) => !row.deleted).map((row) => ({ entityType: row.entity_type, entityId: row.entity_id, ownerId: row.owner_id, payload: row.payload }));
 }
 
+async function adminEntities(env, type) {
+  const rows = await env.DB.prepare('SELECT entity_id, owner_id, payload, updated_at FROM entities WHERE entity_type = ? AND deleted = 0 ORDER BY updated_at DESC LIMIT 1000').bind(type).all();
+  return rows.results.map((row) => ({ id: row.entity_id, ownerId: row.owner_id, updatedAt: row.updated_at, ...JSON.parse(row.payload) }));
+}
+
+async function saveAdminEntity(env, type, id, payload, ownerId = null) {
+  await env.DB.prepare('INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0').bind(type, id, ownerId, JSON.stringify(payload), Date.now()).run();
+}
+
 export default {
   async fetch(request, env) {
     const origin = originFor(request);
@@ -106,6 +134,74 @@ export default {
     const url = new URL(request.url);
     try {
       if (url.pathname === '/api/health') return json({ ok: true, service: 'dzcore-cloudflare-api' }, 200, origin);
+
+      if (url.pathname === '/api/admin/login' && request.method === 'POST') {
+        const body = await request.json();
+        if (String(body.secret || '') !== adminKey(env)) return json({ error: 'invalid_admin_secret' }, 401, origin);
+        return json({ ok: true }, 200, origin, { 'set-cookie': cookie(adminKey(env), 86400, ADMIN_COOKIE) });
+      }
+      if (url.pathname === '/api/admin/logout' && request.method === 'POST') return json({ ok: true }, 200, origin, { 'set-cookie': cookie('', 0, ADMIN_COOKIE) });
+      if (url.pathname === '/api/admin/session' && request.method === 'GET') return json({ authenticated: isAdmin(request, env) }, 200, origin);
+      if (url.pathname.startsWith('/api/admin/')) {
+        const denied = adminRequired(request, env, origin);
+        if (denied) return denied;
+
+        if (url.pathname === '/api/admin/overview' && request.method === 'GET') {
+          const [users, posts, comments, reports, banned] = await Promise.all([
+            env.DB.prepare('SELECT COUNT(*) AS count FROM auth_users').first(),
+            env.DB.prepare("SELECT COUNT(*) AS count FROM entities WHERE entity_type = 'post' AND deleted = 0").first(),
+            env.DB.prepare("SELECT COUNT(*) AS count FROM entities WHERE entity_type = 'comment' AND deleted = 0").first(),
+            env.DB.prepare("SELECT COUNT(*) AS count FROM entities WHERE entity_type = 'report' AND deleted = 0").first(),
+            env.DB.prepare("SELECT COUNT(*) AS count FROM entities WHERE entity_type = 'adminBan' AND deleted = 0").first(),
+          ]);
+          return json({ users: users?.count || 0, posts: posts?.count || 0, comments: comments?.count || 0, reports: reports?.count || 0, banned: banned?.count || 0 }, 200, origin);
+        }
+        if (url.pathname === '/api/admin/users' && request.method === 'GET') {
+          const rows = await env.DB.prepare('SELECT id, username, email, profile_json, created_at FROM auth_users ORDER BY created_at DESC LIMIT 1000').all();
+          const bans = await adminEntities(env, 'adminBan');
+          const banMap = new Map(bans.map((ban) => [ban.userId, ban]));
+          return json({ users: rows.results.map((row) => ({ id: row.id, username: row.username, email: row.email, createdAt: row.created_at, profile: cleanUser(JSON.parse(row.profile_json)), ban: banMap.get(row.id) || null })) }, 200, origin);
+        }
+        if (url.pathname === '/api/admin/reports' && request.method === 'GET') return json({ reports: await adminEntities(env, 'report') }, 200, origin);
+        if (url.pathname === '/api/admin/notifications' && request.method === 'POST') {
+          const body = await request.json();
+          if (!body.userId || !String(body.message || '').trim()) return json({ error: 'invalid_notification' }, 400, origin);
+          const notification = { id: crypto.randomUUID(), userId: body.userId, type: 'admin_warning', title: String(body.title || 'تنبيه من الإدارة').slice(0, 120), message: String(body.message).trim().slice(0, 1000), timestamp: Date.now(), read: false };
+          await saveAdminEntity(env, 'notification', notification.id, notification, body.userId);
+          return json({ notification }, 201, origin);
+        }
+        if (url.pathname === '/api/admin/actions' && request.method === 'POST') {
+          const body = await request.json();
+          const userId = String(body.userId || '');
+          const action = String(body.action || '');
+          if (!userId || !['ban', 'unban', 'delete', 'reset_password', 'resolve_report'].includes(action)) return json({ error: 'invalid_action' }, 400, origin);
+          if (action === 'ban' || action === 'unban') {
+            const ban = { userId, reason: String(body.reason || '').slice(0, 500), expiresAt: action === 'ban' && body.durationDays ? Date.now() + Number(body.durationDays) * 86400000 : null, createdAt: Date.now() };
+            await saveAdminEntity(env, 'adminBan', userId, ban, userId);
+            if (action === 'unban') await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'adminBan' AND entity_id = ?").bind(Date.now(), userId).run();
+            if (action === 'ban') await env.DB.prepare('DELETE FROM auth_sessions WHERE user_id = ?').bind(userId).run();
+            return json({ ok: true, action }, 200, origin);
+          }
+          if (action === 'delete') {
+            await env.DB.batch([
+              env.DB.prepare('DELETE FROM auth_sessions WHERE user_id = ?').bind(userId),
+              env.DB.prepare('DELETE FROM auth_users WHERE id = ?').bind(userId),
+              env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE owner_id = ? OR entity_id = ?").bind(Date.now(), userId, userId),
+            ]);
+            return json({ ok: true, action }, 200, origin);
+          }
+          if (action === 'reset_password') {
+            const temporaryPassword = crypto.randomUUID().replaceAll('-', '').slice(0, 12);
+            await env.DB.prepare('UPDATE auth_users SET password_hash = ? WHERE id = ?').bind(await hashPassword(temporaryPassword), userId).run();
+            await env.DB.prepare('DELETE FROM auth_sessions WHERE user_id = ?').bind(userId).run();
+            return json({ ok: true, temporaryPassword }, 200, origin);
+          }
+          const reportId = String(body.reportId || '');
+          if (reportId) await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'report' AND entity_id = ?").bind(Date.now(), reportId).run();
+          return json({ ok: true, action }, 200, origin);
+        }
+      }
+
       if (url.pathname === '/api/auth/me' && request.method === 'GET') return json({ user: cleanUser(await currentUser(request, env)) }, 200, origin);
       if (url.pathname === '/api/auth/register' && request.method === 'POST') {
         const body = await request.json();
@@ -131,6 +227,12 @@ export default {
         const term = String(body.term || '').trim().toLowerCase();
         const row = await env.DB.prepare('SELECT id, username, email, password_hash, profile_json FROM auth_users WHERE lower(email) = ? OR lower(username) = ?').bind(term, term).first();
         if (!row || !(await verifyPassword(String(body.password || ''), row.password_hash))) return json({ error: 'invalid_credentials' }, 401, origin);
+        const activeBan = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'adminBan' AND entity_id = ? AND deleted = 0").bind(row.id).first();
+        if (activeBan) {
+          const ban = JSON.parse(activeBan.payload);
+          if (!ban.expiresAt || ban.expiresAt > Date.now()) return json({ error: 'account_banned' }, 403, origin);
+          await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'adminBan' AND entity_id = ?").bind(Date.now(), row.id).run();
+        }
         const session = await createSession(row.id, env);
         const user = { ...JSON.parse(row.profile_json), id: row.id, username: row.username, email: row.email };
         return json({ user: cleanUser(user) }, 200, origin, { 'set-cookie': cookie(session.token, SESSION_DAYS * 86400) });
@@ -154,15 +256,25 @@ export default {
         await env.DB.batch(statements);
         return json({ user: cleanUser({ ...profile, id: user.id, username: user.username, email: profile.email || user.email }) }, 200, origin);
       }
+      if (url.pathname === '/api/reports' && request.method === 'POST') {
+        const user = await currentUser(request, env);
+        if (!user) return json({ error: 'unauthorized' }, 401, origin);
+        const body = await request.json();
+        const targetType = String(body.targetType || '');
+        const targetId = String(body.targetId || '');
+        const reason = String(body.reason || '').trim();
+        if (!['post', 'user', 'comment'].includes(targetType) || !targetId || !reason) return json({ error: 'invalid_report' }, 400, origin);
+        const report = { id: crypto.randomUUID(), reporterId: user.id, reporterUsername: user.username, targetType, targetId, reason: reason.slice(0, 1000), status: 'open', createdAt: Date.now() };
+        await saveAdminEntity(env, 'report', report.id, report, user.id);
+        return json({ report: { id: report.id, status: report.status } }, 201, origin);
+      }
       if (url.pathname === '/api/entities' && request.method === 'GET') return json({ items: await entityList(url, env) }, 200, origin);
       if (url.pathname === '/api/entities/batch' && request.method === 'POST') {
         const user = await currentUser(request, env);
         if (!user) return json({ error: 'unauthorized' }, 401, origin);
         const body = await request.json();
         const entities = Array.isArray(body.entities) ? body.entities : [];
-        if (!entities.length || entities.length > 20 || entities.some((item) => item.entityType !== 'profileMedia' || !item.entityId || typeof item.payload !== 'string')) {
-          return json({ error: 'invalid_entity_batch' }, 400, origin);
-        }
+        if (!entities.length || entities.length > 20 || entities.some((item) => item.entityType !== 'profileMedia' || !item.entityId || typeof item.payload !== 'string')) return json({ error: 'invalid_entity_batch' }, 400, origin);
         const statements = entities.map((item) => env.DB.prepare('INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0').bind(item.entityType, item.entityId, item.ownerId || user.id, item.payload, Date.now()));
         await env.DB.batch(statements);
         return json({ ok: true }, 200, origin);
