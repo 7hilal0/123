@@ -66,6 +66,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
   const [imageEditor, setImageEditor] = useState<{ src: string; target: 'avatar' | 'banner'; setter: (value: string) => void; gif: boolean } | null>(null);
   const [imageZoom, setImageZoom] = useState(1);
   const [imageRotation, setImageRotation] = useState(0);
+  const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
+  const imageDragRef = useRef<{ x: number; y: number; offsetX: number; offsetY: number } | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const BackIcon = dir === 'rtl' ? ArrowRight : ArrowLeft;
@@ -113,6 +115,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
       });
       setImageZoom(1);
       setImageRotation(0);
+      setImageOffset({ x: 0, y: 0 });
       setImageEditor({ src, target, setter, gif: file.type === 'image/gif' });
     } catch (error) {
       console.error('Unable to read profile image', error);
@@ -120,6 +123,21 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
       event.target.value = '';
     }
   };
+
+  const getImageOffsetLimit = () => Math.max(0, (imageZoom - 1) * 50);
+  const startImageDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    imageDragRef.current = { x: event.clientX, y: event.clientY, offsetX: imageOffset.x, offsetY: imageOffset.y };
+  };
+  const moveImageDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!imageDragRef.current) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const limit = getImageOffsetLimit();
+    const nextX = imageDragRef.current.offsetX + ((event.clientX - imageDragRef.current.x) / rect.width) * 100;
+    const nextY = imageDragRef.current.offsetY + ((event.clientY - imageDragRef.current.y) / rect.height) * 100;
+    setImageOffset({ x: clamp(nextX, -limit, limit), y: clamp(nextY, -limit, limit) });
+  };
+  const stopImageDrag = () => { imageDragRef.current = null; };
 
   const saveImageEdit = () => {
     if (!imageEditor) return;
@@ -140,7 +158,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
       if (!context) return;
       const scale = Math.max(width / image.width, height / image.height) * imageZoom;
       context.save();
-      context.translate(width / 2, height / 2);
+      context.translate(width / 2 + (imageOffset.x / 100) * width, height / 2 + (imageOffset.y / 100) * height);
       context.rotate((imageRotation * Math.PI) / 180);
       context.drawImage(image, -image.width * scale / 2, -image.height * scale / 2, image.width * scale, image.height * scale);
       context.restore();
@@ -386,13 +404,20 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
               <button type="button" onClick={saveImageEdit} aria-label="Apply"><Check className="h-7 w-7" /></button>
             </header>
             <div className="flex flex-1 items-center justify-center p-5" onClick={(event) => event.stopPropagation()}>
-              <div className={`relative overflow-hidden border border-white/70 bg-neutral-900 ${imageEditor.target === 'avatar' ? 'aspect-square w-[min(82vw,420px)] rounded-full' : 'aspect-[12/5] w-full max-w-3xl rounded-2xl'}`}>
-                <img src={imageEditor.src} alt="Edit preview" className="h-full w-full object-cover" style={{ transform: `scale(${imageZoom}) rotate(${imageRotation}deg)` }} />
+              <div
+                className={`relative cursor-grab touch-none overflow-hidden border border-white/70 bg-neutral-900 active:cursor-grabbing ${imageEditor.target === 'avatar' ? 'aspect-square w-[min(82vw,420px)] rounded-full' : 'aspect-[12/5] w-full max-w-3xl rounded-2xl'}`}
+                onPointerDown={startImageDrag}
+                onPointerMove={moveImageDrag}
+                onPointerUp={stopImageDrag}
+                onPointerCancel={stopImageDrag}
+              >
+                <img src={imageEditor.src} alt="Edit preview" draggable={false} className="h-full w-full select-none object-cover" style={{ transform: `translate(${imageOffset.x}%, ${imageOffset.y}%) scale(${imageZoom}) rotate(${imageRotation}deg)` }} />
                 <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,transparent_33%,rgba(255,255,255,.5)_33%,rgba(255,255,255,.5)_33.3%,transparent_33.3%,transparent_66%,rgba(255,255,255,.5)_66%,rgba(255,255,255,.5)_66.3%,transparent_66.3%),linear-gradient(to_bottom,transparent_33%,rgba(255,255,255,.5)_33%,rgba(255,255,255,.5)_33.3%,transparent_33.3%,transparent_66%,rgba(255,255,255,.5)_66%,rgba(255,255,255,.5)_66.3%,transparent_66.3%)]" />
               </div>
             </div>
             <div className="space-y-5 border-t border-white/10 bg-[#101114] px-6 py-6 sm:px-12">
-              <label className="flex items-center gap-4 text-sm"><span className="w-16">Scale</span><input type="range" min="1" max="3" step="0.01" value={imageZoom} onChange={(event) => setImageZoom(Number(event.target.value))} className="w-full accent-white" /></label>
+              <label className="flex items-center gap-4 text-sm"><span className="w-16">Scale</span><input type="range" min="1" max="3" step="0.01" value={imageZoom} onChange={(event) => { setImageZoom(Number(event.target.value)); setImageOffset({ x: 0, y: 0 }); }} className="w-full accent-white" /></label>
+              <p className="text-center text-xs text-neutral-400">Drag the image to position it inside the frame</p>
               <button type="button" onClick={() => setImageRotation((value) => (value + 90) % 360)} className="mx-auto flex items-center gap-2 rounded-xl border border-white/15 px-4 py-2 text-sm"><RotateCw className="h-4 w-4" /> Rotate</button>
               {imageEditor.gif && <p className="text-center text-xs text-neutral-400">GIF animation will be preserved. Crop controls preview the frame, while the original animation is saved.</p>}
             </div>
