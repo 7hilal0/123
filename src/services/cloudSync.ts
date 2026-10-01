@@ -102,7 +102,20 @@ export const cloudSync = {
   async deleteComments(postId: string, commentIds: string[]): Promise<boolean> { try { for (const commentId of commentIds) await saveEntity('comment', { id: commentId, postId, deleted: true, deletedAt: Date.now() } as unknown as Comment, postId); return true; } catch { return false; } },
   deleteComment(postId: string, commentId: string) { return this.deleteComments(postId, [commentId]); },
   async fetchComments(postId: string) { const comments = await fetchType<Comment & { postId?: string }>('comment', (comment) => comment.postId === postId); return comments.filter((comment) => !(comment as Comment & { deleted?: boolean }).deleted); },
-  saveConversation: (conversation: Conversation) => saveEntity('conversation', conversation),
+  saveConversation: (conversation: Conversation) => {
+    // Never store full participant objects here: they may contain large GIF
+    // data URLs and can make the conversation row too large for D1.
+    const compactConversation = {
+      id: conversation.id,
+      participantIds: conversation.participantIds || Object.keys(conversation.participants || {}),
+      lastMessage: conversation.lastMessage,
+      lastMessageTime: conversation.lastMessageTime,
+      lastMessageTimestamp: conversation.lastMessageTimestamp,
+      lastSenderId: conversation.lastSenderId,
+      unreadCount: conversation.unreadCount || 0,
+    } as Conversation;
+    return saveEntity('conversation', compactConversation, conversation.participantIds?.[0]);
+  },
   fetchConversations: (userId: string) => fetchType<Conversation>('conversation', (conversation) => Boolean(conversation.participantIds?.includes(userId) || conversation.id.includes(userId) || conversation.participant?.id === userId)),
   subscribeConversations(userId: string, callback: (items: Conversation[]) => void) { return subscribePoll(() => this.fetchConversations(userId), callback, 'conversations'); },
   saveDirectMessage: (conversationId: string, message: DirectMessage) => saveEntity('message', { ...message, conversationId } as DirectMessage & { conversationId: string }, conversationId),
