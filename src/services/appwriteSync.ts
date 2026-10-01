@@ -1,304 +1,56 @@
-import { APPWRITE_DATABASE_ID, APPWRITE_TABLE_ID, Query, tablesDB } from '../lib/appwrite';
 import { User, Community, Post, Comment, Conversation, DirectMessage, NotificationItem } from '../types';
-
-const MAX_PAGE = 100;
-
-type EntityType =
-  | 'user'
-  | 'community'
-  | 'post'
-  | 'comment'
-  | 'conversation'
-  | 'message'
-  | 'notification'
-  | 'profileMedia';
-
-type StoredRow = {
-  entityType: string;
-  ownerId?: string;
-  payload: string;
-};
-
-type ProfileMediaChunk = {
-  id: string;
-  userId: string;
-  field: 'avatar' | 'banner';
-  index: number;
-  total: number;
-  value: string;
-};
+import { cloudflareApi } from './cloudflareApi';
 
 const MEDIA_CHUNK_SIZE = 48_000;
 const MEDIA_BATCH_SIZE = 3;
-
-function splitMedia(value: string): string[] {
-  if (!value) return [''];
-  const chunks: string[] = [];
-  for (let index = 0; index < value.length; index += MEDIA_CHUNK_SIZE) {
-    chunks.push(value.slice(index, index + MEDIA_CHUNK_SIZE));
-  }
-  return chunks;
-}
+type EntityType = 'user' | 'community' | 'post' | 'comment' | 'conversation' | 'message' | 'notification' | 'profileMedia';
+type ProfileMediaChunk = { id: string; userId: string; field: 'avatar' | 'banner'; index: number; total: number; value: string };
 
 const pause = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
-
-async function saveMediaChunk(chunk: ProfileMediaChunk): Promise<void> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    try {
-      await saveEntity('profileMedia', chunk, chunk.userId);
-      return;
-    } catch (error) {
-      lastError = error;
-      await pause(350 * (attempt + 1));
-    }
-  }
-  throw lastError;
-}
-
-function stripUndefined<T>(value: T): T {
-  if (value === undefined || value === null) return value;
-  if (Array.isArray(value)) return value.map((item) => stripUndefined(item)) as unknown as T;
-  if (typeof value === 'object' && !(value instanceof Date)) {
-    const result: Record<string, unknown> = {};
-    for (const [key, item] of Object.entries(value)) {
-      if (item !== undefined) result[key] = stripUndefined(item);
-    }
-    return result as T;
-  }
-  return value;
-}
-
-// Appwrite row IDs are limited to 36 safe characters. This deterministic hash
-// keeps updates idempotent without exposing the original nested-document key.
-function rowId(type: EntityType, id: string): string {
-  let hash = 2166136261;
-  for (const char of `${type}:${id}`) {
-    hash ^= char.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `${type.slice(0, 3)}_${(hash >>> 0).toString(16).padStart(8, '0')}_${Math.abs(id.length).toString(16)}`;
-}
-
-async function listRows(baseQueries: ReturnType<typeof Query.equal>[] = []): Promise<Array<{ $id: string; data: StoredRow }>> {
-  const rows: Array<{ $id: string; data: StoredRow }> = [];
-  for (let offset = 0; offset < 10000; offset += MAX_PAGE) {
-    const result = await tablesDB.listRows({
-      databaseId: APPWRITE_DATABASE_ID,
-      tableId: APPWRITE_TABLE_ID,
-      queries: [...baseQueries, Query.limit(MAX_PAGE), Query.offset(offset)],
-      total: false,
-      ttl: 0,
-    });
-    const page = (result.rows || []) as Array<{ $id: string; entityType?: string; ownerId?: string; payload?: string }>;
-    rows.push(...page.map((row) => ({
-      $id: row.$id,
-      data: { entityType: row.entityType || '', ownerId: row.ownerId, payload: row.payload || '{}' },
-    })));
-    if (page.length < MAX_PAGE) break;
-  }
-  return rows;
-}
-
-function parse<T>(row: { data: StoredRow }): T | null {
-  try {
-    return JSON.parse(row.data.payload) as T;
-  } catch {
-    return null;
-  }
-}
-
-async function saveEntity<T extends { id: string }>(entityType: EntityType, entity: T, ownerId?: string): Promise<void> {
-  const clean = stripUndefined(entity);
-  await tablesDB.upsertRow({
-    databaseId: APPWRITE_DATABASE_ID,
-    tableId: APPWRITE_TABLE_ID,
-    rowId: rowId(entityType, entity.id),
-    data: {
-      entityType,
-      ownerId: ownerId || entity.id,
-      payload: JSON.stringify(clean),
-    },
-  });
-}
-
-async function fetchType<T>(entityType: EntityType, predicate?: (value: T) => boolean): Promise<T[]> {
-  const rows = await listRows();
-  const values = rows
-    .filter((row) => row.data.entityType === entityType)
-    .map((row) => parse<T>(row))
-    .filter((value): value is T => Boolean(value));
-  return predicate ? values.filter(predicate) : values;
-}
-
-function subscribePoll<T>(fetcher: () => Promise<T[]>, callback: (items: T[]) => void, label: string): () => void {
-  let stopped = false;
-  const poll = async () => {
-    try {
-      const items = await fetcher();
-      if (!stopped) callback(items);
-    } catch (error) {
-      console.error(`[Appwrite] ${label} sync error:`, error);
-    }
-  };
-  void poll();
-  const timer = window.setInterval(poll, 10000);
-  return () => {
-    stopped = true;
-    window.clearInterval(timer);
-  };
-}
+function splitMedia(value: string): string[] { if (!value) return ['']; const chunks: string[] = []; for (let i = 0; i < value.length; i += MEDIA_CHUNK_SIZE) chunks.push(value.slice(i, i + MEDIA_CHUNK_SIZE)); return chunks; }
+function parse<T>(payload: string): T | null { try { return JSON.parse(payload) as T; } catch { return null; } }
+async function listRows<T>(type?: EntityType, ownerId?: string) { return (await cloudflareApi.listEntities(type, ownerId)).items; }
+async function fetchType<T>(type: EntityType, predicate?: (value: T) => boolean): Promise<T[]> { const rows = await listRows(type); const values = rows.map((row) => parse<T>(row.payload)).filter((value): value is T => Boolean(value)); return predicate ? values.filter(predicate) : values; }
+async function saveEntity<T extends { id: string }>(entityType: EntityType, entity: T, ownerId?: string): Promise<void> { await cloudflareApi.saveEntity(entityType, entity.id, JSON.stringify(entity), ownerId || entity.id); }
+function subscribePoll<T>(fetcher: () => Promise<T[]>, callback: (items: T[]) => void, label: string): () => void { let stopped = false; const poll = async () => { try { const items = await fetcher(); if (!stopped) callback(items); } catch (error) { console.error(`[Cloudflare] ${label} sync error:`, error); } }; void poll(); const timer = window.setInterval(poll, 10000); return () => { stopped = true; window.clearInterval(timer); }; }
 
 export const appwriteSync = {
   async saveUser(user: User): Promise<void> {
-    // Keep large animated GIF data out of the user row. Appwrite text columns
-    // can reject a large base64 GIF even though a compressed JPG succeeds.
     const { avatar, banner, ...profile } = user;
     await saveEntity('user', profile as User);
-
-    const media = [
-      { field: 'avatar' as const, value: avatar || '' },
-      { field: 'banner' as const, value: banner || '' },
-    ];
-    for (const item of media) {
+    for (const item of [{ field: 'avatar' as const, value: avatar || '' }, { field: 'banner' as const, value: banner || '' }]) {
       const chunks = splitMedia(item.value);
-      const rows = chunks.map((value, index) => ({
-        id: `${user.id}:${item.field}:${index}`,
-        userId: user.id,
-        field: item.field,
-        index,
-        total: chunks.length,
-        value,
-      } as ProfileMediaChunk));
-      for (let index = 0; index < rows.length; index += MEDIA_BATCH_SIZE) {
-        await Promise.all(rows.slice(index, index + MEDIA_BATCH_SIZE).map(saveMediaChunk));
-        await pause(180);
-      }
+      const rows = chunks.map((value, index) => ({ id: `${user.id}:${item.field}:${index}`, userId: user.id, field: item.field, index, total: chunks.length, value } as ProfileMediaChunk));
+      for (let index = 0; index < rows.length; index += MEDIA_BATCH_SIZE) { await Promise.all(rows.slice(index, index + MEDIA_BATCH_SIZE).map((row) => saveEntity('profileMedia', row, user.id))); await pause(80); }
     }
   },
-  async fetchUsers(): Promise<User[]> {
-    const users = await fetchType<User>('user');
-    // Do not download every animated GIF before the feed can render.
-    // Media for the signed-in profile is loaded separately on demand.
-    return users;
-  },
+  fetchUsers: () => fetchType<User>('user'),
   async fetchUserMedia(userId: string): Promise<Partial<User>> {
-    const rows = await listRows([
-      Query.equal('entityType', ['profileMedia']),
-      Query.equal('ownerId', [userId]),
-    ]);
-    const media = rows
-      .filter((row) => row.data.entityType === 'profileMedia' && row.data.ownerId === userId)
-      .map((row) => parse<ProfileMediaChunk>(row))
-      .filter((value): value is ProfileMediaChunk => Boolean(value));
-    const mediaByUser = new Map<string, Partial<Record<'avatar' | 'banner', string>>>();
-
+    const rows = await listRows('profileMedia', userId);
+    const media = rows.map((row) => parse<ProfileMediaChunk>(row.payload)).filter((value): value is ProfileMediaChunk => Boolean(value));
+    const result: Partial<User> = {};
     for (const field of ['avatar', 'banner'] as const) {
-      const groups = new Map<string, ProfileMediaChunk[]>();
-      for (const item of media) {
-        if (item.field !== field) continue;
-        const key = `${item.userId}:${item.total}`;
-        groups.set(key, [...(groups.get(key) || []), item]);
-      }
-      for (const [key, chunks] of groups) {
-        const [userId, totalText] = key.split(':');
-        const total = Number(totalText);
-        if (!Number.isFinite(total) || chunks.length < total) continue;
-        const value = chunks.sort((a, b) => a.index - b.index).slice(0, total).map((item) => item.value).join('');
-        const current = mediaByUser.get(userId) || {};
-        current[field] = value;
-        mediaByUser.set(userId, current);
-      }
+      const chunks = media.filter((item) => item.field === field).sort((a, b) => a.index - b.index);
+      if (chunks.length && chunks.length >= chunks[0].total) result[field] = chunks.slice(0, chunks[0].total).map((item) => item.value).join('');
     }
-
-    return mediaByUser.get(userId) || {};
+    return result;
   },
-
-  async saveCommunity(community: Community): Promise<void> {
-    await saveEntity('community', community);
-  },
-  fetchCommunities(): Promise<Community[]> {
-    return fetchType<Community>('community');
-  },
-
-  async savePost(post: Post): Promise<void> {
-    await saveEntity('post', post, post.author?.id);
-  },
-  async deletePost(postId: string): Promise<boolean> {
-    const post = { id: postId, deleted: true, deletedAt: Date.now() } as unknown as Post;
-    try {
-      await saveEntity('post', post);
-      return true;
-    } catch (error) {
-      console.error('[Appwrite] Error marking post deleted:', error);
-      return false;
-    }
-  },
-  async fetchPosts(): Promise<Post[] | null> {
-    try {
-      return await fetchType<Post>('post');
-    } catch (error) {
-      console.error('[Appwrite] Error fetching posts:', error);
-      return null;
-    }
-  },
-  subscribePosts(callback: (posts: Post[]) => void): () => void {
-    return subscribePoll(() => this.fetchPosts().then((items) => items || []), callback, 'posts');
-  },
-
-  async saveComment(postId: string, comment: Comment): Promise<void> {
-    await saveEntity('comment', { ...comment, postId } as Comment & { postId: string }, postId);
-  },
-  async deleteComments(postId: string, commentIds: string[]): Promise<boolean> {
-    try {
-      for (const commentId of commentIds) {
-        await saveEntity('comment', { id: commentId, postId, deleted: true, deletedAt: Date.now() } as unknown as Comment, postId);
-      }
-      return true;
-    } catch (error) {
-      console.error('[Appwrite] Error deleting comments:', error);
-      return false;
-    }
-  },
-  deleteComment(postId: string, commentId: string): Promise<boolean> {
-    return this.deleteComments(postId, [commentId]);
-  },
-  async fetchComments(postId: string): Promise<Comment[]> {
-    const comments = await fetchType<Comment & { postId?: string }>('comment', (comment) => comment.postId === postId);
-    return comments.filter((comment) => !(comment as Comment & { deleted?: boolean }).deleted);
-  },
-
-  async saveConversation(conversation: Conversation): Promise<void> {
-    await saveEntity('conversation', conversation);
-  },
-  fetchConversations(userId: string): Promise<Conversation[]> {
-    return fetchType<Conversation>('conversation', (conversation) =>
-      Boolean(conversation.participantIds?.includes(userId) || conversation.id.includes(userId) || conversation.participant?.id === userId)
-    );
-  },
-  subscribeConversations(userId: string, callback: (items: Conversation[]) => void): () => void {
-    return subscribePoll(() => this.fetchConversations(userId), callback, 'conversations');
-  },
-
-  async saveDirectMessage(conversationId: string, message: DirectMessage): Promise<void> {
-    await saveEntity('message', { ...message, conversationId } as DirectMessage & { conversationId: string }, conversationId);
-  },
-  async fetchMessages(conversationId: string): Promise<DirectMessage[]> {
-    const messages = await fetchType<DirectMessage & { conversationId?: string }>('message', (message) => message.conversationId === conversationId);
-    return messages.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-  },
-  subscribeMessages(conversationId: string, callback: (items: DirectMessage[]) => void): () => void {
-    return subscribePoll(() => this.fetchMessages(conversationId), callback, 'messages');
-  },
-
-  async saveNotification(notification: NotificationItem): Promise<void> {
-    await saveEntity('notification', notification, notification.recipientId);
-  },
-  subscribeNotifications(userId: string, callback: (items: NotificationItem[]) => void): () => void {
-    return subscribePoll(
-      () => fetchType<NotificationItem>('notification', (notification) => notification.recipientId === userId),
-      callback,
-      'notifications'
-    );
-  },
+  saveCommunity: (community: Community) => saveEntity('community', community),
+  fetchCommunities: () => fetchType<Community>('community'),
+  savePost: (post: Post) => saveEntity('post', post, post.author?.id),
+  async deletePost(postId: string): Promise<boolean> { try { await saveEntity('post', { id: postId, deleted: true, deletedAt: Date.now() } as unknown as Post); return true; } catch { return false; } },
+  async fetchPosts(): Promise<Post[] | null> { try { return await fetchType<Post>('post'); } catch { return null; } },
+  subscribePosts(callback: (posts: Post[]) => void) { return subscribePoll(() => this.fetchPosts().then((items) => items || []), callback, 'posts'); },
+  saveComment: (postId: string, comment: Comment) => saveEntity('comment', { ...comment, postId } as Comment & { postId: string }, postId),
+  async deleteComments(postId: string, commentIds: string[]): Promise<boolean> { try { for (const commentId of commentIds) await saveEntity('comment', { id: commentId, postId, deleted: true, deletedAt: Date.now() } as unknown as Comment, postId); return true; } catch { return false; } },
+  deleteComment(postId: string, commentId: string) { return this.deleteComments(postId, [commentId]); },
+  async fetchComments(postId: string) { const comments = await fetchType<Comment & { postId?: string }>('comment', (comment) => comment.postId === postId); return comments.filter((comment) => !(comment as Comment & { deleted?: boolean }).deleted); },
+  saveConversation: (conversation: Conversation) => saveEntity('conversation', conversation),
+  fetchConversations: (userId: string) => fetchType<Conversation>('conversation', (conversation) => Boolean(conversation.participantIds?.includes(userId) || conversation.id.includes(userId) || conversation.participant?.id === userId)),
+  subscribeConversations(userId: string, callback: (items: Conversation[]) => void) { return subscribePoll(() => this.fetchConversations(userId), callback, 'conversations'); },
+  saveDirectMessage: (conversationId: string, message: DirectMessage) => saveEntity('message', { ...message, conversationId } as DirectMessage & { conversationId: string }, conversationId),
+  async fetchMessages(conversationId: string) { const messages = await fetchType<DirectMessage & { conversationId?: string }>('message', (message) => message.conversationId === conversationId); return messages.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); },
+  subscribeMessages(conversationId: string, callback: (items: DirectMessage[]) => void) { return subscribePoll(() => this.fetchMessages(conversationId), callback, 'messages'); },
+  saveNotification: (notification: NotificationItem) => saveEntity('notification', notification, notification.recipientId),
+  subscribeNotifications(userId: string, callback: (items: NotificationItem[]) => void) { return subscribePoll(() => fetchType<NotificationItem>('notification', (notification) => notification.recipientId === userId), callback, 'notifications'); },
 };

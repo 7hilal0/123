@@ -14,10 +14,10 @@ import {
 import { storage } from '../utils/storage';
 import { translations, Language, Translations } from '../locales/translations';
 import { appwriteSync } from '../services/appwriteSync';
+import { cloudflareApi } from '../services/cloudflareApi';
 import { DEFAULT_USER_AVATAR } from '../utils/avatarConstants';
 import { resolvePostForUser, resolveCommentForUser } from '../utils/voting';
 import { resolveConversationForUser } from '../utils/conversationUtils';
-import { account, ID } from '../lib/appwrite';
 
 export interface ToastMessage {
   id: string;
@@ -209,16 +209,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, [currentUser?.id]);
 
-  // Restore the Appwrite session after refresh. Legacy local sessions are not trusted.
+  // Restore the Cloudflare HttpOnly cookie session after refresh.
   useEffect(() => {
     let active = true;
-    account.get().then(async (sessionUser) => {
+    cloudflareApi.me().then(async ({ user: sessionUser }) => {
       if (!active) return;
+      if (!sessionUser) { setCurrentUser(null); return; }
       const remoteUsers = await appwriteSync.fetchUsers().catch(() => [] as User[]);
-      const cachedProfile = storage.getUsers().find((user) => user.id === sessionUser.$id);
-      const cachedMedia = await storage.getProfileMediaBackup(sessionUser.$id).catch(() => null);
-      const remoteProfile = remoteUsers.find((user) => user.id === sessionUser.$id);
-      const remoteMedia = await appwriteSync.fetchUserMedia(sessionUser.$id).catch(() => ({} as Partial<User>));
+      const cachedProfile = storage.getUsers().find((user) => user.id === sessionUser.id);
+      const cachedMedia = await storage.getProfileMediaBackup(sessionUser.id).catch(() => null);
+      const remoteProfile = remoteUsers.find((user) => user.id === sessionUser.id);
+      const remoteMedia = await appwriteSync.fetchUserMedia(sessionUser.id).catch(() => ({} as Partial<User>));
       const localAvatar = cachedMedia?.avatar || remoteMedia.avatar || cachedProfile?.avatar;
       const localBanner = cachedMedia?.banner || remoteMedia.banner || cachedProfile?.banner;
       const profile = remoteProfile ? {
@@ -233,9 +234,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           : remoteProfile.banner,
         profileColor: remoteProfile.profileColor || cachedProfile?.profileColor,
       } : {
-        id: sessionUser.$id,
-        username: sessionUser.email.split('@')[0],
-        displayName: sessionUser.name || sessionUser.email.split('@')[0],
+        id: sessionUser.id,
+        username: sessionUser.username,
+        displayName: sessionUser.displayName || sessionUser.username,
         email: sessionUser.email,
         avatar: localAvatar || DEFAULT_USER_AVATAR,
         banner: localBanner || '',
@@ -1291,7 +1292,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  // Appwrite Authentication
+  // Cloudflare D1 Authentication
   const login = async (usernameOrEmail: string, password?: string): Promise<boolean> => {
     const term = usernameOrEmail.trim().toLowerCase();
     let profile = users.find(
@@ -1323,14 +1324,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     try {
-      await account.createEmailPasswordSession({ email, password });
-      const sessionUser = await account.get();
+      const { user: sessionUser } = await cloudflareApi.login(term, password);
       const resolved = profile
-        ? { ...profile, id: sessionUser.$id, email: sessionUser.email }
+        ? { ...profile, id: sessionUser.id, email: sessionUser.email }
         : ({
-            id: sessionUser.$id,
-            username: sessionUser.email.split('@')[0],
-            displayName: sessionUser.name || sessionUser.email.split('@')[0],
+            id: sessionUser.id,
+            username: sessionUser.username,
+            displayName: sessionUser.displayName || sessionUser.username,
             email: sessionUser.email,
             avatar: DEFAULT_USER_AVATAR,
             banner: '',
@@ -1353,7 +1353,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       return true;
     } catch (error: any) {
-      console.error('[Appwrite] Login failed:', error);
+      console.error('[Cloudflare] Login failed:', error);
       showToast(
         language === 'ar'
           ? 'تعذر تسجيل الدخول. تحقق من البريد/اسم المستخدم وكلمة المرور.'
@@ -1392,34 +1392,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     try {
-      const created = await account.create({ userId: ID.unique(), email: cleanEmail, password, name: displayName.trim() || cleanUsername });
-      await account.createEmailPasswordSession({ email: cleanEmail, password });
-      const newUser: User = {
-        id: created.$id,
+      const { user: newUser } = await cloudflareApi.register({
         username: cleanUsername,
         displayName: displayName.trim() || cleanUsername,
         email: cleanEmail,
+        password,
         avatar: avatarUrl || DEFAULT_USER_AVATAR,
-        banner: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
-        bio: '',
-        status: 'online',
-        customStatus: '',
-        badges: [language === 'ar' ? 'عضو جديد' : 'Member'],
-        karma: 0,
-        joinedDate: language === 'ar' ? 'انضم اليوم' : 'Joined today',
-        followersCount: 0,
-        followingCount: 0,
-        isFollowing: false,
+      });
+      const normalizedUser: User = {
+        ...newUser,
+        username: cleanUsername,
+        displayName: displayName.trim() || cleanUsername,
+        email: cleanEmail,
       };
-      setUsers((prev) => [newUser, ...prev]);
-      setCurrentUser(newUser);
-      await appwriteSync.saveUser(newUser);
+      setUsers((prev) => [normalizedUser, ...prev]);
+      setCurrentUser(normalizedUser);
       setAuthModalOpenState(false);
-      showToast(language === 'ar' ? `أهلاً بك في DZCORE، ${newUser.displayName}!` : `Welcome to DZCORE, ${newUser.displayName}!`, 'success');
+      showToast(language === 'ar' ? `أهلاً بك في DZCORE، ${normalizedUser.displayName}!` : `Welcome to DZCORE, ${normalizedUser.displayName}!`, 'success');
       return true;
     } catch (error: any) {
-      console.error('[Appwrite] Registration failed:', error);
-      const message = error?.code === 409 ? 'Email is already registered' : 'Could not create the account';
+      console.error('[Cloudflare] Registration failed:', error);
+      const message = error?.code === 'already_registered' ? 'Email is already registered' : 'Could not create the account';
       showToast(language === 'ar' ? 'تعذر إنشاء الحساب، تحقق من البيانات' : message, 'warning');
       return false;
     }
@@ -1429,7 +1422,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!currentUser) return false;
     try {
       const normalizedEmail = email.trim();
-      await account.updateEmail(normalizedEmail, currentPassword);
+      await cloudflareApi.updateAccount({ email: normalizedEmail, currentPassword });
       const updatedUser = { ...currentUser, email: normalizedEmail };
       setCurrentUser(updatedUser);
       setUsers((prev) => prev.map((user) => user.id === updatedUser.id ? updatedUser : user));
@@ -1438,7 +1431,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast(language === 'ar' ? 'تم تحديث البريد الإلكتروني بنجاح' : 'Email updated successfully', 'success');
       return true;
     } catch (error: any) {
-      console.error('[Appwrite] Email update failed:', error);
+      console.error('[Cloudflare] Email update failed:', error);
       showToast(language === 'ar' ? 'تعذر تغيير البريد الإلكتروني. تحقق من كلمة المرور والبريد.' : 'Could not update email. Check your password and email.', 'warning');
       return false;
     }
@@ -1446,17 +1439,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateAccountPassword = async (newPassword: string, currentPassword: string) => {
     if (!currentUser) return false;
     try {
-      await account.updatePassword(newPassword, currentPassword);
+      await cloudflareApi.updateAccount({ newPassword, currentPassword });
       showToast(language === 'ar' ? 'تم تغيير كلمة المرور بنجاح' : 'Password updated successfully', 'success');
       return true;
     } catch (error: any) {
-      console.error('[Appwrite] Password update failed:', error);
+      console.error('[Cloudflare] Password update failed:', error);
       showToast(language === 'ar' ? 'تعذر تغيير كلمة المرور. تحقق من كلمة المرور الحالية.' : 'Could not update password. Check your current password.', 'warning');
       return false;
     }
   };
   const logout = async () => {
-    try { await account.deleteSession({ sessionId: 'current' }); } catch { /* already signed out */ }
+    try { await cloudflareApi.logout(); } catch { /* already signed out */ }
     setCurrentUser(null);
     showToast(language === 'ar' ? 'تم تسجيل الخروج بنجاح' : 'Signed out successfully', 'info');
   };
