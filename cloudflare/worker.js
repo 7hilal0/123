@@ -86,7 +86,7 @@ async function currentUser(request, env) {
 }
 
 function adminKey(env) {
-  return String(env.ADMIN_PANEL_KEY || 'DZ123');
+  return String(env.ADMIN_PANEL_KEY || '');
 }
 
 function isAdmin(request, env) {
