@@ -110,7 +110,10 @@ async function entityList(url, env) {
   const ownerId = url.searchParams.get('ownerId');
   const entityId = url.searchParams.get('entityId');
   const summary = url.searchParams.get('summary') === '1';
-  let query = 'SELECT entity_type, entity_id, owner_id, payload, deleted FROM entities';
+  const payloadSelect = summary && type === 'post'
+    ? "json_remove(payload, '$.author.avatar', '$.author.banner', '$.mediaUrl') AS payload"
+    : 'payload';
+  let query = `SELECT entity_type, entity_id, owner_id, ${payloadSelect}, deleted FROM entities`;
   const values = [];
   const clauses = [];
   if (type) { clauses.push('entity_type = ?'); values.push(type); }
@@ -122,10 +125,7 @@ async function entityList(url, env) {
   return result.results.filter((row) => !row.deleted).map((row) => {
     if (summary && type === 'post') {
       const payload = JSON.parse(row.payload);
-      if (typeof payload.mediaUrl === 'string' && payload.mediaUrl.length > 500000) {
-        delete payload.mediaUrl;
-        payload.mediaDeferred = true;
-      }
+      if (payload.mediaType === 'image') payload.mediaDeferred = true;
       if (payload.author && typeof payload.author === 'object') {
         if (typeof payload.author.avatar === 'string' && payload.author.avatar.length > 200000) {
           payload.author.avatar = '';
