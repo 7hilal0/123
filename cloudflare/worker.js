@@ -38,7 +38,7 @@ function fromBase64(value) {
 
 async function hashPassword(password, salt = toBase64(crypto.getRandomValues(new Uint8Array(16)))) {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: fromBase64(salt), iterations: 120000, hash: 'SHA-256' }, key, 256);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: fromBase64(salt), iterations: 100000, hash: 'SHA-256' }, key, 256);
   return `${salt}.${toBase64(new Uint8Array(bits))}`;
 }
 
@@ -121,7 +121,7 @@ export default {
         } catch (error) {
           await env.DB.prepare('DELETE FROM auth_users WHERE id = ?').bind(id).run().catch(() => {});
           const message = String(error?.message || 'already_registered');
-          return json({ error: message.includes('UNIQUE') ? 'already_registered' : 'registration_failed', detail: message.slice(0, 160) }, message.includes('UNIQUE') ? 409 : 500, origin);
+          return json({ error: message.includes('UNIQUE') ? 'already_registered' : 'registration_failed' }, message.includes('UNIQUE') ? 409 : 500, origin);
         }
         const session = await createSession(id, env);
         return json({ user: cleanUser(profile) }, 201, origin, { 'set-cookie': cookie(session.token, SESSION_DAYS * 86400) });
