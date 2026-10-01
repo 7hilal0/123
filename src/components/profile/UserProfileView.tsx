@@ -67,9 +67,7 @@ export const UserProfileView: React.FC = () => {
   return (
     <div
       className="mx-auto min-h-screen max-w-5xl pb-16 text-start"
-      style={{
-        backgroundColor: profileColor,
-      }}
+      style={{ backgroundColor: `${profileColor}12` }}
     >
       {/* Profile Header Banner */}
       <div className="relative h-44 sm:h-56 md:h-64 w-full bg-neutral-900 overflow-hidden">
@@ -240,7 +238,7 @@ export const UserProfileView: React.FC = () => {
         </div>
 
       {/* Tab Content stays on the normal page surface, not inside the colored profile panel */}
-      <div className="px-4 sm:px-6 mt-4 space-y-3.5" style={{ backgroundColor: profileColor }}>
+      <div className="px-4 sm:px-6 mt-4 space-y-3.5" style={{ backgroundColor: `${profileColor}08` }}>
           {activeTab === 'posts' && (
             <>
               {userPosts.map((post) => (

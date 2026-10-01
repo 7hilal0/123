@@ -18,7 +18,7 @@ import { NotificationsView } from './components/notifications/NotificationsView'
 import { SearchView } from './components/search/SearchView';
 
 const MainContent: React.FC = () => {
-  const { activeTab, isInsideChat } = useApp();
+  const { activeTab, isInsideChat, currentUser } = useApp();
 
   return (
     <main
@@ -29,6 +29,7 @@ const MainContent: React.FC = () => {
           ? 'pb-16 lg:pb-0'
           : 'pb-24 lg:pb-12'
       }`}
+      style={activeTab === 'profile' ? { backgroundColor: `${currentUser?.profileColor || '#10b981'}12` } : undefined}
     >
       {activeTab === 'feed' && <FeedView />}
       {activeTab === 'community-detail' && <CommunityDetail />}
