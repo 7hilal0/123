@@ -214,22 +214,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!active) return;
       const remoteUsers = await appwriteSync.fetchUsers().catch(() => [] as User[]);
       const cachedProfile = storage.getUsers().find((user) => user.id === sessionUser.$id);
+      const cachedMedia = await storage.getProfileMediaBackup(sessionUser.$id).catch(() => null);
       const remoteProfile = remoteUsers.find((user) => user.id === sessionUser.$id);
+      const localAvatar = cachedMedia?.avatar || cachedProfile?.avatar;
+      const localBanner = cachedMedia?.banner || cachedProfile?.banner;
       const profile = remoteProfile ? {
         ...remoteProfile,
-        // Keep a locally cached GIF if an older/large Appwrite row omitted the media field.
-        avatar: remoteProfile.avatar && remoteProfile.avatar !== DEFAULT_USER_AVATAR
-          ? remoteProfile.avatar
-          : cachedProfile?.avatar || remoteProfile.avatar || DEFAULT_USER_AVATAR,
-        banner: remoteProfile.banner || cachedProfile?.banner || '',
+        // Prefer the local IndexedDB copy for animated media when the cloud row
+        // is incomplete or still contains only a partial chunk upload.
+        avatar: localAvatar?.startsWith('data:image/gif') || !remoteProfile.avatar || remoteProfile.avatar === DEFAULT_USER_AVATAR
+          ? localAvatar || remoteProfile.avatar || DEFAULT_USER_AVATAR
+          : remoteProfile.avatar,
+        banner: localBanner?.startsWith('data:image/gif') || !remoteProfile.banner
+          ? localBanner || remoteProfile.banner || ''
+          : remoteProfile.banner,
         profileColor: remoteProfile.profileColor || cachedProfile?.profileColor,
       } : {
         id: sessionUser.$id,
         username: sessionUser.email.split('@')[0],
         displayName: sessionUser.name || sessionUser.email.split('@')[0],
         email: sessionUser.email,
-        avatar: cachedProfile?.avatar || DEFAULT_USER_AVATAR,
-        banner: cachedProfile?.banner || '',
+        avatar: localAvatar || DEFAULT_USER_AVATAR,
+        banner: localBanner || '',
         bio: cachedProfile?.bio || '',
         status: cachedProfile?.status || 'online' as UserStatus,
         customStatus: cachedProfile?.customStatus || '',
@@ -1204,6 +1210,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updated: User = { ...currentUser, ...updates };
     setCurrentUser(updated);
     setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updated : u)));
+    void storage.saveProfileMediaBackup(updated.id, {
+      avatar: updated.avatar,
+      banner: updated.banner,
+    }).catch((error) => console.warn('[Storage] Profile media backup failed:', error));
 
     // Update all posts authored by currentUser so posts and profile avatars stay 100% in sync
     setPosts((prev) =>
