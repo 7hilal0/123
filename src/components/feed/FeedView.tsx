@@ -11,7 +11,8 @@ import {
   ShieldCheck,
   Sparkles,
   UserPlus,
-  LogIn
+  LogIn,
+  Loader2
 } from 'lucide-react';
 
 export const FeedView: React.FC = () => {
@@ -27,6 +28,8 @@ export const FeedView: React.FC = () => {
     navigateToProfile,
     toggleFollowUser,
     setAuthModalOpen,
+    cloudSyncStatus,
+    dir,
     t,
   } = useApp();
 
@@ -301,6 +304,11 @@ export const FeedView: React.FC = () => {
                     <span>{t.explorePeople}</span>
                   </button>
                 )}
+              </div>
+            ) : cloudSyncStatus === 'syncing' ? (
+              <div className="p-12 text-center bg-gradient-to-br from-neutral-900/70 to-neutral-950/60 rounded-2xl border border-white/[0.08] text-neutral-400 space-y-3 shadow-lg shadow-black/10">
+                <Loader2 className="w-8 h-8 mx-auto text-emerald-400 animate-spin" aria-label="Loading posts" />
+                <p className="text-sm">{dir === 'rtl' ? 'جاري تحميل المنشورات…' : 'Loading posts…'}</p>
               </div>
             ) : (
               /* General Empty State */

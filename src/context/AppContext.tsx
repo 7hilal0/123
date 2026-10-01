@@ -727,6 +727,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!postToDelete || postToDelete.author.id !== currentUser.id) return;
 
     deletedPostIdsRef.current.add(postId);
+    setCloudSyncStatus('syncing');
     setPosts((prev) => prev.filter((p) => p.id !== postId));
     setComments((prev) => {
       const copy = { ...prev };
@@ -737,9 +738,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Cloud Delete. If it fails, restore the post instead of silently losing the user's data.
     cloudSync.deletePost(postId).then((deleted) => {
       if (deleted) {
+        setCloudSyncStatus('connected');
         showToast(language === 'ar' ? 'تم حذف المنشور نهائياً' : 'Post permanently deleted', 'success');
         return;
       }
+      setCloudSyncStatus('connected');
       deletedPostIdsRef.current.delete(postId);
       setPosts((prev) => (prev.some((p) => p.id === postId) ? prev : [postToDelete, ...prev]));
       showToast(language === 'ar' ? 'تعذر حذف المنشور من السيرفر' : 'The post could not be deleted from the server', 'warning');
