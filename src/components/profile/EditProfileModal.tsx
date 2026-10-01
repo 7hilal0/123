@@ -15,6 +15,39 @@ const PROFILE_COLORS = [
   '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#64748b',
 ];
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function hexToHsl(hex: string): [number, number, number] {
+  const value = hex.replace('#', '');
+  const number = Number.parseInt(value.length === 3 ? value.split('').map((part) => part + part).join('') : value, 16);
+  const r = ((number >> 16) & 255) / 255;
+  const g = ((number >> 8) & 255) / 255;
+  const b = (number & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const lightness = (max + min) / 2;
+  if (max === min) return [0, 0, Math.round(lightness * 100)];
+  const delta = max - min;
+  const saturation = lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+  let hue = 0;
+  if (max === r) hue = (g - b) / delta + (g < b ? 6 : 0);
+  else if (max === g) hue = (b - r) / delta + 2;
+  else hue = (r - g) / delta + 4;
+  return [Math.round(hue * 60), Math.round(saturation * 100), Math.round(lightness * 100)];
+}
+
+function hslToHex(hue: number, saturation: number, lightness: number) {
+  const s = saturation / 100;
+  const l = lightness / 100;
+  const chroma = (1 - Math.abs(2 * l - 1)) * s;
+  const x = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const match = l - chroma / 2;
+  const [r, g, b] = hue < 60 ? [chroma, x, 0] : hue < 120 ? [x, chroma, 0] : hue < 180 ? [0, chroma, x] : hue < 240 ? [0, x, chroma] : hue < 300 ? [x, 0, chroma] : [chroma, 0, x];
+  return `#${[r, g, b].map((part) => Math.round((part + match) * 255).toString(16).padStart(2, '0')).join('')}`;
+}
+
 export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) => {
   const { currentUser, updateCurrentUserProfile, t, dir } = useApp();
   const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
@@ -23,12 +56,37 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
   const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatar || '');
   const [bannerUrl, setBannerUrl] = useState(currentUser?.banner || '');
   const [profileColor, setProfileColor] = useState(currentUser?.profileColor || '#10b981');
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const [pickerHue, setPickerHue] = useState(() => hexToHsl(currentUser?.profileColor || '#10b981')[0]);
+  const [pickerSaturation, setPickerSaturation] = useState(() => hexToHsl(currentUser?.profileColor || '#10b981')[1]);
+  const [pickerLightness, setPickerLightness] = useState(() => hexToHsl(currentUser?.profileColor || '#10b981')[2]);
   const [status, setStatus] = useState<UserStatus>(currentUser?.status || 'online');
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const BackIcon = dir === 'rtl' ? ArrowRight : ArrowLeft;
 
   if (!currentUser) return null;
+
+  const openColorPicker = () => {
+    const [hue, saturation, lightness] = hexToHsl(profileColor);
+    setPickerHue(hue);
+    setPickerSaturation(saturation);
+    setPickerLightness(lightness);
+    setColorPickerOpen(true);
+  };
+
+  const updateColorSquare = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const saturation = clamp(((event.clientX - rect.left) / rect.width) * 100, 0, 100);
+    const lightness = clamp(100 - ((event.clientY - rect.top) / rect.height) * 100, 0, 100);
+    setPickerSaturation(Math.round(saturation));
+    setPickerLightness(Math.round(lightness));
+  };
+
+  const confirmColor = () => {
+    setProfileColor(hslToHex(pickerHue, pickerSaturation, pickerLightness));
+    setColorPickerOpen(false);
+  };
 
   const handleImage = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -203,15 +261,13 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                     <p className="text-xs font-semibold text-neutral-200">لون خلفية الحساب</p>
                     <p className="mt-1 text-[11px] text-neutral-500">لا يغيّر لون اسمك أو منشوراتك</p>
                   </div>
-                  <label className="relative h-10 w-14 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-white/20" style={{ backgroundColor: profileColor }}>
-                    <input
-                      type="color"
-                      value={profileColor}
-                      onChange={(event) => setProfileColor(event.target.value)}
-                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                      aria-label="Profile background color"
-                    />
-                  </label>
+                  <button
+                    type="button"
+                    onClick={openColorPicker}
+                    className="relative h-10 w-14 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-white/20 transition hover:scale-105"
+                    style={{ backgroundColor: profileColor }}
+                    aria-label="Open profile background color picker"
+                  />
                 </div>
                 <div className="mt-3 grid grid-cols-9 gap-2">
                   {PROFILE_COLORS.map((color) => (
@@ -261,6 +317,60 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
             </div>
           </footer>
         </form>
+
+        {colorPickerOpen && (
+          <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={() => setColorPickerOpen(false)}>
+            <div className="w-full max-w-lg rounded-t-3xl border border-white/10 bg-[#101216] p-5 shadow-2xl sm:rounded-3xl" onClick={(event) => event.stopPropagation()}>
+              <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-white/20 sm:hidden" />
+              <div className="mb-5 flex items-center justify-between gap-3">
+                <h2 className="text-xl font-bold text-white">Pick a Colour</h2>
+                <button type="button" onClick={confirmColor} className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15">Select</button>
+              </div>
+              <input
+                value={hslToHex(pickerHue, pickerSaturation, pickerLightness)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setProfileColor(value);
+                  if (/^#[0-9a-f]{6}$/i.test(value)) {
+                    const [hue, saturation, lightness] = hexToHsl(value);
+                    setPickerHue(hue);
+                    setPickerSaturation(saturation);
+                    setPickerLightness(lightness);
+                  }
+                }}
+                className="mb-5 w-full rounded-2xl border border-white/20 bg-black/30 px-4 py-3 text-lg text-white outline-none focus:border-white/50"
+                aria-label="HEX color value"
+              />
+              <div className="mb-5 flex justify-center gap-5">
+                {PROFILE_COLORS.slice(0, 5).map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => {
+                      const [hue, saturation, lightness] = hexToHsl(color);
+                      setPickerHue(hue); setPickerSaturation(saturation); setPickerLightness(lightness);
+                    }}
+                    className={`h-12 w-12 rounded-lg border-2 transition hover:scale-105 ${hslToHex(pickerHue, pickerSaturation, pickerLightness) === color ? 'border-white' : 'border-transparent'}`}
+                    style={{ backgroundColor: color }}
+                    aria-label={`Preset ${color}`}
+                  />
+                ))}
+              </div>
+              <div
+                className="relative h-64 w-full cursor-crosshair overflow-hidden rounded-xl"
+                style={{ background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${pickerHue} 100% 50%))` }}
+                onPointerDown={updateColorSquare}
+                onPointerMove={(event) => { if (event.buttons === 1) updateColorSquare(event); }}
+              >
+                <span className="pointer-events-none absolute h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_2px_rgba(0,0,0,.7)]" style={{ left: `${pickerSaturation}%`, top: `${100 - pickerLightness}%` }} />
+              </div>
+              <div className="relative mt-5 h-7 overflow-hidden rounded-full border-2 border-white/20" style={{ background: 'linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)' }}>
+                <input type="range" min="0" max="359" value={pickerHue} onChange={(event) => setPickerHue(Number(event.target.value))} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label="Hue" />
+                <span className="pointer-events-none absolute top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-transparent shadow-[0_0_0_2px_rgba(0,0,0,.65)]" style={{ left: `${(pickerHue / 359) * 100}%` }} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
