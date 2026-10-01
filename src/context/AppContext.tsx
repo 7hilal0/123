@@ -348,9 +348,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     setCloudSyncStatus('syncing');
 
-    // Proactively purge welcome post from Cloudflare
-    cloudSync.deletePost('post_official_welcome').catch(() => {});
-
     // Subscribe to remote posts live. This is the single initial post read;
     // a separate fetch here would double Cloudflare reads and exhaust quotas.
     const unsubPosts = cloudSync.subscribePosts((remotePosts) => {
@@ -367,40 +364,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
-    // 3. Fetch communities
-    cloudSync.fetchCommunities().then((remoteComms) => {
-      if (remoteComms && remoteComms.length > 0) {
-        setCommunities((local) => {
-          const remoteIds = new Set(remoteComms.map((c) => c.id));
-          const localOnly = local.filter((c) => !remoteIds.has(c.id));
-          return [...remoteComms, ...localOnly];
-        });
-      }
-    }).catch(() => {});
-
-    // 4. Fetch users
-    cloudSync.fetchUsers(currentUser?.id).then((remoteUsers) => {
-      if (remoteUsers && remoteUsers.length > 0) {
-        setUsers((local) => {
-          const remoteIds = new Set(remoteUsers.map((u) => u.id));
-          const localOnly = local.filter((u) => !remoteIds.has(u.id));
-          const mergedRemote = remoteUsers.map((remote) => {
-            const cached = local.find((user) => user.id === remote.id);
-            return {
-              ...cached,
-              ...remote,
-              // Keep a cached image if a media chunk is still being uploaded or
-              // the first refresh happens while the media request is incomplete.
-              avatar: remote.avatar || cached?.avatar || DEFAULT_USER_AVATAR,
-              banner: remote.banner || cached?.banner || '',
-            };
+    // Communities and the complete user/media catalog are noncritical for the
+    // first paint. Let the feed render first, then hydrate them in the background.
+    const backgroundSync = window.setTimeout(() => {
+      cloudSync.fetchCommunities().then((remoteComms) => {
+        if (remoteComms && remoteComms.length > 0) {
+          setCommunities((local) => {
+            const remoteIds = new Set(remoteComms.map((c) => c.id));
+            const localOnly = local.filter((c) => !remoteIds.has(c.id));
+            return [...remoteComms, ...localOnly];
           });
-          return [...mergedRemote, ...localOnly];
-        });
-      }
-    }).catch(() => {});
+        }
+      }).catch(() => {});
+
+      cloudSync.fetchUsers(currentUser?.id).then((remoteUsers) => {
+        if (remoteUsers && remoteUsers.length > 0) {
+          setUsers((local) => {
+            const remoteIds = new Set(remoteUsers.map((u) => u.id));
+            const localOnly = local.filter((u) => !remoteIds.has(u.id));
+            const mergedRemote = remoteUsers.map((remote) => {
+              const cached = local.find((user) => user.id === remote.id);
+              return {
+                ...cached,
+                ...remote,
+                avatar: remote.avatar || cached?.avatar || DEFAULT_USER_AVATAR,
+                banner: remote.banner || cached?.banner || '',
+              };
+            });
+            return [...mergedRemote, ...localOnly];
+          });
+        }
+      }).catch(() => {});
+    }, 900);
 
     return () => {
+      window.clearTimeout(backgroundSync);
       unsubPosts();
     };
   }, []);
