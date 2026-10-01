@@ -96,8 +96,10 @@ export const cloudSync = {
   fetchCommunities: () => fetchType<Community>('community'),
   savePost: (post: Post) => saveEntity('post', post, post.author?.id),
   async deletePost(postId: string): Promise<boolean> { try { await saveEntity('post', { id: postId, deleted: true, deletedAt: Date.now() } as unknown as Post); return true; } catch { return false; } },
-  async fetchPosts(): Promise<Post[] | null> { try { return await fetchType<Post>('post'); } catch { return null; } },
-  subscribePosts(callback: (posts: Post[]) => void) { return subscribePoll(() => this.fetchPosts().then((items) => items || []), callback, 'posts'); },
+  async fetchPosts(): Promise<Post[]> { return fetchType<Post>('post'); },
+  // A failed poll must not be converted into []: that would erase the cached
+  // feed and make all posts appear to disappear during a brief network error.
+  subscribePosts(callback: (posts: Post[]) => void) { return subscribePoll(() => this.fetchPosts(), callback, 'posts'); },
   saveComment: (postId: string, comment: Comment) => saveEntity('comment', { ...comment, postId } as Comment & { postId: string }, postId),
   async deleteComments(postId: string, commentIds: string[]): Promise<boolean> { try { for (const commentId of commentIds) await saveEntity('comment', { id: commentId, postId, deleted: true, deletedAt: Date.now() } as unknown as Comment, postId); return true; } catch { return false; } },
   deleteComment(postId: string, commentId: string) { return this.deleteComments(postId, [commentId]); },
