@@ -57,7 +57,7 @@ export const AuthModal: React.FC = () => {
       }
       const success = await login(username.trim(), password.trim() || undefined);
       if (!success) {
-        setErrorMessage('Invalid username or password');
+        setErrorMessage('هذا الحساب غير موجود في النظام الجديد. افتح تبويب «إنشاء حساب» وسجّل حسابًا جديدًا.');
       }
     } else {
       if (!username.trim() || !displayName.trim()) {

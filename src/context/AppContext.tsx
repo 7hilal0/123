@@ -1313,7 +1313,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (error: any) {
       console.error('[Appwrite] Login failed:', error);
       showToast(
-        language === 'ar' ? 'بيانات الدخول غير صحيحة' : 'Invalid email or password',
+        language === 'ar'
+          ? 'هذا الحساب القديم غير موجود في النظام الجديد. أنشئ حسابًا جديدًا من تبويب إنشاء حساب.'
+          : 'This old account is not in the new system. Create a new account from the Register tab.',
         'warning'
       );
       return false;
