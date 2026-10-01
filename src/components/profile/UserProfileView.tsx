@@ -93,7 +93,7 @@ export const UserProfileView: React.FC = () => {
           boxShadow: `0 0 0 1px ${profileColor}18, 0 18px 50px ${profileColor}14`,
         }}
       >
-        <div className="relative -mt-14 sm:-mt-20 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div className="relative flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-5 sm:pt-6">
           {/* Avatar & Identifiers */}
           <div className="flex items-end gap-4">
             <div className="relative rounded-3xl p-1 bg-neutral-950 shadow-2xl">
