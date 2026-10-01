@@ -29,6 +29,7 @@ type ProfileMediaChunk = {
 };
 
 const MEDIA_CHUNK_SIZE = 48_000;
+const MEDIA_BATCH_SIZE = 3;
 
 function splitMedia(value: string): string[] {
   if (!value) return [''];
@@ -37,6 +38,22 @@ function splitMedia(value: string): string[] {
     chunks.push(value.slice(index, index + MEDIA_CHUNK_SIZE));
   }
   return chunks;
+}
+
+const pause = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+
+async function saveMediaChunk(chunk: ProfileMediaChunk): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      await saveEntity('profileMedia', chunk);
+      return;
+    } catch (error) {
+      lastError = error;
+      await pause(350 * (attempt + 1));
+    }
+  }
+  throw lastError;
 }
 
 function stripUndefined<T>(value: T): T {
@@ -145,14 +162,18 @@ export const appwriteSync = {
     ];
     for (const item of media) {
       const chunks = splitMedia(item.value);
-      await Promise.all(chunks.map((value, index) => saveEntity('profileMedia', {
+      const rows = chunks.map((value, index) => ({
         id: `${user.id}:${item.field}:${index}`,
         userId: user.id,
         field: item.field,
         index,
         total: chunks.length,
         value,
-      } as ProfileMediaChunk)));
+      } as ProfileMediaChunk));
+      for (let index = 0; index < rows.length; index += MEDIA_BATCH_SIZE) {
+        await Promise.all(rows.slice(index, index + MEDIA_BATCH_SIZE).map(saveMediaChunk));
+        await pause(180);
+      }
     }
   },
   async fetchUsers(): Promise<User[]> {
