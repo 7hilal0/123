@@ -17,6 +17,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
   const [customStatus, setCustomStatus] = useState(currentUser?.customStatus || '');
   const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatar || '');
   const [bannerUrl, setBannerUrl] = useState(currentUser?.banner || '');
+  const [profileColor, setProfileColor] = useState(currentUser?.profileColor || '#10b981');
   const [status, setStatus] = useState<UserStatus>(currentUser?.status || 'online');
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -54,6 +55,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
       customStatus: customStatus.trim(),
       avatar: avatarUrl,
       banner: bannerUrl,
+      profileColor,
       status,
     });
     onClose();
@@ -167,6 +169,34 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                   );
                 })}
               </div>
+            </div>
+          </div>
+
+          {/* Account Color */}
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <label htmlFor="profile-color" className="block text-xs font-semibold text-neutral-200">
+                  Account color
+                </label>
+                <p className="mt-1 text-[11px] text-neutral-500">
+                  يظهر حول ملفك واسمك في صفحتك الشخصية
+                </p>
+              </div>
+              <label
+                htmlFor="profile-color"
+                className="relative h-10 w-16 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-white/20 shadow-inner"
+                style={{ backgroundColor: profileColor }}
+                title="Choose account color"
+              >
+                <input
+                  id="profile-color"
+                  type="color"
+                  value={profileColor}
+                  onChange={(e) => setProfileColor(e.target.value)}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                />
+              </label>
             </div>
           </div>
 
