@@ -19,7 +19,7 @@ export const TopBar: React.FC = () => {
       {/* Center: DZCORE Brand Logo & Name */}
       <button
         onClick={() => navigateToFeed('hot')}
-        className="absolute left-4 md:left-6 flex items-center gap-2.5 rounded-2xl px-3 py-1.5 group focus:outline-none cursor-pointer select-none transition-colors hover:bg-white/[0.04]"
+        className="flex items-center gap-2.5 rounded-2xl px-3 py-1.5 group focus:outline-none cursor-pointer select-none transition-colors hover:bg-white/[0.04]"
         title="DZCORE"
       >
         <div className="w-10 h-8 rounded-xl overflow-hidden bg-neutral-900 border border-white/10 flex items-center justify-center shadow-md shadow-emerald-600/20 group-hover:scale-105 transition-transform">
