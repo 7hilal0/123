@@ -175,7 +175,11 @@ export default {
           const body = await request.json();
           const userId = String(body.userId || '');
           const action = String(body.action || '');
-          if (!userId || !['ban', 'unban', 'delete', 'reset_password', 'resolve_report'].includes(action)) return json({ error: 'invalid_action' }, 400, origin);
+          if (!userId || !['ban', 'unban', 'delete', 'reset_password', 'resolve_report', 'delete_post'].includes(action)) return json({ error: 'invalid_action' }, 400, origin);
+          if (action === 'delete_post') {
+            await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'post' AND entity_id = ?").bind(Date.now(), userId).run();
+            return json({ ok: true, action }, 200, origin);
+          }
           if (action === 'ban' || action === 'unban') {
             const ban = { userId, reason: String(body.reason || '').slice(0, 500), expiresAt: action === 'ban' && body.durationDays ? Date.now() + Number(body.durationDays) * 86400000 : null, createdAt: Date.now() };
             await saveAdminEntity(env, 'adminBan', userId, ban, userId);
@@ -201,6 +205,7 @@ export default {
           if (reportId) await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'report' AND entity_id = ?").bind(Date.now(), reportId).run();
           return json({ ok: true, action }, 200, origin);
         }
+        if (url.pathname === '/api/admin/posts' && request.method === 'GET') return json({ posts: await adminEntities(env, 'post') }, 200, origin);
       }
 
       if (url.pathname === '/api/auth/me' && request.method === 'GET') return json({ user: cleanUser(await currentUser(request, env)) }, 200, origin);

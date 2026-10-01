@@ -12,7 +12,10 @@ import {
   Trash2,
   ImageOff,
   UserPlus,
-  UserCheck
+  UserCheck,
+  MoreVertical,
+  Flag,
+  X
 } from 'lucide-react';
 
 interface PostCardProps {
@@ -28,11 +31,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
     downvotePost,
     toggleSavePost,
     deletePost,
+    submitReport,
     toggleFollowUser,
     navigateToPost,
     navigateToCommunity,
     navigateToProfile,
     showToast,
+    setAuthModalOpen,
     comments,
     t,
   } = useApp();
@@ -44,6 +49,11 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
       : (users.find((u) => u.id === post.author.id) || post.author);
 
   const [imageError, setImageError] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState<'post' | 'user'>('post');
+  const [reportReason, setReportReason] = useState('');
+  const [reportBusy, setReportBusy] = useState(false);
   const netScore = post.upvotes - post.downvotes;
   const activeVote = currentUser ? (post.votes?.[currentUser.id] ?? null) : null;
 
@@ -63,6 +73,30 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
     }
   };
 
+  const openReport = (target: 'post' | 'user') => {
+    if (!currentUser) {
+      setAuthModalOpen(true, 'login');
+      return;
+    }
+    setReportTarget(target);
+    setReportReason('');
+    setMenuOpen(false);
+    setReportOpen(true);
+  };
+
+  const submitCurrentReport = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const reason = reportReason.trim();
+    if (!reason) return;
+    setReportBusy(true);
+    const sent = await submitReport(reportTarget, reportTarget === 'post' ? post.id : author.id, reason);
+    setReportBusy(false);
+    if (sent) {
+      setReportOpen(false);
+      setReportReason('');
+    }
+  };
+
   return (
     <article
       onClick={handleCardClick}
@@ -73,6 +107,56 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
       }`}
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+      <div className="absolute end-3 top-3 z-10" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={() => setMenuOpen((open) => !open)}
+          className="rounded-lg p-2 text-neutral-500 transition-colors hover:bg-white/10 hover:text-neutral-200"
+          aria-label="خيارات المنشور"
+          title="خيارات المنشور"
+        >
+          <MoreVertical className="h-4 w-4" />
+        </button>
+        {menuOpen && (
+          <div className="absolute end-0 top-10 w-52 rounded-xl border border-white/10 bg-neutral-900 p-1.5 shadow-2xl shadow-black/50">
+            <button type="button" onClick={() => openReport('post')} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-start text-xs text-neutral-200 hover:bg-white/10">
+              <Flag className="h-4 w-4 text-amber-400" /> الإبلاغ عن المنشور
+            </button>
+            <button type="button" onClick={() => openReport('user')} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-start text-xs text-neutral-200 hover:bg-white/10">
+              <Flag className="h-4 w-4 text-rose-400" /> الإبلاغ عن صاحب الحساب
+            </button>
+          </div>
+        )}
+      </div>
+
+      {reportOpen && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/70 p-4" onClick={() => setReportOpen(false)}>
+          <form onSubmit={submitCurrentReport} onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl border border-white/10 bg-neutral-900 p-5 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-white">{reportTarget === 'post' ? 'الإبلاغ عن المنشور' : 'الإبلاغ عن صاحب الحساب'}</h3>
+                <p className="mt-1 text-xs text-neutral-400">اكتب سبب البلاغ حتى تتمكن الإدارة من مراجعته.</p>
+              </div>
+              <button type="button" onClick={() => setReportOpen(false)} className="rounded-lg p-2 text-neutral-400 hover:bg-white/10 hover:text-white" aria-label="إغلاق"><X className="h-4 w-4" /></button>
+            </div>
+            <textarea
+              value={reportReason}
+              onChange={(e) => setReportReason(e.target.value)}
+              required
+              minLength={3}
+              maxLength={1000}
+              rows={5}
+              placeholder="اكتب سبب البلاغ هنا..."
+              className="w-full resize-none rounded-xl border border-white/10 bg-neutral-950 p-3 text-sm text-white outline-none placeholder:text-neutral-600 focus:border-emerald-400/50"
+            />
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button type="button" onClick={() => setReportOpen(false)} className="rounded-lg px-4 py-2 text-sm text-neutral-400 hover:bg-white/10">إلغاء</button>
+              <button type="submit" disabled={reportBusy || reportReason.trim().length < 3} className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-neutral-950 disabled:cursor-not-allowed disabled:opacity-50">{reportBusy ? 'جارٍ الإرسال...' : 'إرسال البلاغ'}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
       <div className="flex gap-3 md:gap-4 items-start">
         {/* Voting Column (Desktop) */}
         <div

@@ -87,6 +87,7 @@ interface AppContextType {
     tags: string[];
   }) => void;
   deletePost: (postId: string) => void;
+  submitReport: (targetType: 'post' | 'user' | 'comment', targetId: string, reason: string) => Promise<boolean>;
 
   // Comments
   addComment: (postId: string, content: string, parentId?: string) => void;
@@ -720,7 +721,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(language === 'ar' ? 'تم نشر موضوعك وحفظه في السيرفر! 🚀' : 'Post published and saved to cloud! 🚀', 'success');
     navigateToPost(newPostId);
   };
-
   const deletePost = (postId: string) => {
     if (!currentUser) return;
     const postToDelete = posts.find((p) => p.id === postId);
@@ -749,6 +749,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     if (selectedPostId === postId) {
       navigateToFeed();
+    }
+  };
+
+  const submitReport = async (targetType: 'post' | 'user' | 'comment', targetId: string, reason: string) => {
+    if (!currentUser) {
+      setAuthModalOpen(true, 'login');
+      return false;
+    }
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) return false;
+    try {
+      await cloudflareApi.submitReport(targetType, targetId, trimmedReason);
+      showToast(language === 'ar' ? 'تم إرسال البلاغ إلى الإدارة' : 'Report sent to moderators', 'success');
+      return true;
+    } catch {
+      showToast(language === 'ar' ? 'تعذر إرسال البلاغ' : 'Could not send the report', 'warning');
+      return false;
     }
   };
 
@@ -1532,6 +1549,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleSavePost,
         createPost,
         deletePost,
+        submitReport,
 
         addComment,
         deleteComment,
