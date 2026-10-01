@@ -25,7 +25,7 @@ export const MobileNav: React.FC = () => {
   const totalUnreadMessages = conversations.reduce((acc, c) => acc + c.unreadCount, 0);
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-neutral-950/95 backdrop-blur-xl border-t border-white/10 pb-safe shadow-2xl">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-neutral-950/95 backdrop-blur-xl border-t border-white/10 pb-safe shadow-2xl">
       <div className="grid grid-cols-5 items-center h-16 px-2">
         {/* Home Feed */}
         <button

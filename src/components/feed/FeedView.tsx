@@ -206,9 +206,9 @@ export const FeedView: React.FC = () => {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 md:py-8 xl:py-10 text-start">
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 xl:gap-8 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8 items-start">
         {/* Main Feed Column */}
-        <div className="xl:col-span-8 space-y-5 min-w-0 w-full">
+        <div className="md:col-span-8 space-y-5 min-w-0 w-full">
           {/* Feed Filter Bar (Segmented Controls) */}
           <div className="bg-neutral-900/75 border border-white/[0.08] rounded-2xl p-1.5 backdrop-blur-xl shadow-lg shadow-black/10">
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar w-full">
@@ -328,7 +328,7 @@ export const FeedView: React.FC = () => {
         </div>
 
         {/* Sidebar Widgets (Desktop) */}
-        <div className="hidden xl:block xl:col-span-4 space-y-5 sticky top-20 text-start min-w-0">
+        <div className="hidden md:block md:col-span-4 space-y-5 sticky top-20 text-start min-w-0">
           {/* Welcome Card */}
           <div className="p-5 rounded-2xl bg-gradient-to-br from-neutral-900/90 via-neutral-900/75 to-neutral-950 border border-white/[0.08] shadow-xl shadow-black/20">
             <div className="flex items-center gap-2.5 mb-3">

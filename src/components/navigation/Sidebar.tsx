@@ -64,7 +64,7 @@ export const Sidebar: React.FC = () => {
   const ChevronIcon = dir === 'rtl' ? ChevronLeft : ChevronRight;
 
   return (
-    <aside className={`hidden lg:flex flex-col w-64 h-screen sticky top-0 bg-neutral-950/80 backdrop-blur-xl border-white/5 select-none shrink-0 z-30 ${dir === 'rtl' ? 'lg:order-2 border-s lg:border-e-0' : 'border-e'}`}>
+    <aside className={`hidden md:flex flex-col w-64 h-screen sticky top-0 bg-neutral-950/80 backdrop-blur-xl border-white/5 select-none shrink-0 z-30 ${dir === 'rtl' ? 'md:order-2 border-s md:border-e-0' : 'border-e'}`}>
       {/* Brand Header */}
       <div className="h-16 flex items-center justify-between px-5 border-b border-white/5">
         <button

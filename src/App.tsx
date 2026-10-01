@@ -26,8 +26,8 @@ const MainContent: React.FC = () => {
         isInsideChat
           ? 'pb-0'
           : activeTab === 'messages'
-          ? 'pb-16 lg:pb-0'
-          : 'pb-24 lg:pb-12'
+          ? 'pb-16 md:pb-0'
+          : 'pb-24 md:pb-12'
       }`}
       style={activeTab === 'profile' ? { backgroundColor: `${currentUser?.profileColor || '#10b981'}12` } : undefined}
     >
