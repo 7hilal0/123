@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Camera, Palette, Save, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Camera, Check, Palette, RotateCw, Save, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { UserStatus } from '../../types';
 import { readImageFile } from '../../utils/fileUpload';
@@ -63,6 +63,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
   const [pickerSaturation, setPickerSaturation] = useState(() => hexToHsl(currentUser?.profileColor || '#10b981')[1]);
   const [pickerLightness, setPickerLightness] = useState(() => hexToHsl(currentUser?.profileColor || '#10b981')[2]);
   const [status, setStatus] = useState<UserStatus>(currentUser?.status || 'online');
+  const [imageEditor, setImageEditor] = useState<{ src: string; target: 'avatar' | 'banner'; setter: (value: string) => void; gif: boolean } | null>(null);
+  const [imageZoom, setImageZoom] = useState(1);
+  const [imageRotation, setImageRotation] = useState(0);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const BackIcon = dir === 'rtl' ? ArrowRight : ArrowLeft;
@@ -97,17 +100,54 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
   const handleImage = async (
     event: React.ChangeEvent<HTMLInputElement>,
     setter: (value: string) => void,
-    width: number,
+    target: 'avatar' | 'banner',
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
-      setter(await readImageFile(file, width, 0.85));
+      const src = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('فشل قراءة الصورة'));
+        reader.readAsDataURL(file);
+      });
+      setImageZoom(1);
+      setImageRotation(0);
+      setImageEditor({ src, target, setter, gif: file.type === 'image/gif' });
     } catch (error) {
       console.error('Unable to read profile image', error);
     } finally {
       event.target.value = '';
     }
+  };
+
+  const saveImageEdit = () => {
+    if (!imageEditor) return;
+    // Drawing a GIF on canvas would remove its animation, so keep the original GIF.
+    if (imageEditor.gif) {
+      imageEditor.setter(imageEditor.src);
+      setImageEditor(null);
+      return;
+    }
+    const image = new Image();
+    image.onload = () => {
+      const width = imageEditor.target === 'avatar' ? 400 : 1200;
+      const height = imageEditor.target === 'avatar' ? 400 : 500;
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      if (!context) return;
+      const scale = Math.max(width / image.width, height / image.height) * imageZoom;
+      context.save();
+      context.translate(width / 2, height / 2);
+      context.rotate((imageRotation * Math.PI) / 180);
+      context.drawImage(image, -image.width * scale / 2, -image.height * scale / 2, image.width * scale, image.height * scale);
+      context.restore();
+      imageEditor.setter(canvas.toDataURL('image/jpeg', 0.9));
+      setImageEditor(null);
+    };
+    image.src = imageEditor.src;
   };
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -174,7 +214,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                 ref={bannerInputRef}
                 type="file"
                 accept="image/*"
-                onChange={(event) => handleImage(event, setBannerUrl, 1200)}
+                onChange={(event) => handleImage(event, setBannerUrl, 'banner')}
                 className="hidden"
               />
             </div>
@@ -200,7 +240,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                   ref={avatarInputRef}
                   type="file"
                   accept="image/*"
-                  onChange={(event) => handleImage(event, setAvatarUrl, 400)}
+                  onChange={(event) => handleImage(event, setAvatarUrl, 'avatar')}
                   className="hidden"
                 />
               </div>
@@ -337,6 +377,27 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
             </div>
           </footer>
         </form>
+
+        {imageEditor && (
+          <div className="fixed inset-0 z-[80] flex flex-col bg-black/95 text-white" onClick={() => setImageEditor(null)}>
+            <header className="flex items-center justify-between border-b border-white/10 px-4 py-4 sm:px-8">
+              <button type="button" onClick={() => setImageEditor(null)} aria-label="Cancel"><X className="h-7 w-7" /></button>
+              <h2 className="text-lg font-bold">Edit Image</h2>
+              <button type="button" onClick={saveImageEdit} aria-label="Apply"><Check className="h-7 w-7" /></button>
+            </header>
+            <div className="flex flex-1 items-center justify-center p-5" onClick={(event) => event.stopPropagation()}>
+              <div className={`relative overflow-hidden border border-white/70 bg-neutral-900 ${imageEditor.target === 'avatar' ? 'aspect-square w-[min(82vw,420px)] rounded-full' : 'aspect-[12/5] w-full max-w-3xl rounded-2xl'}`}>
+                <img src={imageEditor.src} alt="Edit preview" className="h-full w-full object-cover" style={{ transform: `scale(${imageZoom}) rotate(${imageRotation}deg)` }} />
+                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,transparent_33%,rgba(255,255,255,.5)_33%,rgba(255,255,255,.5)_33.3%,transparent_33.3%,transparent_66%,rgba(255,255,255,.5)_66%,rgba(255,255,255,.5)_66.3%,transparent_66.3%),linear-gradient(to_bottom,transparent_33%,rgba(255,255,255,.5)_33%,rgba(255,255,255,.5)_33.3%,transparent_33.3%,transparent_66%,rgba(255,255,255,.5)_66%,rgba(255,255,255,.5)_66.3%,transparent_66.3%)]" />
+              </div>
+            </div>
+            <div className="space-y-5 border-t border-white/10 bg-[#101114] px-6 py-6 sm:px-12">
+              <label className="flex items-center gap-4 text-sm"><span className="w-16">Scale</span><input type="range" min="1" max="3" step="0.01" value={imageZoom} onChange={(event) => setImageZoom(Number(event.target.value))} className="w-full accent-white" /></label>
+              <button type="button" onClick={() => setImageRotation((value) => (value + 90) % 360)} className="mx-auto flex items-center gap-2 rounded-xl border border-white/15 px-4 py-2 text-sm"><RotateCw className="h-4 w-4" /> Rotate</button>
+              {imageEditor.gif && <p className="text-center text-xs text-neutral-400">GIF animation will be preserved. Crop controls preview the frame, while the original animation is saved.</p>}
+            </div>
+          </div>
+        )}
 
         {colorPickerOpen && (
           <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={() => setColorPickerOpen(false)}>
