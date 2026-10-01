@@ -71,13 +71,22 @@ export const UserProfileView: React.FC = () => {
     >
       {/* Profile Header Banner */}
       <div className="relative h-44 sm:h-56 md:h-64 w-full bg-neutral-900 overflow-hidden">
-        <img
-          src={user.banner}
-          alt={user.displayName}
-          referrerPolicy="no-referrer"
-          className="w-full h-full object-cover opacity-80"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/40 to-transparent" />
+        {user.banner ? (
+          <>
+            <img
+              src={user.banner}
+              alt={user.displayName}
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/40 to-transparent" />
+          </>
+        ) : (
+          <div
+            className="absolute inset-0 bg-[#3f424a]"
+            aria-label="No profile banner"
+          />
+        )}
 
         <button
           onClick={() => navigateToFeed()}
