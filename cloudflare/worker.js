@@ -121,7 +121,7 @@ export default {
         } catch (error) {
           await env.DB.prepare('DELETE FROM auth_users WHERE id = ?').bind(id).run().catch(() => {});
           const message = String(error?.message || 'already_registered');
-          return json({ error: message.includes('UNIQUE') ? 'already_registered' : 'registration_failed' }, message.includes('UNIQUE') ? 409 : 500, origin);
+          return json({ error: message.includes('UNIQUE') ? 'already_registered' : 'registration_failed', detail: message.slice(0, 160) }, message.includes('UNIQUE') ? 409 : 500, origin);
         }
         const session = await createSession(id, env);
         return json({ user: cleanUser(profile) }, 201, origin, { 'set-cookie': cookie(session.token, SESSION_DAYS * 86400) });
