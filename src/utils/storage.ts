@@ -77,7 +77,7 @@ const COMMENT_RESET_VERSION = `${STORAGE_PREFIX}comments_reset_v1`;
 const VOTE_RESET_VERSION = `${STORAGE_PREFIX}votes_reset_v1`;
 const ACCOUNT_RESET_VERSION = `${STORAGE_PREFIX}accounts_reset_v2`;
 const POST_RESET_VERSION = `${STORAGE_PREFIX}posts_reset_v4`;
-const APPWRITE_ACCOUNT_RESET_VERSION = `${STORAGE_PREFIX}appwrite_accounts_reset_v1`;
+const CLOUDFLARE_ACCOUNT_RESET_VERSION = `${STORAGE_PREFIX}cloudflare_accounts_reset_v1`;
 if (typeof window !== 'undefined') {
   try {
     if (localStorage.getItem(COMMENT_RESET_VERSION) !== 'done') {
@@ -103,12 +103,12 @@ if (typeof window !== 'undefined') {
       // valid local session during normal refreshes or after a new deployment.
       localStorage.setItem(ACCOUNT_RESET_VERSION, 'done');
     }
-    if (localStorage.getItem(APPWRITE_ACCOUNT_RESET_VERSION) !== 'done') {
+    if (localStorage.getItem(CLOUDFLARE_ACCOUNT_RESET_VERSION) !== 'done') {
       // Appwrite is now the source of truth and its user list was reset.
       // Remove old demo/legacy accounts cached on individual phones.
       localStorage.removeItem(STORAGE_KEYS.USERS);
       localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
-      localStorage.setItem(APPWRITE_ACCOUNT_RESET_VERSION, 'done');
+      localStorage.setItem(CLOUDFLARE_ACCOUNT_RESET_VERSION, 'done');
     }
     if (localStorage.getItem(POST_RESET_VERSION) !== 'done') {
       localStorage.removeItem(STORAGE_KEYS.POSTS);

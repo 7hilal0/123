@@ -13,7 +13,7 @@ import {
 } from '../types';
 import { storage } from '../utils/storage';
 import { translations, Language, Translations } from '../locales/translations';
-import { appwriteSync } from '../services/appwriteSync';
+import { cloudSync } from '../services/cloudSync';
 import { cloudflareApi } from '../services/cloudflareApi';
 import { DEFAULT_USER_AVATAR } from '../utils/avatarConstants';
 import { resolvePostForUser, resolveCommentForUser } from '../utils/voting';
@@ -215,11 +215,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     cloudflareApi.me().then(async ({ user: sessionUser }) => {
       if (!active) return;
       if (!sessionUser) { setCurrentUser(null); return; }
-      const remoteUsers = await appwriteSync.fetchUsers().catch(() => [] as User[]);
+      const remoteUsers = await cloudSync.fetchUsers().catch(() => [] as User[]);
       const cachedProfile = storage.getUsers().find((user) => user.id === sessionUser.id);
       const cachedMedia = await storage.getProfileMediaBackup(sessionUser.id).catch(() => null);
       const remoteProfile = remoteUsers.find((user) => user.id === sessionUser.id);
-      const remoteMedia = await appwriteSync.fetchUserMedia(sessionUser.id).catch(() => ({} as Partial<User>));
+      const remoteMedia = await cloudSync.fetchUserMedia(sessionUser.id).catch(() => ({} as Partial<User>));
       const localAvatar = cachedMedia?.avatar || remoteMedia.avatar || cachedProfile?.avatar;
       const localBanner = cachedMedia?.banner || remoteMedia.banner || cachedProfile?.banner;
       const profile = remoteProfile ? {
@@ -267,7 +267,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    const unsubConvs = appwriteSync.subscribeConversations(currentUser.id, (remoteConvs) => {
+    const unsubConvs = cloudSync.subscribeConversations(currentUser.id, (remoteConvs) => {
       const resolved = remoteConvs.map((c) => resolveConversationForUser(c, currentUser, users));
       resolved.sort((a, b) => (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0));
       setConversations(resolved);
@@ -289,7 +289,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (!activeConversationId) return;
 
-    const unsubMsgs = appwriteSync.subscribeMessages(activeConversationId, (remoteMsgs) => {
+    const unsubMsgs = cloudSync.subscribeMessages(activeConversationId, (remoteMsgs) => {
       setDirectMessages((prev) => ({
         ...prev,
         [activeConversationId]: remoteMsgs,
@@ -361,11 +361,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCloudSyncStatus('syncing');
 
     // Proactively purge welcome post from Firestore
-    appwriteSync.deletePost('post_official_welcome').catch(() => {});
+    cloudSync.deletePost('post_official_welcome').catch(() => {});
 
     // Subscribe to remote posts live. This is the single initial post read;
     // a separate fetch here would double Firestore reads and exhaust quotas.
-    const unsubPosts = appwriteSync.subscribePosts((remotePosts) => {
+    const unsubPosts = cloudSync.subscribePosts((remotePosts) => {
       setCloudSyncStatus('connected');
       if (remotePosts) {
         const cleanRemote = remotePosts
@@ -380,7 +380,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     // 3. Fetch communities
-    appwriteSync.fetchCommunities().then((remoteComms) => {
+    cloudSync.fetchCommunities().then((remoteComms) => {
       if (remoteComms && remoteComms.length > 0) {
         setCommunities((local) => {
           const remoteIds = new Set(remoteComms.map((c) => c.id));
@@ -391,7 +391,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }).catch(() => {});
 
     // 4. Fetch users
-    appwriteSync.fetchUsers().then((remoteUsers) => {
+    cloudSync.fetchUsers().then((remoteUsers) => {
       if (remoteUsers && remoteUsers.length > 0) {
         setUsers((local) => {
           const remoteIds = new Set(remoteUsers.map((u) => u.id));
@@ -413,7 +413,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const pending = pendingVoteSavesRef.current;
     pendingVoteSavesRef.current = {};
-    Object.values(pending).forEach((post) => { void appwriteSync.savePost(post); });
+    Object.values(pending).forEach((post) => { void cloudSync.savePost(post); });
   }, [posts]);
   useEffect(() => { storage.saveCommunities(communities); }, [communities]);
   useEffect(() => { storage.saveComments(comments); }, [comments]);
@@ -467,7 +467,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     // Sync remote comments for this post
-    appwriteSync.fetchComments(postId).then((remoteComments) => {
+    cloudSync.fetchComments(postId).then((remoteComments) => {
       const cleanRemote = remoteComments
         .filter((comment) => !deletedCommentIdsRef.current.has(comment.id))
         .map((comment) => resolveCommentForUser(comment, currentUser?.id));
@@ -480,7 +480,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         prev.map((p) => {
           if (p.id === postId && p.commentCount !== cleanRemote.length) {
             const updated = { ...p, commentCount: cleanRemote.length };
-            appwriteSync.savePost(updated);
+            cloudSync.savePost(updated);
             return updated;
           }
           return p;
@@ -550,7 +550,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     if (!currentUser?.id) { setNotifications([]); return; }
-    const unsubscribe = appwriteSync.subscribeNotifications(currentUser.id, (remote) => {
+    const unsubscribe = cloudSync.subscribeNotifications(currentUser.id, (remote) => {
       setNotifications((previous) => {
         const merged = new Map(previous.map((item) => [item.id, item]));
         remote.forEach((item) => merged.set(item.id, { ...merged.get(item.id), ...item }));
@@ -566,7 +566,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addActivityNotification = (recipientId: string | undefined, type: NotificationItem['type'], actor: User, title: string, message: string, targetType: NotificationItem['targetType'], targetId: string) => {
     if (!currentUser || !recipientId || recipientId === actor.id || !actor) return;
     const item: NotificationItem = { id: `notification_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, recipientId, type, actor, title, message, timestamp: language === 'ar' ? 'الآن' : language === 'fr' ? 'À l’instant' : 'Just now', isRead: false, targetType, targetId };
-    appwriteSync.saveNotification(item).catch((error) => console.error('[Firestore] Notification save failed', error));
+    cloudSync.saveNotification(item).catch((error) => console.error('[Firestore] Notification save failed', error));
     if (recipientId === currentUser.id) setNotifications((prev) => [item, ...prev].slice(0, 100));
   };
 
@@ -604,7 +604,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setPosts((previous) => previous.map((post) => (post.id === postId ? updated : post)));
     // Save immediately, including an empty votes map after removing a vote.
-    void appwriteSync.savePost(updated);
+    void cloudSync.savePost(updated);
 
     if (updated.userVote === desiredVote && existing.author.id !== currentUser.id) {
       addActivityNotification(
@@ -717,7 +717,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setComments((prev) => ({ ...prev, [newPostId]: [] }));
 
     // Real-time Cloud Save
-    appwriteSync.savePost(newPost);
+    cloudSync.savePost(newPost);
 
     showToast(language === 'ar' ? 'تم نشر موضوعك وحفظه في السيرفر! 🚀' : 'Post published and saved to cloud! 🚀', 'success');
     navigateToPost(newPostId);
@@ -737,7 +737,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     // Cloud Delete. If it fails, restore the post instead of silently losing the user's data.
-    appwriteSync.deletePost(postId).then((deleted) => {
+    cloudSync.deletePost(postId).then((deleted) => {
       if (deleted) {
         showToast(language === 'ar' ? 'تم حذف المنشور نهائياً' : 'Post permanently deleted', 'success');
         return;
@@ -803,7 +803,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             commentCount: p.commentCount + 1,
             lastCommentTimestamp: commentNow,
           };
-          appwriteSync.savePost(updated);
+          cloudSync.savePost(updated);
           return updated;
         }
         return p;
@@ -811,7 +811,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     // Cloud Save Comment
-    appwriteSync.saveComment(postId, newComment);
+    cloudSync.saveComment(postId, newComment);
     const targetPost = posts.find((p) => p.id === postId);
     const targetComment = parentId ? (comments[postId] || []).flatMap((c) => [c, ...(c.replies || [])]).find((c) => c.id === parentId) : null;
     const recipientId = parentId ? targetComment?.author.id : targetPost?.author.id;
@@ -860,7 +860,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((p) => {
         if (p.id === postId) {
           const updated = { ...p, commentCount: Math.max(0, nextComments.length) };
-          appwriteSync.savePost(updated);
+          cloudSync.savePost(updated);
           return updated;
         }
         return p;
@@ -868,7 +868,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     // Delete the selected comment and all nested replies as one cloud operation.
-    appwriteSync.deleteComments(postId, idsToDelete).then((deleted) => {
+    cloudSync.deleteComments(postId, idsToDelete).then((deleted) => {
       if (deleted) {
         showToast(language === 'ar' ? 'تم حذف التعليق نهائياً' : 'Comment permanently deleted', 'success');
         return;
@@ -918,7 +918,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               downvotes,
               userVote: nextUserVote,
             };
-            appwriteSync.saveComment(postId, updated);
+            cloudSync.saveComment(postId, updated);
             return updated;
           }
           if (c.replies && c.replies.length > 0) {
@@ -942,7 +942,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((c) => {
         if (c.slug === slug) {
           const updated = { ...c, isMember: true, memberCount: c.memberCount + 1 };
-          appwriteSync.saveCommunity(updated);
+          cloudSync.saveCommunity(updated);
           showToast(language === 'ar' ? `انضممت إلى مجتمع ${c.name}` : `Joined ${c.name}`, 'success');
           return updated;
         }
@@ -961,7 +961,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((c) => {
         if (c.slug === slug) {
           const updated = { ...c, isMember: false, memberCount: Math.max(0, c.memberCount - 1) };
-          appwriteSync.saveCommunity(updated);
+          cloudSync.saveCommunity(updated);
           showToast(language === 'ar' ? `غادرت مجتمع ${c.name}` : `Left ${c.name}`, 'info');
           return updated;
         }
@@ -1025,7 +1025,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCommunities((prev) => [newComm, ...prev]);
 
     // Cloud Save Community
-    appwriteSync.saveCommunity(newComm);
+    cloudSync.saveCommunity(newComm);
 
     showToast(
       language === 'ar' ? `تم إنشاء المجتمع وحفظه سحابياً! 🎉` : `Community saved to cloud! 🎉`,
@@ -1099,7 +1099,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setConversations((prev) => [newConv, ...prev.filter((c) => c.id !== convId)]);
     setDirectMessages((prev) => ({ ...prev, [convId]: [] }));
 
-    await appwriteSync.saveConversation(newConv);
+    await cloudSync.saveConversation(newConv);
 
     setActiveConversationId(convId);
     setIsInsideChat(true);
@@ -1165,8 +1165,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ]);
 
     // Save message and updated conversation to Cloud Firestore in real time
-    await appwriteSync.saveDirectMessage(activeConversationId, newMsg);
-    await appwriteSync.saveConversation(updatedConv);
+    await cloudSync.saveDirectMessage(activeConversationId, newMsg);
+    await cloudSync.saveConversation(updatedConv);
   };
 
   // Follow user
@@ -1201,7 +1201,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             isFollowing: nextFollowing,
             followersCount: nextFollowing ? u.followersCount + 1 : Math.max(0, u.followersCount - 1),
           };
-          appwriteSync.saveUser(updated);
+          cloudSync.saveUser(updated);
           return updated;
         }
         return u;
@@ -1224,7 +1224,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((p) => {
         if (p.author.id === currentUser.id) {
           const updatedPost = { ...p, author: updated };
-          appwriteSync.savePost(updatedPost);
+          cloudSync.savePost(updatedPost);
           return updatedPost;
         }
         return p;
@@ -1243,7 +1243,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     // Save to Appwrite and surface failures instead of silently losing media updates.
-    void appwriteSync.saveUser(updated).catch((error) => {
+    void cloudSync.saveUser(updated).catch((error) => {
       console.error('[Appwrite] Profile save failed:', error);
       showToast(
         language === 'ar'
@@ -1268,7 +1268,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setCurrentUser(updated);
     setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updated : u)));
-    appwriteSync.saveUser(updated);
+    cloudSync.saveUser(updated);
     showToast(
       language === 'ar' ? 'تم تحديث حالة التواجد' : 'Status presence updated',
       'info'
@@ -1299,7 +1299,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (u) => u.username.toLowerCase() === term || (u.email && u.email.toLowerCase() === term)
     );
     if (!profile && !term.includes('@')) {
-      const remoteUsers = await appwriteSync.fetchUsers().catch(() => [] as User[]);
+      const remoteUsers = await cloudSync.fetchUsers().catch(() => [] as User[]);
       profile = remoteUsers.find((u) => u.username.toLowerCase() === term);
       if (remoteUsers.length > 0) {
         setUsers((local) => {
@@ -1427,7 +1427,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentUser(updatedUser);
       setUsers((prev) => prev.map((user) => user.id === updatedUser.id ? updatedUser : user));
       storage.saveUsers(users.map((user) => user.id === updatedUser.id ? updatedUser : user));
-      await appwriteSync.saveUser(updatedUser);
+      await cloudSync.saveUser(updatedUser);
       showToast(language === 'ar' ? 'تم تحديث البريد الإلكتروني بنجاح' : 'Email updated successfully', 'success');
       return true;
     } catch (error: any) {
