@@ -216,8 +216,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const cachedProfile = storage.getUsers().find((user) => user.id === sessionUser.$id);
       const cachedMedia = await storage.getProfileMediaBackup(sessionUser.$id).catch(() => null);
       const remoteProfile = remoteUsers.find((user) => user.id === sessionUser.$id);
-      const localAvatar = cachedMedia?.avatar || cachedProfile?.avatar;
-      const localBanner = cachedMedia?.banner || cachedProfile?.banner;
+      const remoteMedia = await appwriteSync.fetchUserMedia(sessionUser.$id).catch(() => ({} as Partial<User>));
+      const localAvatar = cachedMedia?.avatar || remoteMedia.avatar || cachedProfile?.avatar;
+      const localBanner = cachedMedia?.banner || remoteMedia.banner || cachedProfile?.banner;
       const profile = remoteProfile ? {
         ...remoteProfile,
         // Prefer the local IndexedDB copy for animated media when the cloud row

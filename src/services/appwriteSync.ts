@@ -46,7 +46,7 @@ async function saveMediaChunk(chunk: ProfileMediaChunk): Promise<void> {
   let lastError: unknown;
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
-      await saveEntity('profileMedia', chunk);
+      await saveEntity('profileMedia', chunk, chunk.userId);
       return;
     } catch (error) {
       lastError = error;
@@ -80,13 +80,13 @@ function rowId(type: EntityType, id: string): string {
   return `${type.slice(0, 3)}_${(hash >>> 0).toString(16).padStart(8, '0')}_${Math.abs(id.length).toString(16)}`;
 }
 
-async function listRows(): Promise<Array<{ $id: string; data: StoredRow }>> {
+async function listRows(baseQueries: ReturnType<typeof Query.equal>[] = []): Promise<Array<{ $id: string; data: StoredRow }>> {
   const rows: Array<{ $id: string; data: StoredRow }> = [];
   for (let offset = 0; offset < 10000; offset += MAX_PAGE) {
     const result = await tablesDB.listRows({
       databaseId: APPWRITE_DATABASE_ID,
       tableId: APPWRITE_TABLE_ID,
-      queries: [Query.limit(MAX_PAGE), Query.offset(offset)],
+      queries: [...baseQueries, Query.limit(MAX_PAGE), Query.offset(offset)],
       total: false,
       ttl: 0,
     });
@@ -178,7 +178,19 @@ export const appwriteSync = {
   },
   async fetchUsers(): Promise<User[]> {
     const users = await fetchType<User>('user');
-    const media = await fetchType<ProfileMediaChunk>('profileMedia');
+    // Do not download every animated GIF before the feed can render.
+    // Media for the signed-in profile is loaded separately on demand.
+    return users;
+  },
+  async fetchUserMedia(userId: string): Promise<Partial<User>> {
+    const rows = await listRows([
+      Query.equal('entityType', ['profileMedia']),
+      Query.equal('ownerId', [userId]),
+    ]);
+    const media = rows
+      .filter((row) => row.data.entityType === 'profileMedia' && row.data.ownerId === userId)
+      .map((row) => parse<ProfileMediaChunk>(row))
+      .filter((value): value is ProfileMediaChunk => Boolean(value));
     const mediaByUser = new Map<string, Partial<Record<'avatar' | 'banner', string>>>();
 
     for (const field of ['avatar', 'banner'] as const) {
@@ -199,7 +211,7 @@ export const appwriteSync = {
       }
     }
 
-    return users.map((user) => ({ ...user, ...(mediaByUser.get(user.id) || {}) }));
+    return mediaByUser.get(userId) || {};
   },
 
   async saveCommunity(community: Community): Promise<void> {
