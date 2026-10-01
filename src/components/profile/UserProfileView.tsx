@@ -84,16 +84,16 @@ export const UserProfileView: React.FC = () => {
       </div>
 
       <div
-        className="px-4 sm:px-6 relative -mt-14 sm:-mt-20 rounded-b-2xl border-x border-b overflow-hidden"
+        className="px-4 sm:px-6 relative rounded-b-2xl border-x border-b overflow-hidden"
         style={{
-          // Keep the banner area image-only; begin the account color below the
-          // avatar overlap so it never tints the user's uploaded background.
-          backgroundImage: `linear-gradient(to bottom, transparent 0, transparent 5.5rem, ${profileColor}18 7.5rem, ${profileColor}10 62%, ${profileColor}08 100%)`,
+          // The color panel begins exactly where the cover ends. The avatar
+          // may overlap visually, but the color never covers the banner.
+          backgroundImage: `linear-gradient(to bottom, ${profileColor}28 0%, ${profileColor}18 28%, ${profileColor}10 62%, ${profileColor}08 100%)`,
           borderColor: `${profileColor}66`,
           boxShadow: `0 0 0 1px ${profileColor}18, 0 18px 50px ${profileColor}14`,
         }}
       >
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div className="relative -mt-14 sm:-mt-20 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           {/* Avatar & Identifiers */}
           <div className="flex items-end gap-4">
             <div className="relative rounded-3xl p-1 bg-neutral-950 shadow-2xl">
