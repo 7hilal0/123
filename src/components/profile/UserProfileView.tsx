@@ -84,11 +84,10 @@ export const UserProfileView: React.FC = () => {
       </div>
 
       <div
-        className="px-4 sm:px-6 relative -mt-16 sm:-mt-20 rounded-b-3xl border-x border-b"
+        className="px-4 sm:px-6 relative -mt-14 sm:-mt-20 rounded-b-2xl border-x border-b overflow-hidden"
         style={{
-          backgroundColor: `${profileColor}14`,
-          borderColor: `${profileColor}30`,
-          boxShadow: `inset 0 -80px 120px ${profileColor}0d`,
+          backgroundColor: `${profileColor}0c`,
+          borderColor: `${profileColor}24`,
         }}
       >
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
@@ -228,8 +227,10 @@ export const UserProfileView: React.FC = () => {
           )}
         </div>
 
-        {/* Tab Content */}
-        <div className="mt-4 space-y-3.5">
+        </div>
+
+      {/* Tab Content stays on the normal page surface, not inside the colored profile panel */}
+      <div className="px-4 sm:px-6 mt-4 space-y-3.5">
           {activeTab === 'posts' && (
             <>
               {userPosts.map((post) => (
@@ -255,7 +256,6 @@ export const UserProfileView: React.FC = () => {
               )}
             </>
           )}
-        </div>
       </div>
 
       {editProfileModalOpen && (
