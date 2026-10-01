@@ -26,13 +26,13 @@ export const CreatePostView: React.FC = () => {
   } = useApp();
 
   const [mediaType, setMediaType] = useState<PostMediaType>('text');
-  const [postFormat, setPostFormat] = useState<'discussion' | 'article' | 'image' | 'link'>('discussion');
+  const [postFormat, setPostFormat] = useState<'discussion' | 'image'>('discussion');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [tagInput, setTagInput] = useState('');
-  const [tags, setTags] = useState<string[]>(['dzcore', 'عام']);
+  const [tags, setTags] = useState<string[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -146,14 +146,12 @@ export const CreatePostView: React.FC = () => {
             <p className="text-xs font-semibold text-neutral-200">{dir === 'rtl' ? 'ماذا تريد أن تنشر؟' : 'What do you want to share?'}</p>
             <p className="text-[10px] text-neutral-500">{dir === 'rtl' ? 'اختر نوعًا واحدًا، ويمكنك ترك العنوان فارغًا' : 'Choose a format; the title is optional'}</p>
           </div>
-          <span className="rounded-full bg-white/5 px-2 py-1 text-[10px] text-neutral-500">4 formats</span>
+          <span className="rounded-full bg-white/5 px-2 py-1 text-[10px] text-neutral-500">2 formats</span>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
           {([
             { id: 'discussion' as const, value: 'text' as PostMediaType, icon: FileText, label: dir === 'rtl' ? 'نقاش' : 'Discussion', hint: dir === 'rtl' ? 'فكرة أو سؤال' : 'Idea or question', active: 'bg-emerald-500/10 border-emerald-500/40', iconBg: 'bg-emerald-500/10', iconText: 'text-emerald-400' },
-            { id: 'article' as const, value: 'text' as PostMediaType, icon: FileText, label: dir === 'rtl' ? 'مقال' : 'Article', hint: dir === 'rtl' ? 'نص طويل أو شرح' : 'Long-form writing', active: 'bg-amber-500/10 border-amber-500/40', iconBg: 'bg-amber-500/10', iconText: 'text-amber-400' },
             { id: 'image' as const, value: 'image' as PostMediaType, icon: ImageIcon, label: dir === 'rtl' ? 'صورة / عمل فني' : 'Image / Artwork', hint: dir === 'rtl' ? 'انشر صورة فقط' : 'Image-only posts', active: 'bg-teal-500/10 border-teal-500/40', iconBg: 'bg-teal-500/10', iconText: 'text-teal-400' },
-            { id: 'link' as const, value: 'link' as PostMediaType, icon: Link2, label: dir === 'rtl' ? 'رابط / فيديو' : 'Link / Video', hint: dir === 'rtl' ? 'مصدر خارجي أو فيديو' : 'External source or video', active: 'bg-indigo-500/10 border-indigo-500/40', iconBg: 'bg-indigo-500/10', iconText: 'text-indigo-400' },
           ] as const).map((format, index) => {
             const active = postFormat === format.id;
             const Icon = format.icon;
