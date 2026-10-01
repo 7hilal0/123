@@ -126,6 +126,13 @@ async function entityList(url, env) {
         delete payload.mediaUrl;
         payload.mediaDeferred = true;
       }
+      if (payload.author && typeof payload.author === 'object') {
+        if (typeof payload.author.avatar === 'string' && payload.author.avatar.length > 200000) {
+          payload.author.avatar = '';
+          payload.authorMediaDeferred = true;
+        }
+        if (typeof payload.author.banner === 'string' && payload.author.banner.length > 200000) payload.author.banner = '';
+      }
       return { entityType: row.entity_type, entityId: row.entity_id, ownerId: row.owner_id, payload: JSON.stringify(payload) };
     }
     return { entityType: row.entity_type, entityId: row.entity_id, ownerId: row.owner_id, payload: row.payload };
