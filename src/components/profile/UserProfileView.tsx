@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { cloudSync } from '../../services/cloudSync';
 import { Avatar } from '../common/Avatar';
 import { PostCard } from '../posts/PostCard';
 import { EditProfileModal } from './EditProfileModal';
@@ -33,13 +34,25 @@ export const UserProfileView: React.FC = () => {
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'posts' | 'comments' | 'saved'>('posts');
+  const [loadedMedia, setLoadedMedia] = useState<{ userId: string; avatar?: string; banner?: string } | null>(null);
 
   const targetUserId = selectedUserId || currentUser?.id;
   const user = users.find((u) => u.id === targetUserId) || currentUser;
 
+  useEffect(() => {
+    if (!user?.id) return;
+    let active = true;
+    cloudSync.fetchUserMedia(user.id).then((media) => {
+      if (active && (media.avatar || media.banner)) setLoadedMedia({ userId: user.id, avatar: media.avatar, banner: media.banner });
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [user?.id]);
+
+  const displayUser = user && loadedMedia?.userId === user.id ? { ...user, ...loadedMedia } : user;
+
   const BackIcon = dir === 'rtl' ? ArrowRight : ArrowLeft;
 
-  if (!user) {
+  if (!displayUser) {
     return (
       <div className="max-w-2xl mx-auto py-16 px-4 text-center">
         <h2 className="text-xl font-bold text-white mb-2">Member not found</h2>
@@ -53,15 +66,15 @@ export const UserProfileView: React.FC = () => {
     );
   }
 
-  const isSelf = currentUser && currentUser.id === user.id;
-  const profileColor = user.profileColor || '#10b981';
-  const displayNameColor = user.displayNameColor || '#ffffff';
-  const userPosts = posts.filter((p) => p.author.id === user.id);
+  const isSelf = currentUser && currentUser.id === displayUser.id;
+  const profileColor = displayUser.profileColor || '#10b981';
+  const displayNameColor = displayUser.displayNameColor || '#ffffff';
+  const userPosts = posts.filter((p) => p.author.id === displayUser.id);
   const savedPosts = posts.filter((p) => p.isSaved);
 
   const handleShareProfile = () => {
     navigator.clipboard?.writeText(window.location.href);
-    showToast(`${t.linkCopied} (@${user.username})`, 'info');
+    showToast(`${t.linkCopied} (@${displayUser.username})`, 'info');
   };
 
   return (
@@ -71,11 +84,11 @@ export const UserProfileView: React.FC = () => {
     >
       {/* Profile Header Banner */}
       <div className="relative h-44 sm:h-56 md:h-64 w-full bg-neutral-900 overflow-hidden">
-        {user.banner ? (
+        {displayUser.banner ? (
           <>
             <img
-              src={user.banner}
-              alt={user.displayName}
+              src={displayUser.banner}
+              alt={displayUser.displayName}
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover opacity-80"
             />
@@ -111,26 +124,26 @@ export const UserProfileView: React.FC = () => {
           <div className="flex items-end gap-4">
             <div className="relative rounded-full p-1 bg-transparent shadow-2xl">
               <Avatar
-                src={user.avatar}
-                alt={user.displayName}
+                src={displayUser.avatar}
+                alt={displayUser.displayName}
                 size="2xl"
-                status={user.status}
+                status={displayUser.status}
               />
             </div>
 
             <div className="mb-2">
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-display font-bold tracking-tight" style={{ color: displayNameColor }}>
-                  {user.displayName}
+                  {displayUser.displayName}
                 </h1>
-                {user.badges && user.badges.length > 0 && (
+                {displayUser.badges && displayUser.badges.length > 0 && (
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-600/20 text-emerald-400 border border-emerald-500/30">
-                    {user.badges[0]}
+                    {displayUser.badges[0]}
                   </span>
                 )}
               </div>
             <span className="text-xs sm:text-sm text-neutral-400 font-mono">
-                @{user.username}
+                @{displayUser.username}
               </span>
             </div>
           </div>
@@ -149,19 +162,19 @@ export const UserProfileView: React.FC = () => {
             ) : (
               <>
                 <button
-                  onClick={() => toggleFollowUser(user.id)}
+                  onClick={() => toggleFollowUser(displayUser.id)}
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                    user.isFollowing
+                    displayUser.isFollowing
                       ? 'bg-neutral-800 hover:bg-rose-500/10 hover:text-rose-400 text-neutral-200 border border-white/10'
                       : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/30'
                   }`}
                 >
-                  {user.isFollowing && <Check className="w-3.5 h-3.5" />}
-                  <span>{user.isFollowing ? t.following : t.follow}</span>
+                  {displayUser.isFollowing && <Check className="w-3.5 h-3.5" />}
+                  <span>{displayUser.isFollowing ? t.following : t.follow}</span>
                 </button>
 
                 <button
-                  onClick={() => navigateToMessages(user.id)}
+                  onClick={() => navigateToMessages(displayUser.id)}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-white/10 hover:bg-white/15 text-white border border-white/10 transition-colors cursor-pointer"
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
@@ -181,37 +194,37 @@ export const UserProfileView: React.FC = () => {
         </div>
 
         {/* Status Quote */}
-        {user.customStatus && (
+        {displayUser.customStatus && (
           <div className="mt-4 p-3 rounded-xl bg-neutral-900/60 border border-white/5 text-xs text-neutral-300 flex items-center gap-2 max-w-xl">
             <span className="text-neutral-500 font-mono text-[10px] uppercase tracking-wider">
               Status:
             </span>
-            <span className="italic">{user.customStatus}</span>
+            <span className="italic">{displayUser.customStatus}</span>
           </div>
         )}
 
         {/* Bio */}
         <p className="text-xs sm:text-sm text-neutral-300 mt-3 max-w-2xl leading-relaxed">
-          {user.bio}
+          {displayUser.bio}
         </p>
 
         {/* Metrics Row */}
         <div className="flex items-center gap-6 mt-4 pt-4 border-t border-white/5 text-xs text-neutral-400">
           <div className="flex items-center gap-1.5">
             <Flame className="w-4 h-4 text-emerald-400" />
-            <span className="font-semibold text-white font-mono">{user.karma}</span>
+            <span className="font-semibold text-white font-mono">{displayUser.karma}</span>
             <span>{t.karma}</span>
           </div>
 
           <div className="flex items-center gap-1.5">
             <Users className="w-4 h-4 text-neutral-500" />
-            <span className="font-semibold text-white font-mono">{user.followersCount}</span>
+            <span className="font-semibold text-white font-mono">{displayUser.followersCount}</span>
             <span>{t.followers}</span>
           </div>
 
           <div className="flex items-center gap-1.5">
             <Calendar className="w-4 h-4 text-neutral-500" />
-            <span>{t.joinedDate}: {user.joinedDate}</span>
+            <span>{t.joinedDate}: {displayUser.joinedDate}</span>
           </div>
         </div>
 

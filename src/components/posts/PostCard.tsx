@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Post } from '../../types';
 import { useApp } from '../../context/AppContext';
+import { cloudSync } from '../../services/cloudSync';
 import { Avatar } from '../common/Avatar';
 import {
   ArrowBigUp,
@@ -54,6 +55,19 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
   const [reportTarget, setReportTarget] = useState<'post' | 'user'>('post');
   const [reportReason, setReportReason] = useState('');
   const [reportBusy, setReportBusy] = useState(false);
+  const [resolvedMediaUrl, setResolvedMediaUrl] = useState(post.mediaUrl || '');
+
+  useEffect(() => {
+    setResolvedMediaUrl(post.mediaUrl || '');
+    if (!post.mediaDeferred) return;
+    let active = true;
+    const timer = window.setTimeout(() => {
+      cloudSync.fetchPost(post.id).then((fullPost) => {
+        if (active && fullPost?.mediaUrl) setResolvedMediaUrl(fullPost.mediaUrl);
+      }).catch(() => {});
+    }, 250);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [post.id, post.mediaUrl, post.mediaDeferred]);
   const netScore = post.upvotes - post.downvotes;
   const activeVote = currentUser ? (post.votes?.[currentUser.id] ?? null) : null;
 
@@ -282,11 +296,11 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
           )}
 
           {/* Media Render */}
-          {post.mediaUrl && post.mediaType === 'image' && (
+          {resolvedMediaUrl && post.mediaType === 'image' && (
             <div className="relative rounded-xl overflow-hidden bg-neutral-950 my-3 max-h-[500px] border border-white/5 flex items-center justify-center">
               {!imageError ? (
                 <img
-                  src={post.mediaUrl}
+                  src={resolvedMediaUrl}
                   alt={post.title}
                   referrerPolicy="no-referrer"
                   onError={() => setImageError(true)}

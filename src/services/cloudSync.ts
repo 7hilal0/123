@@ -42,7 +42,6 @@ export const cloudSync = {
     // User profiles intentionally omit large avatar/banner data. Reassemble the
     // separately stored chunks here so other people's images survive a refresh,
     // not only the currently signed-in user's images.
-    const mediaRows = await listRows('profileMedia');
     const followRows = await listRows('follow');
     const follows = followRows.map((row) => parse<FollowRecord>(row.payload)).filter((value): value is FollowRecord => Boolean(value));
     const followerCounts = new Map<string, number>();
@@ -52,29 +51,12 @@ export const cloudSync = {
       followerCounts.set(follow.followingId, (followerCounts.get(follow.followingId) || 0) + 1);
       if (follow.followerId === currentUserId) followingByCurrentUser.add(follow.followingId);
     }
-    const mediaByUser = new Map<string, ProfileMediaChunk[]>();
-    for (const row of mediaRows) {
-      const media = parse<ProfileMediaChunk>(row.payload);
-      if (!media) continue;
-      const list = mediaByUser.get(media.userId) || [];
-      list.push(media);
-      mediaByUser.set(media.userId, list);
-    }
-
     return users.map((user) => {
-      const media = mediaByUser.get(user.id) || [];
       const hydrated = {
         ...user,
         ...(followerCounts.has(user.id) ? { followersCount: followerCounts.get(user.id) || 0 } : {}),
         ...(currentUserId ? { isFollowing: followingByCurrentUser.has(user.id) } : {}),
       };
-      for (const field of ['avatar', 'banner'] as const) {
-        const chunks = media.filter((item) => item.field === field).sort((a, b) => a.index - b.index);
-        const total = chunks[0]?.total || 0;
-        if (total > 0 && chunks.length >= total && chunks.slice(0, total).every((item, index) => item.index === index)) {
-          hydrated[field] = chunks.slice(0, total).map((item) => item.value).join('');
-        }
-      }
       return hydrated;
     });
   },
@@ -96,7 +78,14 @@ export const cloudSync = {
   fetchCommunities: () => fetchType<Community>('community'),
   savePost: (post: Post) => saveEntity('post', post, post.author?.id),
   async deletePost(postId: string): Promise<boolean> { try { await saveEntity('post', { id: postId, deleted: true, deletedAt: Date.now() } as unknown as Post); return true; } catch { return false; } },
-  async fetchPosts(): Promise<Post[]> { return fetchType<Post>('post'); },
+  async fetchPosts(): Promise<Post[]> {
+    const rows = (await cloudflareApi.listEntities('post', undefined, { summary: '1' })).items;
+    return rows.map((row) => parse<Post>(row.payload)).filter((value): value is Post => Boolean(value));
+  },
+  async fetchPost(postId: string): Promise<Post | null> {
+    const rows = (await cloudflareApi.listEntities('post', undefined, { entityId: postId })).items;
+    return rows[0] ? parse<Post>(rows[0].payload) : null;
+  },
   // A failed poll must not be converted into []: that would erase the cached
   // feed and make all posts appear to disappear during a brief network error.
   subscribePosts(callback: (posts: Post[]) => void) { return subscribePoll(() => this.fetchPosts(), callback, 'posts'); },

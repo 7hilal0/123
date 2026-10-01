@@ -108,15 +108,28 @@ async function createSession(userId, env) {
 async function entityList(url, env) {
   const type = url.searchParams.get('type');
   const ownerId = url.searchParams.get('ownerId');
+  const entityId = url.searchParams.get('entityId');
+  const summary = url.searchParams.get('summary') === '1';
   let query = 'SELECT entity_type, entity_id, owner_id, payload, deleted FROM entities';
   const values = [];
   const clauses = [];
   if (type) { clauses.push('entity_type = ?'); values.push(type); }
   if (ownerId) { clauses.push('owner_id = ?'); values.push(ownerId); }
+  if (entityId) { clauses.push('entity_id = ?'); values.push(entityId); }
   if (clauses.length) query += ` WHERE ${clauses.join(' AND ')}`;
   query += ' ORDER BY updated_at DESC LIMIT 10000';
   const result = await env.DB.prepare(query).bind(...values).all();
-  return result.results.filter((row) => !row.deleted).map((row) => ({ entityType: row.entity_type, entityId: row.entity_id, ownerId: row.owner_id, payload: row.payload }));
+  return result.results.filter((row) => !row.deleted).map((row) => {
+    if (summary && type === 'post') {
+      const payload = JSON.parse(row.payload);
+      if (typeof payload.mediaUrl === 'string' && payload.mediaUrl.length > 500000) {
+        delete payload.mediaUrl;
+        payload.mediaDeferred = true;
+      }
+      return { entityType: row.entity_type, entityId: row.entity_id, ownerId: row.owner_id, payload: JSON.stringify(payload) };
+    }
+    return { entityType: row.entity_type, entityId: row.entity_id, ownerId: row.owner_id, payload: row.payload };
+  });
 }
 
 async function adminEntities(env, type) {

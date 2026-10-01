@@ -62,6 +62,7 @@ export interface Post {
   content: string;
   mediaType: PostMediaType;
   mediaUrl?: string;
+  mediaDeferred?: boolean;
   linkUrl?: string;
   upvotes: number;
   downvotes: number;

@@ -24,7 +24,7 @@ export const cloudflareApi = {
       method: 'POST',
       body: JSON.stringify({ targetType, targetId, reason }),
     }),
-  listEntities: (type?: string, ownerId?: string) => request<{ items: Array<{ entityType: string; entityId: string; ownerId?: string; payload: string }> }>(`/api/entities?${new URLSearchParams({ ...(type ? { type } : {}), ...(ownerId ? { ownerId } : {}) })}`),
+  listEntities: (type?: string, ownerId?: string, extra: Record<string, string> = {}) => request<{ items: Array<{ entityType: string; entityId: string; ownerId?: string; payload: string }> }>(`/api/entities?${new URLSearchParams({ ...(type ? { type } : {}), ...(ownerId ? { ownerId } : {}), ...extra })}`),
   saveEntity: (entityType: string, entityId: string, payload: string, ownerId?: string) => request<{ ok: boolean }>('/api/entities', { method: 'POST', body: JSON.stringify({ entityType, entityId, payload, ownerId }) }),
   saveEntityBatch: (entities: Array<{ entityType: string; entityId: string; payload: string; ownerId?: string }>) => request<{ ok: boolean }>('/api/entities/batch', { method: 'POST', body: JSON.stringify({ entities }) }),
 };
