@@ -1,4 +1,4 @@
-import { Account, Client, ID, OAuthProvider, Query, Realtime, TablesDB } from 'appwrite';
+import { Account, Client, ID, Query, Realtime, TablesDB } from 'appwrite';
 
 export const APPWRITE_ENDPOINT = import.meta.env.VITE_APPWRITE_ENDPOINT || 'https://fra.cloud.appwrite.io/v1';
 export const APPWRITE_PROJECT_ID = import.meta.env.VITE_APPWRITE_PROJECT_ID || '6abde6d5001e5d6b6f6f';
@@ -12,4 +12,4 @@ export const appwriteClient = new Client()
 export const account = new Account(appwriteClient);
 export const tablesDB = new TablesDB(appwriteClient);
 export const realtime = new Realtime(appwriteClient);
-export { ID, OAuthProvider, Query };
+export { ID, Query };

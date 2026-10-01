@@ -17,7 +17,7 @@ import { appwriteSync } from '../services/appwriteSync';
 import { DEFAULT_USER_AVATAR } from '../utils/avatarConstants';
 import { resolvePostForUser, resolveCommentForUser } from '../utils/voting';
 import { resolveConversationForUser } from '../utils/conversationUtils';
-import { account, ID, OAuthProvider } from '../lib/appwrite';
+import { account, ID } from '../lib/appwrite';
 
 export interface ToastMessage {
   id: string;
@@ -119,7 +119,6 @@ interface AppContextType {
   // Auth
   login: (usernameOrEmail: string, password?: string) => Promise<boolean>;
   register: (username: string, displayName: string, email: string, password?: string, avatarUrl?: string) => Promise<boolean>;
-  signInWithGoogle: () => Promise<boolean>;
   logout: () => void;
   switchUser: (userId: string) => void;
 
@@ -1377,21 +1376,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const signInWithGoogle = async (): Promise<boolean> => {
-    try {
-      await account.createOAuth2Session({
-        provider: OAuthProvider.Google,
-        success: window.location.origin,
-        failure: `${window.location.origin}/?auth=failed`,
-      });
-      return true;
-    } catch (error) {
-      console.error('[Appwrite] Google sign-in failed:', error);
-      showToast(language === 'ar' ? 'تعذر تسجيل الدخول بواسطة Google' : 'Google sign-in could not be completed', 'warning');
-      return false;
-    }
-  };
-
   const logout = async () => {
     try { await account.deleteSession({ sessionId: 'current' }); } catch { /* already signed out */ }
     setCurrentUser(null);
@@ -1500,7 +1484,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       login,
       register,
-      signInWithGoogle,
       logout,
         switchUser,
 
