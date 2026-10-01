@@ -2,13 +2,25 @@ import { User, Community, Post, Comment, Conversation, DirectMessage, Notificati
 import { cloudflareApi } from './cloudflareApi';
 
 const MEDIA_CHUNK_SIZE = 48_000;
-const MEDIA_BATCH_SIZE = 3;
 type EntityType = 'user' | 'community' | 'post' | 'comment' | 'conversation' | 'message' | 'notification' | 'profileMedia';
 type ProfileMediaChunk = { id: string; userId: string; field: 'avatar' | 'banner'; index: number; total: number; value: string };
 
 const pause = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 function splitMedia(value: string): string[] { if (!value) return ['']; const chunks: string[] = []; for (let i = 0; i < value.length; i += MEDIA_CHUNK_SIZE) chunks.push(value.slice(i, i + MEDIA_CHUNK_SIZE)); return chunks; }
 function parse<T>(payload: string): T | null { try { return JSON.parse(payload) as T; } catch { return null; } }
+async function saveMediaBatch(rows: ProfileMediaChunk[]): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await cloudflareApi.saveEntityBatch(rows.map((row) => ({ entityType: 'profileMedia', entityId: row.id, ownerId: row.userId, payload: JSON.stringify(row) })));
+      return;
+    } catch (error) {
+      lastError = error;
+      await pause(300 * (attempt + 1));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Profile media batch upload failed');
+}
 async function listRows<T>(type?: EntityType, ownerId?: string) { return (await cloudflareApi.listEntities(type, ownerId)).items; }
 async function fetchType<T>(type: EntityType, predicate?: (value: T) => boolean): Promise<T[]> { const rows = await listRows(type); const values = rows.map((row) => parse<T>(row.payload)).filter((value): value is T => Boolean(value)); return predicate ? values.filter(predicate) : values; }
 async function saveEntity<T extends { id: string }>(entityType: EntityType, entity: T, ownerId?: string): Promise<void> { await cloudflareApi.saveEntity(entityType, entity.id, JSON.stringify(entity), ownerId || entity.id); }
@@ -21,7 +33,7 @@ export const cloudSync = {
     for (const item of [{ field: 'avatar' as const, value: avatar || '' }, { field: 'banner' as const, value: banner || '' }]) {
       const chunks = splitMedia(item.value);
       const rows = chunks.map((value, index) => ({ id: `${user.id}:${item.field}:${index}`, userId: user.id, field: item.field, index, total: chunks.length, value } as ProfileMediaChunk));
-      for (let index = 0; index < rows.length; index += MEDIA_BATCH_SIZE) { await Promise.all(rows.slice(index, index + MEDIA_BATCH_SIZE).map((row) => saveEntity('profileMedia', row, user.id))); await pause(80); }
+      for (let index = 0; index < rows.length; index += 20) { await saveMediaBatch(rows.slice(index, index + 20)); await pause(120); }
     }
   },
   async fetchUsers(): Promise<User[]> {

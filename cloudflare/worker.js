@@ -155,6 +155,18 @@ export default {
         return json({ user: cleanUser({ ...profile, id: user.id, username: user.username, email: profile.email || user.email }) }, 200, origin);
       }
       if (url.pathname === '/api/entities' && request.method === 'GET') return json({ items: await entityList(url, env) }, 200, origin);
+      if (url.pathname === '/api/entities/batch' && request.method === 'POST') {
+        const user = await currentUser(request, env);
+        if (!user) return json({ error: 'unauthorized' }, 401, origin);
+        const body = await request.json();
+        const entities = Array.isArray(body.entities) ? body.entities : [];
+        if (!entities.length || entities.length > 20 || entities.some((item) => item.entityType !== 'profileMedia' || !item.entityId || typeof item.payload !== 'string')) {
+          return json({ error: 'invalid_entity_batch' }, 400, origin);
+        }
+        const statements = entities.map((item) => env.DB.prepare('INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0').bind(item.entityType, item.entityId, item.ownerId || user.id, item.payload, Date.now()));
+        await env.DB.batch(statements);
+        return json({ ok: true }, 200, origin);
+      }
       if (url.pathname === '/api/entities' && request.method === 'POST') {
         const user = await currentUser(request, env);
         if (!user) return json({ error: 'unauthorized' }, 401, origin);
