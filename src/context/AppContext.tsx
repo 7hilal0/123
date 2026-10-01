@@ -1265,11 +1265,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const profile = users.find(
       (u) => u.username.toLowerCase() === term || (u.email && u.email.toLowerCase() === term)
     );
-    const email = profile?.email?.trim();
+    // A profile row may be unavailable while Appwrite is loading or after a
+    // migration. If the user entered an email, authenticate directly instead
+    // of requiring the profile document to exist first.
+    const email = profile?.email?.trim() || (term.includes('@') ? term : '');
 
     if (!email || !password) {
       showToast(
-        language === 'ar' ? 'أدخل البريد الإلكتروني وكلمة المرور' : 'Enter your email and password',
+        language === 'ar'
+          ? 'أدخل البريد الإلكتروني وكلمة المرور. تسجيل الدخول باسم المستخدم يتطلب وجود ملفك في قاعدة البيانات.'
+          : 'Enter your email and password. Username login requires your profile to be available.',
         'warning'
       );
       return false;
