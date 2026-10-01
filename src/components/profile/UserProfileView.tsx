@@ -84,7 +84,7 @@ export const UserProfileView: React.FC = () => {
       </div>
 
       <div
-        className="px-4 sm:px-6 relative rounded-b-2xl border-x border-b overflow-hidden"
+        className="px-4 sm:px-6 relative rounded-b-2xl border-x border-b overflow-visible"
         style={{
           // The color panel begins exactly where the cover ends. The avatar
           // may overlap visually, but the color never covers the banner.
