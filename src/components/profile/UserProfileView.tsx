@@ -86,7 +86,7 @@ export const UserProfileView: React.FC = () => {
       <div
         className="px-4 sm:px-6 relative -mt-14 sm:-mt-20 rounded-b-2xl border-x border-b overflow-hidden"
         style={{
-          backgroundColor: `${profileColor}0c`,
+          backgroundImage: `linear-gradient(to bottom, transparent 0, transparent 5.5rem, ${profileColor}0c 5.5rem, ${profileColor}0c 100%)`,
           borderColor: `${profileColor}24`,
         }}
       >
