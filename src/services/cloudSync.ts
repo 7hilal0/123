@@ -14,7 +14,7 @@ async function fetchType<T>(type: EntityType, predicate?: (value: T) => boolean)
 async function saveEntity<T extends { id: string }>(entityType: EntityType, entity: T, ownerId?: string): Promise<void> { await cloudflareApi.saveEntity(entityType, entity.id, JSON.stringify(entity), ownerId || entity.id); }
 function subscribePoll<T>(fetcher: () => Promise<T[]>, callback: (items: T[]) => void, label: string): () => void { let stopped = false; const poll = async () => { try { const items = await fetcher(); if (!stopped) callback(items); } catch (error) { console.error(`[Cloudflare] ${label} sync error:`, error); } }; void poll(); const timer = window.setInterval(poll, 10000); return () => { stopped = true; window.clearInterval(timer); }; }
 
-export const appwriteSync = {
+export const cloudSync = {
   async saveUser(user: User): Promise<void> {
     const { avatar, banner, ...profile } = user;
     await saveEntity('user', profile as User);

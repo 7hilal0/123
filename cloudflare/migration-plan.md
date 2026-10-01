@@ -14,4 +14,4 @@ Remove the runtime dependency on the locked Appwrite project without touching th
 
 ## Safety boundary
 
-The old Appwrite project remains untouched. The Cloudflare backend is tested on the Pages deployment before the frontend stops calling Appwrite. Existing production deployment and domain remain unchanged until the new account flow and entity synchronization are verified.
+The old Appwrite project remains untouched. The Cloudflare backend is tested on the Pages deployment before the frontend stops using the legacy backend. Existing production deployment and domain remain unchanged until the new account flow and entity synchronization are verified.

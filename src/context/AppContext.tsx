@@ -192,7 +192,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [directMessages, setDirectMessages] = useState<Record<string, DirectMessage[]>>(() => storage.getDirectMessages());
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => storage.getNotifications());
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'connected' | 'syncing' | 'offline'>('connected');
-  // Keeps optimistic deletions out of a stale Firestore snapshot while the delete request settles.
+  // Keeps optimistic deletions out of a stale Cloudflare snapshot while the delete request settles.
   const deletedPostIdsRef = useRef<Set<string>>(new Set());
   const deletedCommentIdsRef = useRef<Set<string>>(new Set());
   const pendingVoteSavesRef = useRef<Record<string, Post>>({});
@@ -356,15 +356,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => window.removeEventListener('popstate', restoreFromHistory);
   }, []);
 
-  // --- Real-time Cloud Synchronization (Firestore) ---
+  // --- Real-time Cloud Synchronization (Cloudflare) ---
   useEffect(() => {
     setCloudSyncStatus('syncing');
 
-    // Proactively purge welcome post from Firestore
+    // Proactively purge welcome post from Cloudflare
     cloudSync.deletePost('post_official_welcome').catch(() => {});
 
     // Subscribe to remote posts live. This is the single initial post read;
-    // a separate fetch here would double Firestore reads and exhaust quotas.
+    // a separate fetch here would double Cloudflare reads and exhaust quotas.
     const unsubPosts = cloudSync.subscribePosts((remotePosts) => {
       setCloudSyncStatus('connected');
       if (remotePosts) {
@@ -374,7 +374,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           )
           .map((p) => resolvePostForUser(p, currentUser?.id));
 
-        // Firestore is authoritative. Do not merge old local posts into the feed.
+        // Cloudflare is authoritative. Do not merge old local posts into the feed.
         setPosts(cleanRemote);
       }
     });
@@ -471,7 +471,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const cleanRemote = remoteComments
         .filter((comment) => !deletedCommentIdsRef.current.has(comment.id))
         .map((comment) => resolveCommentForUser(comment, currentUser?.id));
-      // Firestore is authoritative after a refresh. Do not merge stale localStorage
+      // Cloudflare is authoritative after a refresh. Do not merge stale localStorage
       // comments back into the post, otherwise another device can see deleted data.
       setComments((prev) => ({ ...prev, [postId]: cleanRemote }));
 
@@ -566,7 +566,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addActivityNotification = (recipientId: string | undefined, type: NotificationItem['type'], actor: User, title: string, message: string, targetType: NotificationItem['targetType'], targetId: string) => {
     if (!currentUser || !recipientId || recipientId === actor.id || !actor) return;
     const item: NotificationItem = { id: `notification_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, recipientId, type, actor, title, message, timestamp: language === 'ar' ? 'الآن' : language === 'fr' ? 'À l’instant' : 'Just now', isRead: false, targetType, targetId };
-    cloudSync.saveNotification(item).catch((error) => console.error('[Firestore] Notification save failed', error));
+    cloudSync.saveNotification(item).catch((error) => console.error('[Cloudflare] Notification save failed', error));
     if (recipientId === currentUser.id) setNotifications((prev) => [item, ...prev].slice(0, 100));
   };
 
@@ -1164,7 +1164,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...prev.filter((c) => c.id !== activeConversationId),
     ]);
 
-    // Save message and updated conversation to Cloud Firestore in real time
+    // Save message and updated conversation to Cloud Cloudflare in real time
     await cloudSync.saveDirectMessage(activeConversationId, newMsg);
     await cloudSync.saveConversation(updatedConv);
   };
@@ -1242,9 +1242,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return newComments;
     });
 
-    // Save to Appwrite and surface failures instead of silently losing media updates.
+    // Save to Cloudflare and surface failures instead of silently losing media updates.
     void cloudSync.saveUser(updated).catch((error) => {
-      console.error('[Appwrite] Profile save failed:', error);
+      console.error('[Cloudflare] Profile save failed:', error);
       showToast(
         language === 'ar'
           ? 'تم حفظ التعديل على هذا الجهاز، لكن تعذر رفع الصورة للسحابة. جرّب GIF أصغر.'
@@ -1308,7 +1308,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       }
     }
-    // A profile row may be unavailable while Appwrite is loading or after a
+    // A profile row may be unavailable while Cloudflare is loading or after a
     // migration. If the user entered an email, authenticate directly instead
     // of requiring the profile document to exist first.
     const email = profile?.email?.trim() || (term.includes('@') ? term : '');

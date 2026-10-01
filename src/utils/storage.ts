@@ -104,7 +104,7 @@ if (typeof window !== 'undefined') {
       localStorage.setItem(ACCOUNT_RESET_VERSION, 'done');
     }
     if (localStorage.getItem(CLOUDFLARE_ACCOUNT_RESET_VERSION) !== 'done') {
-      // Appwrite is now the source of truth and its user list was reset.
+      // Cloudflare is now the source of truth and its user list was reset.
       // Remove old demo/legacy accounts cached on individual phones.
       localStorage.removeItem(STORAGE_KEYS.USERS);
       localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
@@ -188,7 +188,7 @@ export const storage = {
   },
 
   getPosts: (): Post[] => {
-    // Firestore is the only source of truth for posts. Never seed old demo posts.
+    // Cloudflare is the only source of truth for posts. Never seed old demo posts.
     const list = safeGet<Post[]>(STORAGE_KEYS.POSTS, []);
     const users = storage.getUsers();
     const userMap = new Map(users.map((u) => [u.id, u]));
