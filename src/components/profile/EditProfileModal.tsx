@@ -147,7 +147,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
         </header>
 
         <form onSubmit={handleSubmit}>
-          <section className="relative">
+          <section className="relative" style={{ backgroundColor: `${profileColor}10` }}>
             <div className="relative h-44 overflow-hidden bg-neutral-900 sm:h-56 md:h-64">
               <img
                 src={bannerUrl || 'https://images.unsplash.com/photo-1557682250-33bd709cbe85?auto=format&fit=crop&w=1600&q=85'}
@@ -199,14 +199,14 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
               </div>
               <div className="pb-2">
                 <h2 className="text-2xl font-bold tracking-tight text-white">{displayName || currentUser.username}</h2>
-                <p className="font-mono text-sm text-neutral-500">@{currentUser.username}</p>
+                <p className="font-mono text-sm" style={{ color: `${profileColor}cc` }}>@{currentUser.username}</p>
               </div>
             </div>
           </section>
 
           <div className="mx-auto grid max-w-4xl gap-6 px-4 pb-12 pt-8 sm:px-8 lg:grid-cols-[minmax(0,1fr)_280px]">
             <div className="space-y-5">
-              <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-4 sm:p-5">
+              <section className="rounded-2xl border p-4 sm:p-5" style={{ borderColor: `${profileColor}38`, backgroundColor: `${profileColor}0b` }}>
                 <div className="mb-4">
                   <h3 className="text-sm font-bold text-white">Profile information</h3>
                   <p className="mt-1 text-xs text-neutral-500">This is how people will see you across DZCORE.</p>
@@ -220,7 +220,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                       required
                       value={displayName}
                       onChange={(event) => setDisplayName(event.target.value)}
-                      className="w-full rounded-xl border border-white/10 bg-black/20 px-3.5 py-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/10"
+                      className="w-full rounded-xl border bg-black/20 px-3.5 py-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:ring-2" style={{ borderColor: `${profileColor}30` }}
                     />
                   </label>
 
@@ -231,7 +231,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                       value={customStatus}
                       onChange={(event) => setCustomStatus(event.target.value)}
                       placeholder="What are you working on today?"
-                      className="w-full rounded-xl border border-white/10 bg-black/20 px-3.5 py-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/10"
+                      className="w-full rounded-xl border bg-black/20 px-3.5 py-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:ring-2" style={{ borderColor: `${profileColor}30` }}
                     />
                   </label>
 
@@ -242,7 +242,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                       value={bio}
                       onChange={(event) => setBio(event.target.value)}
                       placeholder="Tell the community about yourself..."
-                      className="w-full resize-none rounded-xl border border-white/10 bg-black/20 p-3.5 text-sm leading-relaxed text-white outline-none transition placeholder:text-neutral-600 focus:border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/10"
+                      className="w-full resize-none rounded-xl border bg-black/20 p-3.5 text-sm leading-relaxed text-white outline-none transition placeholder:text-neutral-600 focus:ring-2" style={{ borderColor: `${profileColor}30` }}
                     />
                   </label>
                 </div>
@@ -309,7 +309,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                 <button type="button" onClick={onClose} className="rounded-xl px-4 py-2.5 text-xs font-semibold text-neutral-400 transition hover:bg-white/10 hover:text-white">
                   {t.cancel}
                 </button>
-                <button type="submit" className="flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400">
+                <button type="submit" className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-white shadow-lg transition hover:brightness-110" style={{ backgroundColor: profileColor, boxShadow: `0 10px 28px ${profileColor}45` }}>
                   <Save className="h-4 w-4" />
                   {t.saveChanges}
                 </button>
