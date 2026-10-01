@@ -205,8 +205,8 @@ export const FeedView: React.FC = () => {
     .slice(0, 3);
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 md:py-8 text-start">
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+    <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 md:py-8 xl:py-10 text-start">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 xl:gap-8 items-start">
         {/* Main Feed Column */}
         <div className="xl:col-span-8 space-y-5 min-w-0 w-full">
           {/* Feed Filter Bar (Segmented Controls) */}

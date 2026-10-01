@@ -15,11 +15,11 @@ export const TopBar: React.FC = () => {
   const isProfilePage = activeTab === 'profile';
 
   return (
-    <header className="sticky top-0 z-30 h-16 w-full bg-neutral-950/85 backdrop-blur-xl border-b border-white/5 px-4 md:px-6 relative flex items-center justify-center">
+    <header className="sticky top-0 z-30 h-16 md:h-[72px] w-full bg-neutral-950/80 backdrop-blur-2xl border-b border-white/[0.08] px-4 md:px-8 relative flex items-center justify-center shadow-[0_10px_30px_rgba(0,0,0,.12)]">
       {/* Center: DZCORE Brand Logo & Name */}
       <button
         onClick={() => navigateToFeed('hot')}
-        className="flex items-center gap-2.5 group focus:outline-none cursor-pointer select-none"
+        className="flex items-center gap-2.5 rounded-2xl px-3 py-1.5 group focus:outline-none cursor-pointer select-none transition-colors hover:bg-white/[0.04]"
         title="DZCORE"
       >
         <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-600/30 group-hover:scale-105 transition-transform">
