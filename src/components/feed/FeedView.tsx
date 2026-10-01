@@ -15,6 +15,40 @@ import {
   Loader2
 } from 'lucide-react';
 
+const FeedSkeleton: React.FC = () => (
+  <div className="space-y-3.5" aria-label="Loading posts">
+    {[0, 1].map((item) => (
+      <div key={item} className="rounded-2xl border border-white/[0.08] bg-neutral-900/70 p-5 space-y-5 animate-pulse">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-neutral-800" />
+          <div className="space-y-2 flex-1">
+            <div className="h-3 w-28 rounded bg-neutral-800" />
+            <div className="h-2.5 w-20 rounded bg-neutral-800/80" />
+          </div>
+        </div>
+        <div className="h-5 w-2/5 rounded bg-neutral-800" />
+        <div className="space-y-2">
+          <div className="h-3 w-full rounded bg-neutral-800/80" />
+          <div className="h-3 w-4/5 rounded bg-neutral-800/80" />
+        </div>
+        <div className="h-10 rounded-xl bg-neutral-800/70" />
+      </div>
+    ))}
+  </div>
+);
+
+const AccountSkeleton: React.FC = () => (
+  <div className="rounded-2xl border border-white/5 bg-neutral-900/40 p-5 space-y-4 animate-pulse">
+    <div className="h-4 w-32 rounded bg-neutral-800" />
+    {[0, 1, 2].map((item) => (
+      <div key={item} className="flex items-center gap-3">
+        <div className="h-9 w-9 rounded-full bg-neutral-800" />
+        <div className="space-y-2 flex-1"><div className="h-3 w-24 rounded bg-neutral-800" /><div className="h-2 w-16 rounded bg-neutral-800/80" /></div>
+      </div>
+    ))}
+  </div>
+);
+
 export const FeedView: React.FC = () => {
   const {
     posts,
@@ -232,6 +266,14 @@ export const FeedView: React.FC = () => {
               displayPosts.map((post) => (
                 <PostCard key={post.id} post={post} />
               ))
+            ) : cloudSyncStatus === 'syncing' ? (
+              <>
+                <div className="flex items-center gap-2 px-1 text-xs text-neutral-500">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
+                  <span>{dir === 'rtl' ? 'يتم تجهيز الواجهة ثم تحميل المنشورات…' : 'Preparing the interface, then loading posts…'}</span>
+                </div>
+                <FeedSkeleton />
+              </>
             ) : feedSort === 'following' ? (
               /* Dedicated Empty State for Following Tab */
               <div className="p-8 md:p-10 text-center bg-neutral-900/40 rounded-2xl border border-white/5 space-y-4">
@@ -305,11 +347,6 @@ export const FeedView: React.FC = () => {
                   </button>
                 )}
               </div>
-            ) : cloudSyncStatus === 'syncing' ? (
-              <div className="p-12 text-center bg-gradient-to-br from-neutral-900/70 to-neutral-950/60 rounded-2xl border border-white/[0.08] text-neutral-400 space-y-3 shadow-lg shadow-black/10">
-                <Loader2 className="w-8 h-8 mx-auto text-emerald-400 animate-spin" aria-label="Loading posts" />
-                <p className="text-sm">{dir === 'rtl' ? 'جاري تحميل المنشورات…' : 'Loading posts…'}</p>
-              </div>
             ) : (
               /* General Empty State */
               <div className="p-12 text-center bg-gradient-to-br from-neutral-900/70 to-neutral-950/60 rounded-2xl border border-white/[0.08] text-neutral-400 space-y-3 shadow-lg shadow-black/10">
@@ -327,6 +364,7 @@ export const FeedView: React.FC = () => {
 
         {/* Sidebar Widgets (Desktop) */}
         <div className="hidden md:block md:col-span-4 space-y-5 sticky top-20 text-start min-w-0">
+          {users.length === 0 && <AccountSkeleton />}
           {/* Welcome Card */}
           <div className="p-5 rounded-2xl bg-gradient-to-br from-neutral-900/90 via-neutral-900/75 to-neutral-950 border border-white/[0.08] shadow-xl shadow-black/20">
             <div className="flex items-center gap-2.5 mb-3">
