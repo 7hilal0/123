@@ -90,7 +90,8 @@ function adminKey(env) {
 }
 
 function isAdmin(request, env) {
-  return parseCookies(request)[ADMIN_COOKIE] === adminKey(env);
+  const headerSecret = request.headers.get('x-dzcore-admin-secret');
+  return headerSecret === adminKey(env) || parseCookies(request)[ADMIN_COOKIE] === adminKey(env);
 }
 
 function adminRequired(request, env, origin) {
