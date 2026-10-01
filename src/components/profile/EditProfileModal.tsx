@@ -124,7 +124,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
     }
   };
 
-  const getImageOffsetLimit = () => Math.max(0, (imageZoom - 1) * 50);
+  const getImageScale = () => Math.max(1.15, imageZoom);
+  const getImageOffsetLimit = () => (getImageScale() - 1) * 50;
   const startImageDrag = (event: React.PointerEvent<HTMLDivElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
     imageDragRef.current = { x: event.clientX, y: event.clientY, offsetX: imageOffset.x, offsetY: imageOffset.y };
@@ -156,7 +157,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
       canvas.height = height;
       const context = canvas.getContext('2d');
       if (!context) return;
-      const scale = Math.max(width / image.width, height / image.height) * imageZoom;
+      const scale = Math.max(width / image.width, height / image.height) * getImageScale();
       context.save();
       context.translate(width / 2 + (imageOffset.x / 100) * width, height / 2 + (imageOffset.y / 100) * height);
       context.rotate((imageRotation * Math.PI) / 180);
@@ -411,7 +412,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                 onPointerUp={stopImageDrag}
                 onPointerCancel={stopImageDrag}
               >
-                <img src={imageEditor.src} alt="Edit preview" draggable={false} className="h-full w-full select-none object-cover" style={{ transform: `translate(${imageOffset.x}%, ${imageOffset.y}%) scale(${imageZoom}) rotate(${imageRotation}deg)` }} />
+                <img src={imageEditor.src} alt="Edit preview" draggable={false} className="h-full w-full select-none object-cover" style={{ transform: `translate(${imageOffset.x}%, ${imageOffset.y}%) scale(${getImageScale()}) rotate(${imageRotation}deg)` }} />
                 <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,transparent_33%,rgba(255,255,255,.5)_33%,rgba(255,255,255,.5)_33.3%,transparent_33.3%,transparent_66%,rgba(255,255,255,.5)_66%,rgba(255,255,255,.5)_66.3%,transparent_66.3%),linear-gradient(to_bottom,transparent_33%,rgba(255,255,255,.5)_33%,rgba(255,255,255,.5)_33.3%,transparent_33.3%,transparent_66%,rgba(255,255,255,.5)_66%,rgba(255,255,255,.5)_66.3%,transparent_66.3%)]" />
               </div>
             </div>
