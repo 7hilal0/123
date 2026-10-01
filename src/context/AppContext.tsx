@@ -396,7 +396,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setUsers((local) => {
           const remoteIds = new Set(remoteUsers.map((u) => u.id));
           const localOnly = local.filter((u) => !remoteIds.has(u.id));
-          return [...remoteUsers, ...localOnly];
+          const mergedRemote = remoteUsers.map((remote) => {
+            const cached = local.find((user) => user.id === remote.id);
+            return {
+              ...cached,
+              ...remote,
+              // Keep a cached image if a media chunk is still being uploaded or
+              // the first refresh happens while the media request is incomplete.
+              avatar: remote.avatar || cached?.avatar || DEFAULT_USER_AVATAR,
+              banner: remote.banner || cached?.banner || '',
+            };
+          });
+          return [...mergedRemote, ...localOnly];
         });
       }
     }).catch(() => {});

@@ -24,7 +24,34 @@ export const cloudSync = {
       for (let index = 0; index < rows.length; index += MEDIA_BATCH_SIZE) { await Promise.all(rows.slice(index, index + MEDIA_BATCH_SIZE).map((row) => saveEntity('profileMedia', row, user.id))); await pause(80); }
     }
   },
-  fetchUsers: () => fetchType<User>('user'),
+  async fetchUsers(): Promise<User[]> {
+    const users = await fetchType<User>('user');
+    // User profiles intentionally omit large avatar/banner data. Reassemble the
+    // separately stored chunks here so other people's images survive a refresh,
+    // not only the currently signed-in user's images.
+    const mediaRows = await listRows('profileMedia');
+    const mediaByUser = new Map<string, ProfileMediaChunk[]>();
+    for (const row of mediaRows) {
+      const media = parse<ProfileMediaChunk>(row.payload);
+      if (!media) continue;
+      const list = mediaByUser.get(media.userId) || [];
+      list.push(media);
+      mediaByUser.set(media.userId, list);
+    }
+
+    return users.map((user) => {
+      const media = mediaByUser.get(user.id) || [];
+      const hydrated = { ...user };
+      for (const field of ['avatar', 'banner'] as const) {
+        const chunks = media.filter((item) => item.field === field).sort((a, b) => a.index - b.index);
+        const total = chunks[0]?.total || 0;
+        if (total > 0 && chunks.length >= total && chunks.slice(0, total).every((item, index) => item.index === index)) {
+          hydrated[field] = chunks.slice(0, total).map((item) => item.value).join('');
+        }
+      }
+      return hydrated;
+    });
+  },
   async fetchUserMedia(userId: string): Promise<Partial<User>> {
     const rows = await listRows('profileMedia', userId);
     const media = rows.map((row) => parse<ProfileMediaChunk>(row.payload)).filter((value): value is ProfileMediaChunk => Boolean(value));
