@@ -1249,36 +1249,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateCurrentUserProfile = async (updates: Partial<User>) => {
     if (!currentUser) return;
     const updated: User = { ...currentUser, ...updates };
-    setCurrentUser(updated);
-    setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updated : u)));
-    void storage.saveProfileMediaBackup(updated.id, {
-      avatar: updated.avatar,
-      banner: updated.banner,
-    }).catch((error) => console.warn('[Storage] Profile media backup failed:', error));
-
-    // Update all posts authored by currentUser so posts and profile avatars stay 100% in sync
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p.author.id === currentUser.id) {
-          const updatedPost = { ...p, author: updated };
-          cloudSync.savePost(updatedPost);
-          return updatedPost;
-        }
-        return p;
-      })
-    );
-
-    // Update all comments authored by currentUser
-    setComments((prev) => {
-      const newComments: Record<string, Comment[]> = {};
-      for (const [postId, list] of Object.entries(prev)) {
-        newComments[postId] = list.map((c) =>
-          c.author.id === currentUser.id ? { ...c, author: updated } : c
-        );
-      }
-      return newComments;
-    });
-
     // Wait for Cloudflare to verify every media chunk instead of reporting a
     // success while a browser may still be closing or going offline.
     try {
@@ -1293,6 +1263,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       throw error;
     }
+
+    setCurrentUser(updated);
+    setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updated : u)));
+    void storage.saveProfileMediaBackup(updated.id, { avatar: updated.avatar, banner: updated.banner })
+      .catch((error) => console.warn('[Storage] Profile media backup failed:', error));
+
+    // Update authored content only after the profile commit succeeds.
+    setPosts((prev) => prev.map((p) => {
+      if (p.author.id !== currentUser.id) return p;
+      const updatedPost = { ...p, author: updated };
+      void cloudSync.savePost(updatedPost);
+      return updatedPost;
+    }));
+    setComments((prev) => {
+      const next: Record<string, Comment[]> = {};
+      for (const [postId, list] of Object.entries(prev)) next[postId] = list.map((c) => c.author.id === currentUser.id ? { ...c, author: updated } : c);
+      return next;
+    });
 
     showToast(
       language === 'ar' ? 'تم تحديث ملفك وحفظه في السيرفر' : 'Profile updated and saved to cloud',

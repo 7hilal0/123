@@ -33,7 +33,6 @@ export const cloudSync = {
   async saveUser(user: User): Promise<void> {
     const { avatar, banner, ...profile } = user;
     userMediaCache.delete(user.id);
-    await saveEntity('user', profile as User);
     const uploadedVersions: Partial<Record<'avatar' | 'banner', string>> = {};
     for (const item of [{ field: 'avatar' as const, value: avatar || '' }, { field: 'banner' as const, value: banner || '' }]) {
       const chunks = splitMedia(item.value);
@@ -58,6 +57,9 @@ export const cloudSync = {
       }
       await cloudflareApi.cleanupProfileMedia(item.field, uploadedVersions[item.field] || '');
     }
+    // Commit the lightweight profile only after both media fields are complete.
+    // If the tab closes during upload, the old profile remains authoritative.
+    await saveEntity('user', profile as User);
     userMediaCache.delete(user.id);
   },
   async fetchUsers(currentUserId?: string): Promise<User[]> {

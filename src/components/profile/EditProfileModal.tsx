@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Camera, Check, Palette, RotateCw, Save, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { UserStatus } from '../../types';
@@ -64,6 +64,16 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
   const [pickerLightness, setPickerLightness] = useState(() => hexToHsl(currentUser?.profileColor || '#10b981')[2]);
   const [status, setStatus] = useState<UserStatus>(currentUser?.status || 'online');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!saving) return;
+    const warnBeforeExit = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = 'Profile image is still uploading. Please wait.';
+    };
+    window.addEventListener('beforeunload', warnBeforeExit);
+    return () => window.removeEventListener('beforeunload', warnBeforeExit);
+  }, [saving]);
   const [imageEditor, setImageEditor] = useState<{ src: string; target: 'avatar' | 'banner'; setter: (value: string) => void; gif: boolean } | null>(null);
   const [imageZoom, setImageZoom] = useState(1);
   const [imageRotation, setImageRotation] = useState(0);
@@ -200,7 +210,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => { if (!saving) onClose(); }}
+              disabled={saving}
               className="rounded-xl p-2 text-neutral-400 transition hover:bg-white/10 hover:text-white"
               aria-label={t.cancel}
             >
@@ -213,7 +224,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
           </div>
           <button
             type="button"
-            onClick={onClose}
+              onClick={() => { if (!saving) onClose(); }}
+              disabled={saving}
             className="rounded-xl p-2 text-neutral-500 transition hover:bg-white/10 hover:text-white"
             aria-label={t.cancel}
           >
