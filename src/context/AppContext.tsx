@@ -213,21 +213,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Restore the Cloudflare HttpOnly cookie session after refresh.
   useEffect(() => {
     let active = true;
-    cloudflareApi.me().then(async ({ user: sessionUser }) => {
+    cloudflareApi.me().then(({ user: sessionUser }) => {
       if (!active) return;
       if (!sessionUser) { setCurrentUser(null); return; }
       const cachedProfile = storage.getUsers().find((user) => user.id === sessionUser.id);
-      const cachedMedia = await storage.getProfileMediaBackup(sessionUser.id).catch(() => null);
-      const remoteMedia = await cloudSync.fetchUserMedia(sessionUser.id).catch(() => ({} as Partial<User>));
-      const localAvatar = cachedMedia?.avatar || remoteMedia.avatar || cachedProfile?.avatar;
-      const localBanner = cachedMedia?.banner || remoteMedia.banner || cachedProfile?.banner;
-      // Use the session response immediately. Public profiles and their media
-      // continue loading in the single background sync below.
+      // Render the session and cached profile immediately. IndexedDB/GIF media
+      // is hydrated in the background and must never delay the first screen.
       const profile = {
         ...sessionUser,
         ...(cachedProfile || {}),
-        avatar: localAvatar || DEFAULT_USER_AVATAR,
-        banner: localBanner || '',
+        avatar: cachedProfile?.avatar || DEFAULT_USER_AVATAR,
+        banner: cachedProfile?.banner || '',
         profileColor: cachedProfile?.profileColor,
         displayNameColor: cachedProfile?.displayNameColor,
         bio: cachedProfile?.bio || '',
@@ -242,6 +238,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       setUsers((previous) => previous.some((user) => user.id === profile.id) ? previous.map((user) => user.id === profile.id ? profile : user) : [profile, ...previous]);
       setCurrentUser(profile);
+
+      void Promise.all([
+        storage.getProfileMediaBackup(sessionUser.id).catch(() => null),
+        cloudSync.fetchUserMedia(sessionUser.id).catch(() => ({} as Partial<User>)),
+      ]).then(([cachedMedia, remoteMedia]) => {
+        if (!active) return;
+        const avatar = cachedMedia?.avatar || remoteMedia.avatar;
+        const banner = cachedMedia?.banner || remoteMedia.banner;
+        if (!avatar && !banner) return;
+        setUsers((previous) => previous.map((user) => user.id === sessionUser.id ? { ...user, avatar: avatar || user.avatar, banner: banner || user.banner } : user));
+        setCurrentUser((previous) => previous?.id === sessionUser.id ? { ...previous, avatar: avatar || previous.avatar, banner: banner || previous.banner } : previous);
+      });
     }).catch(() => {
       if (active) setCurrentUser(null);
     });
