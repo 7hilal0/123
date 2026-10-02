@@ -122,11 +122,43 @@ async function entityList(url, env) {
   if (clauses.length) query += ` WHERE ${clauses.join(' AND ')}`;
   query += ' ORDER BY updated_at DESC LIMIT 10000';
   const result = await env.DB.prepare(query).bind(...values).all();
-  return result.results.filter((row) => !row.deleted).map((row) => {
+  const rows = result.results.filter((row) => !row.deleted);
+  let smallAvatarRows = [];
+  if (summary && type === 'post') {
+    const authorIds = [...new Set(rows.map((row) => {
+      try { return JSON.parse(row.payload)?.author?.id; } catch { return null; }
+    }).filter(Boolean))];
+    if (authorIds.length) {
+      const marks = authorIds.map(() => '?').join(',');
+      const eligible = await env.DB.prepare(`SELECT owner_id FROM entities WHERE entity_type = 'profileMedia' AND deleted = 0 AND json_extract(payload, '$.field') = 'avatar' AND owner_id IN (${marks}) GROUP BY owner_id HAVING SUM(length(json_extract(payload, '$.value'))) <= 200000`).bind(...authorIds).all();
+      const eligibleIds = eligible.results.map((row) => row.owner_id);
+      if (eligibleIds.length) {
+        const mediaMarks = eligibleIds.map(() => '?').join(',');
+        const media = await env.DB.prepare(`SELECT owner_id, payload FROM entities WHERE entity_type = 'profileMedia' AND deleted = 0 AND owner_id IN (${mediaMarks}) ORDER BY updated_at ASC`).bind(...eligibleIds).all();
+        smallAvatarRows = media.results;
+      }
+    }
+  }
+  const avatars = new Map();
+  for (const row of smallAvatarRows) {
+    try {
+      const media = JSON.parse(row.payload);
+      if (media.field !== 'avatar') continue;
+      const current = avatars.get(row.owner_id) || [];
+      current.push(media);
+      avatars.set(row.owner_id, current);
+    } catch { /* ignore malformed media rows */ }
+  }
+  return rows.map((row) => {
     if (summary && type === 'post') {
       const payload = JSON.parse(row.payload);
       if (payload.mediaType === 'image') payload.mediaDeferred = true;
       if (payload.author && typeof payload.author === 'object') {
+        const avatarChunks = avatars.get(payload.author.id);
+        if ((!payload.author.avatar || payload.author.avatar.length === 0) && avatarChunks?.length) {
+          avatarChunks.sort((a, b) => a.index - b.index);
+          payload.author.avatar = avatarChunks.map((item) => item.value).join('');
+        }
         if (typeof payload.author.avatar === 'string' && payload.author.avatar.length > 200000) {
           payload.author.avatar = '';
           payload.authorMediaDeferred = true;
