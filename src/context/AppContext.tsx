@@ -109,7 +109,7 @@ interface AppContextType {
 
   // Profile & Social
   toggleFollowUser: (userId: string) => void;
-  updateCurrentUserProfile: (updates: Partial<User>) => void;
+  updateCurrentUserProfile: (updates: Partial<User>) => Promise<void>;
   updateUserStatus: (status: UserStatus, customStatus?: string) => void;
 
   // Notifications
@@ -1244,7 +1244,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const updateCurrentUserProfile = (updates: Partial<User>) => {
+  const updateCurrentUserProfile = async (updates: Partial<User>) => {
     if (!currentUser) return;
     const updated: User = { ...currentUser, ...updates };
     setCurrentUser(updated);
@@ -1277,8 +1277,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return newComments;
     });
 
-    // Save to Cloudflare and surface failures instead of silently losing media updates.
-    void cloudSync.saveUser(updated).catch((error) => {
+    // Wait for Cloudflare to verify every media chunk instead of reporting a
+    // success while a browser may still be closing or going offline.
+    try {
+      await cloudSync.saveUser(updated);
+    } catch (error) {
       console.error('[Cloudflare] Profile save failed:', error);
       showToast(
         language === 'ar'
@@ -1286,7 +1289,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           : 'Saved on this device, but cloud upload failed. Try a smaller GIF.',
         'warning'
       );
-    });
+      throw error;
+    }
 
     showToast(
       language === 'ar' ? 'تم تحديث ملفك وحفظه في السيرفر' : 'Profile updated and saved to cloud',

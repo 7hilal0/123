@@ -36,6 +36,18 @@ export const cloudSync = {
       const rows = chunks.map((value, index) => ({ id: `${user.id}:${item.field}:${index}`, userId: user.id, field: item.field, index, total: chunks.length, value } as ProfileMediaChunk));
       for (let index = 0; index < rows.length; index += 20) { await saveMediaBatch(rows.slice(index, index + 20)); await pause(120); }
     }
+    const savedRows = await listRows<ProfileMediaChunk>('profileMedia', user.id);
+    for (const item of [{ field: 'avatar' as const, value: avatar || '' }, { field: 'banner' as const, value: banner || '' }]) {
+      const expected = splitMedia(item.value);
+      const saved = savedRows
+        .map((row) => parse<ProfileMediaChunk>(row.payload))
+        .filter((row): row is ProfileMediaChunk => row !== null)
+        .filter((row) => row.field === item.field && row.total === expected.length);
+      const indexes = new Set(saved.map((row) => row.index));
+      if (saved.length < expected.length || [...Array(expected.length).keys()].some((index) => !indexes.has(index))) {
+        throw new Error(`Incomplete ${item.field} upload`);
+      }
+    }
   },
   async fetchUsers(currentUserId?: string): Promise<User[]> {
     const users = await fetchType<User>('user');

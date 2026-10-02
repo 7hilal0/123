@@ -63,6 +63,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
   const [pickerSaturation, setPickerSaturation] = useState(() => hexToHsl(currentUser?.profileColor || '#10b981')[1]);
   const [pickerLightness, setPickerLightness] = useState(() => hexToHsl(currentUser?.profileColor || '#10b981')[2]);
   const [status, setStatus] = useState<UserStatus>(currentUser?.status || 'online');
+  const [saving, setSaving] = useState(false);
   const [imageEditor, setImageEditor] = useState<{ src: string; target: 'avatar' | 'banner'; setter: (value: string) => void; gif: boolean } | null>(null);
   const [imageZoom, setImageZoom] = useState(1);
   const [imageRotation, setImageRotation] = useState(0);
@@ -169,19 +170,27 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
     image.src = imageEditor.src;
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    updateCurrentUserProfile({
-      displayName: displayName.trim(),
-      bio: bio.trim(),
-      customStatus: customStatus.trim(),
-      avatar: avatarUrl,
-      banner: bannerUrl,
-      profileColor,
-      displayNameColor,
-      status,
-    });
-    onClose();
+    if (saving) return;
+    setSaving(true);
+    try {
+      await updateCurrentUserProfile({
+        displayName: displayName.trim(),
+        bio: bio.trim(),
+        customStatus: customStatus.trim(),
+        avatar: avatarUrl,
+        banner: bannerUrl,
+        profileColor,
+        displayNameColor,
+        status,
+      });
+      onClose();
+    } catch {
+      // Keep the editor open so the user can retry an incomplete upload.
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -388,9 +397,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                 <button type="button" onClick={onClose} className="rounded-xl px-4 py-2.5 text-xs font-semibold text-neutral-400 transition hover:bg-white/10 hover:text-white">
                   {t.cancel}
                 </button>
-                <button type="submit" className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-white shadow-lg transition hover:brightness-110" style={{ backgroundColor: profileColor, boxShadow: `0 10px 28px ${profileColor}45` }}>
-                  <Save className="h-4 w-4" />
-                  {t.saveChanges}
+                <button type="submit" disabled={saving} className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-wait disabled:opacity-60" style={{ backgroundColor: profileColor, boxShadow: `0 10px 28px ${profileColor}45` }}>
+                  <Save className={`h-4 w-4 ${saving ? 'animate-pulse' : ''}`} />
+                  {saving ? (dir === 'rtl' ? 'جارٍ الحفظ...' : 'Saving...') : t.saveChanges}
                 </button>
               </div>
             </div>
