@@ -3,6 +3,7 @@ import { Post } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { cloudSync } from '../../services/cloudSync';
 import { Avatar } from '../common/Avatar';
+import { DEFAULT_USER_AVATAR } from '../../utils/avatarConstants';
 import {
   ArrowBigUp,
   ArrowBigDown,
@@ -44,10 +45,22 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
   } = useApp();
 
   // Always resolve the latest author profile so avatar and name stay 100% in sync with the user's account
+  const listedAuthor = users.find((u) => u.id === post.author.id);
   const author =
     (currentUser && currentUser.id === post.author.id)
       ? currentUser
-      : (users.find((u) => u.id === post.author.id) || post.author);
+      : listedAuthor
+        ? {
+            ...post.author,
+            ...listedAuthor,
+            // User rows intentionally omit large media. Keep the compact
+            // avatar carried by the post instead of replacing it with the
+            // generic fallback avatar.
+            avatar: listedAuthor.avatar && listedAuthor.avatar !== DEFAULT_USER_AVATAR
+              ? listedAuthor.avatar
+              : post.author.avatar || listedAuthor.avatar,
+          }
+        : post.author;
 
   const [imageError, setImageError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
