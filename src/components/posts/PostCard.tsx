@@ -61,6 +61,21 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
               : post.author.avatar || listedAuthor.avatar,
           }
         : post.author;
+  const [syncedAvatar, setSyncedAvatar] = useState('');
+
+  useEffect(() => {
+    setSyncedAvatar('');
+    if (author.avatar && author.avatar !== DEFAULT_USER_AVATAR) return;
+    let active = true;
+    const timer = window.setTimeout(() => {
+      cloudSync.fetchUserMedia(author.id).then((media) => {
+        if (active && media.avatar) setSyncedAvatar(media.avatar);
+      }).catch(() => {});
+    }, 150);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [author.id, author.avatar]);
+
+  const displayAuthor = syncedAvatar ? { ...author, avatar: syncedAvatar } : author;
 
   const [imageError, setImageError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -116,7 +131,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
     const reason = reportReason.trim();
     if (!reason) return;
     setReportBusy(true);
-    const sent = await submitReport(reportTarget, reportTarget === 'post' ? post.id : author.id, reason);
+    const sent = await submitReport(reportTarget, reportTarget === 'post' ? post.id : displayAuthor.id, reason);
     setReportBusy(false);
     if (sent) {
       setReportOpen(false);
@@ -236,41 +251,41 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                navigateToProfile(author.id);
+                navigateToProfile(displayAuthor.id);
               }}
               className="flex items-center gap-2 group/author focus:outline-none"
             >
               <Avatar
-                src={author.avatar}
-                alt={author.displayName}
+                src={displayAuthor.avatar}
+                alt={displayAuthor.displayName}
                 size="xs"
-                status={author.status}
+                status={displayAuthor.status}
               />
               <div className="flex items-center gap-1.5 text-start">
                 <span className="font-semibold text-neutral-100 group-hover/author:text-emerald-400 transition-colors">
-                  {author.displayName}
+                  {displayAuthor.displayName}
                 </span>
                 <span className="font-mono text-neutral-400 text-[11px]">
-                  @{author.username}
+                  @{displayAuthor.username}
                 </span>
               </div>
             </button>
 
-            {currentUser && author.id !== currentUser.id && (
+            {currentUser && displayAuthor.id !== currentUser.id && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  toggleFollowUser(author.id);
+                  toggleFollowUser(displayAuthor.id);
                 }}
                 className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold transition-colors cursor-pointer ${
-                  author.isFollowing
+                  displayAuthor.isFollowing
                     ? 'border-white/10 bg-white/5 text-neutral-300 hover:border-rose-400/30 hover:text-rose-300'
                     : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
                 }`}
-                title={author.isFollowing ? t.following : t.follow}
+                title={displayAuthor.isFollowing ? t.following : t.follow}
               >
-                {author.isFollowing ? <UserCheck className="h-3 w-3" /> : <UserPlus className="h-3 w-3" />}
-                <span>{author.isFollowing ? t.following : t.follow}</span>
+                {displayAuthor.isFollowing ? <UserCheck className="h-3 w-3" /> : <UserPlus className="h-3 w-3" />}
+                <span>{displayAuthor.isFollowing ? t.following : t.follow}</span>
               </button>
             )}
 
