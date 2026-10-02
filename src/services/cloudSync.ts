@@ -24,10 +24,41 @@ async function saveMediaBatch(rows: ProfileMediaChunk[]): Promise<void> {
   }
   throw lastError instanceof Error ? lastError : new Error('Profile media batch upload failed');
 }
-async function listRows<T>(type?: EntityType, ownerId?: string) { return (await cloudflareApi.listEntities(type, ownerId)).items; }
-async function fetchType<T>(type: EntityType, predicate?: (value: T) => boolean): Promise<T[]> { const rows = await listRows(type); const values = rows.map((row) => parse<T>(row.payload)).filter((value): value is T => Boolean(value)); return predicate ? values.filter(predicate) : values; }
+async function listRows<T>(type?: EntityType, ownerId?: string) {
+  try {
+    const res = await cloudflareApi.listEntities(type, ownerId);
+    return Array.isArray(res?.items) ? res.items : [];
+  } catch {
+    return [];
+  }
+}
+async function fetchType<T>(type: EntityType, predicate?: (value: T) => boolean): Promise<T[]> {
+  const rows = await listRows(type);
+  const values = (rows || [])
+    .map((row) => (row && row.payload ? parse<T>(row.payload) : null))
+    .filter((value): value is T => Boolean(value));
+  return predicate ? values.filter(predicate) : values;
+}
 async function saveEntity<T extends { id: string }>(entityType: EntityType, entity: T, ownerId?: string): Promise<void> { await cloudflareApi.saveEntity(entityType, entity.id, JSON.stringify(entity), ownerId || entity.id); }
-function subscribePoll<T>(fetcher: () => Promise<T[]>, callback: (items: T[]) => void, label: string): () => void { let stopped = false; const poll = async () => { try { const items = await fetcher(); if (!stopped) callback(items); } catch (error) { console.error(`[Cloudflare] ${label} sync error:`, error); } }; void poll(); const timer = window.setInterval(poll, 10000); return () => { stopped = true; window.clearInterval(timer); }; }
+function subscribePoll<T>(fetcher: () => Promise<T[]>, callback: (items: T[]) => void, label: string): () => void {
+  let stopped = false;
+  const poll = async () => {
+    try {
+      const items = await fetcher();
+      if (!stopped && Array.isArray(items)) {
+        callback(items);
+      }
+    } catch (error) {
+      console.error(`[Cloudflare] ${label} sync error:`, error);
+    }
+  };
+  void poll();
+  const timer = window.setInterval(poll, 10000);
+  return () => {
+    stopped = true;
+    window.clearInterval(timer);
+  };
+}
 
 export const cloudSync = {
   async saveUser(user: User): Promise<void> {
@@ -127,12 +158,24 @@ export const cloudSync = {
   savePost: (post: Post) => saveEntity('post', post, post.author?.id),
   async deletePost(postId: string): Promise<boolean> { try { await saveEntity('post', { id: postId, deleted: true, deletedAt: Date.now() } as unknown as Post); return true; } catch { return false; } },
   async fetchPosts(): Promise<Post[]> {
-    const rows = (await cloudflareApi.listEntities('post', undefined, { summary: '1' })).items;
-    return rows.map((row) => parse<Post>(row.payload)).filter((value): value is Post => Boolean(value));
+    try {
+      const res = await cloudflareApi.listEntities('post', undefined, { summary: '1' });
+      const rows = Array.isArray(res?.items) ? res.items : [];
+      return rows
+        .map((row) => (row && row.payload ? parse<Post>(row.payload) : null))
+        .filter((value): value is Post => Boolean(value));
+    } catch {
+      return [];
+    }
   },
   async fetchPost(postId: string): Promise<Post | null> {
-    const rows = (await cloudflareApi.listEntities('post', undefined, { entityId: postId })).items;
-    return rows[0] ? parse<Post>(rows[0].payload) : null;
+    try {
+      const res = await cloudflareApi.listEntities('post', undefined, { entityId: postId });
+      const rows = Array.isArray(res?.items) ? res.items : [];
+      return rows[0] && rows[0].payload ? parse<Post>(rows[0].payload) : null;
+    } catch {
+      return null;
+    }
   },
   // A failed poll must not be converted into []: that would erase the cached
   // feed and make all posts appear to disappear during a brief network error.

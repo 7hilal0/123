@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { cloudSync } from '../../services/cloudSync';
 import { Avatar } from '../common/Avatar';
 import { DEFAULT_USER_AVATAR } from '../../utils/avatarConstants';
+import { VotesBreakdownModal } from './VotesBreakdownModal';
 import {
   ArrowBigUp,
   ArrowBigDown,
@@ -42,7 +43,10 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
     setAuthModalOpen,
     comments,
     t,
+    language,
   } = useApp();
+
+  const [showVotesModal, setShowVotesModal] = useState(false);
 
   // Always resolve the latest author profile so avatar and name stay 100% in sync with the user's account
   const listedAuthor = users.find((u) => u.id === post.author.id);
@@ -202,11 +206,22 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
       <div className="flex gap-3 md:gap-4 items-start">
         {/* Voting Column (Desktop) */}
         <div
-          onClick={(e) => e.stopPropagation()}
-          className="hidden sm:flex flex-col items-center bg-neutral-950/60 border border-white/5 rounded-xl p-1 shrink-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowVotesModal(true);
+          }}
+          className="hidden sm:flex flex-col items-center bg-neutral-950/60 hover:bg-neutral-950/90 border border-white/5 hover:border-emerald-500/30 rounded-xl p-1 shrink-0 transition-colors cursor-pointer group/vote"
+          title={
+            language === 'ar'
+              ? `${post.upvotes} إعجاب • ${post.downvotes} عدم إعجاب (انقر لعرض تفاصيل الأصوات)`
+              : `${post.upvotes} upvotes • ${post.downvotes} downvotes (click for votes breakdown)`
+          }
         >
           <button
-            onClick={() => upvotePost(post.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              upvotePost(post.id);
+            }}
             className={`p-1.5 rounded-lg transition-colors min-h-[32px] min-w-[32px] flex items-center justify-center cursor-pointer ${
               activeVote === 1
                 ? 'text-emerald-500 bg-emerald-500/10'
@@ -218,7 +233,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
             <ArrowBigUp className={`w-5 h-5 ${activeVote === 1 ? 'fill-current' : ''}`} />
           </button>
           <span
-            className={`text-xs font-mono font-bold my-0.5 tabular-nums ${
+            className={`text-xs font-mono font-bold my-0.5 tabular-nums transition-transform group-hover/vote:scale-110 ${
               activeVote === 1
                 ? 'text-emerald-400'
                 : activeVote === -1
@@ -230,7 +245,10 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
           </span>
 
           <button
-            onClick={() => downvotePost(post.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              downvotePost(post.id);
+            }}
             className={`p-1.5 rounded-lg transition-colors min-h-[32px] min-w-[32px] flex items-center justify-center cursor-pointer ${
               activeVote === -1
                 ? 'text-rose-400 bg-rose-500/10'
@@ -376,21 +394,42 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
               className="flex items-center justify-between pt-3 mt-4 border-t border-white/[0.07] text-xs text-neutral-400"
           >
             {/* Mobile Vote Buttons */}
-            <div className="flex sm:hidden items-center bg-neutral-950/80 rounded-lg p-0.5 border border-white/5">
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowVotesModal(true);
+              }}
+              className="flex sm:hidden items-center bg-neutral-950/80 hover:bg-neutral-950 rounded-lg p-0.5 border border-white/5 cursor-pointer"
+              title={
+                language === 'ar'
+                  ? `${post.upvotes} إعجاب • ${post.downvotes} عدم إعجاب (انقر لعرض التفاصيل)`
+                  : `${post.upvotes} upvotes • ${post.downvotes} downvotes (click for details)`
+              }
+            >
               <button
-                onClick={() => upvotePost(post.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  upvotePost(post.id);
+                }}
                 className={`p-1.5 rounded min-h-[36px] min-w-[36px] flex items-center justify-center ${
                   activeVote === 1 ? 'text-emerald-500' : 'text-neutral-400'
                 }`}
+                title={t.upvote}
+                aria-label={t.upvote}
               >
                 <ArrowBigUp className={`w-4 h-4 ${activeVote === 1 ? 'fill-current' : ''}`} />
               </button>
               <span className="text-xs font-mono font-bold px-1 tabular-nums">{netScore}</span>
               <button
-                onClick={() => downvotePost(post.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  downvotePost(post.id);
+                }}
                 className={`p-1.5 rounded min-h-[36px] min-w-[36px] flex items-center justify-center ${
                   activeVote === -1 ? 'text-rose-400' : 'text-neutral-400'
                 }`}
+                title={t.downvote}
+                aria-label={t.downvote}
               >
                 <ArrowBigDown className={`w-4 h-4 ${activeVote === -1 ? 'fill-current' : ''}`} />
               </button>
@@ -440,6 +479,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
           </div>
         </div>
       </div>
+
+      {/* Votes & Reactions Breakdown Modal */}
+      <VotesBreakdownModal
+        post={post}
+        isOpen={showVotesModal}
+        onClose={() => setShowVotesModal(false)}
+      />
     </article>
   );
 };

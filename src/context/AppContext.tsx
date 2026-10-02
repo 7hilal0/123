@@ -275,7 +275,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const unsubConvs = cloudSync.subscribeConversations(currentUser.id, (remoteConvs) => {
-      const resolved = remoteConvs.map((c) => resolveConversationForUser(c, currentUser, users));
+      if (!Array.isArray(remoteConvs)) return;
+      const resolved = remoteConvs
+        .filter(Boolean)
+        .map((c) => resolveConversationForUser(c, currentUser, users));
       resolved.sort((a, b) => (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0));
       setConversations(resolved);
 
@@ -297,6 +300,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!activeConversationId) return;
 
     const unsubMsgs = cloudSync.subscribeMessages(activeConversationId, (remoteMsgs) => {
+      if (!Array.isArray(remoteMsgs)) return;
       setDirectMessages((prev) => ({
         ...prev,
         [activeConversationId]: remoteMsgs,
@@ -371,10 +375,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // a separate fetch here would double Cloudflare reads and exhaust quotas.
     const unsubPosts = cloudSync.subscribePosts((remotePosts) => {
       setCloudSyncStatus('connected');
-      if (remotePosts) {
+      if (Array.isArray(remotePosts)) {
         const cleanRemote = remotePosts
           .filter(
-            (p) => p.id !== 'post_official_welcome' && !p.deleted && !deletedPostIdsRef.current.has(p.id)
+            (p) => Boolean(p && p.id && p.id !== 'post_official_welcome' && !p.deleted && !deletedPostIdsRef.current.has(p.id))
           )
           .map((p) => resolvePostForUser(p, currentUser?.id));
 
@@ -600,9 +604,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const votes: Record<string, 1 | -1> = { ...(existing.votes || {}) };
     const voteState: Record<string, 1 | -1 | 0> = { ...(existing.voteState || {}) };
     const currentVote = voteState[userId] === 0 ? null : (votes[userId] ?? null);
-    // Clicking the active arrow removes the vote. Clicking the opposite arrow
-    // removes the old vote first, so one action changes the score by one.
-    if (currentVote === desiredVote || (currentVote !== null && currentVote !== desiredVote)) {
+    // Clicking the same active arrow cancels the vote (returns to neutral 0).
+    // Clicking the opposite arrow switches directly to the new vote.
+    if (currentVote === desiredVote) {
       delete votes[userId];
       voteState[userId] = 0;
     } else {

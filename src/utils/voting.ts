@@ -8,19 +8,33 @@ import { Post, Comment } from '../types';
  * 3. Freshly created posts start with 0 likes and no automatic like by default.
  */
 export function resolvePostForUser(post: Post, currentUserId?: string | null): Post {
+  if (!post) return post;
   const voteState = post.voteState || {};
-  const votes = Object.fromEntries(
-    Object.entries(post.votes || {}).filter(([userId]) => voteState[userId] !== 0)
-  ) as Record<string, 1 | -1>;
+  const rawVotes = post.votes || {};
+
+  // Clean votes map: filter out entries where voteState is explicitly marked 0
+  const votes: Record<string, 1 | -1> = {};
+  for (const [userId, val] of Object.entries(rawVotes)) {
+    if (voteState[userId] === 0) continue;
+    if (val === 1 || val === -1) {
+      votes[userId] = val;
+    }
+  }
+
   const voteEntries = Object.entries(votes);
 
-  let upvotes = post.upvotes || 0;
-  let downvotes = post.downvotes || 0;
+  // If post.votes is defined (even as empty {}), the exact upvotes is strictly the number of real 1s
+  // This guarantees when likes are reset to 0 or when someone removes a vote, it stays 0 and never resurrects stale numbers
+  let upvotes = 0;
+  let downvotes = 0;
 
-  // If the votes record is populated, dynamically calculate exact totals from each user's recorded vote
-  if (voteEntries.length > 0) {
+  if (post.votes !== undefined && post.votes !== null) {
     upvotes = voteEntries.filter(([, v]) => v === 1).length;
     downvotes = voteEntries.filter(([, v]) => v === -1).length;
+  } else {
+    // Only for legacy posts where votes object was never initialized
+    upvotes = voteEntries.length > 0 ? voteEntries.filter(([, v]) => v === 1).length : (post.upvotes || 0);
+    downvotes = voteEntries.length > 0 ? voteEntries.filter(([, v]) => v === -1).length : (post.downvotes || 0);
   }
 
   // Personal vote state for the viewing user
@@ -40,25 +54,28 @@ export function resolvePostForUser(post: Post, currentUserId?: string | null): P
 }
 
 export function resolveCommentForUser(comment: Comment, currentUserId?: string | null): Comment {
-  const votes = comment.votes || {};
-  const voteEntries = Object.entries(votes);
+  if (!comment) return comment;
+  const rawVotes = comment.votes || {};
+  const voteEntries = Object.entries(rawVotes);
 
-  let upvotes = comment.upvotes || 0;
-  let downvotes = comment.downvotes || 0;
-
-  if (voteEntries.length > 0) {
+  let upvotes = 0;
+  let downvotes = 0;
+  if (comment.votes !== undefined && comment.votes !== null) {
     upvotes = voteEntries.filter(([, v]) => v === 1).length;
     downvotes = voteEntries.filter(([, v]) => v === -1).length;
+  } else {
+    upvotes = voteEntries.length > 0 ? voteEntries.filter(([, v]) => v === 1).length : (comment.upvotes || 0);
+    downvotes = voteEntries.length > 0 ? voteEntries.filter(([, v]) => v === -1).length : (comment.downvotes || 0);
   }
 
-  const userVote: 1 | -1 | null = currentUserId ? (votes[currentUserId] ?? null) : null;
+  const userVote: 1 | -1 | null = currentUserId ? (rawVotes[currentUserId] ?? null) : null;
 
   return {
     ...comment,
     upvotes,
     downvotes,
     userVote,
-    votes,
+    votes: rawVotes,
     replies: comment.replies?.map((r) => resolveCommentForUser(r, currentUserId)),
   };
 }
