@@ -244,11 +244,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cloudSync.fetchUserMedia(sessionUser.id).catch(() => ({} as Partial<User>)),
       ]).then(([cachedMedia, remoteMedia]) => {
         if (!active) return;
-        const avatar = cachedMedia?.avatar || remoteMedia.avatar;
-        const banner = cachedMedia?.banner || remoteMedia.banner;
+        // Local IndexedDB is only a temporary first-paint fallback. Cloudflare
+        // must win so the same account shows the same image in every browser.
+        const avatar = remoteMedia.avatar || cachedMedia?.avatar;
+        const banner = remoteMedia.banner || cachedMedia?.banner;
         if (!avatar && !banner) return;
         setUsers((previous) => previous.map((user) => user.id === sessionUser.id ? { ...user, avatar: avatar || user.avatar, banner: banner || user.banner } : user));
         setCurrentUser((previous) => previous?.id === sessionUser.id ? { ...previous, avatar: avatar || previous.avatar, banner: banner || previous.banner } : previous);
+        if (remoteMedia.avatar || remoteMedia.banner) {
+          void storage.saveProfileMediaBackup(sessionUser.id, {
+            avatar: remoteMedia.avatar || avatar,
+            banner: remoteMedia.banner || banner,
+          });
+        }
       });
     }).catch(() => {
       if (active) setCurrentUser(null);
