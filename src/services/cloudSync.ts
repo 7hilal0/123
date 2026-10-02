@@ -5,6 +5,8 @@ const MEDIA_CHUNK_SIZE = 48_000;
 type EntityType = 'user' | 'community' | 'post' | 'comment' | 'conversation' | 'message' | 'notification' | 'profileMedia' | 'follow';
 type ProfileMediaChunk = { id: string; userId: string; field: 'avatar' | 'banner'; index: number; total: number; value: string; mediaVersion?: string };
 type FollowRecord = { id: string; followerId: string; followingId: string; following: boolean };
+const userMediaCache = new Map<string, Partial<User>>();
+const userMediaRequests = new Map<string, Promise<Partial<User>>>();
 
 const pause = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 function splitMedia(value: string): string[] { if (!value) return ['']; const chunks: string[] = []; for (let i = 0; i < value.length; i += MEDIA_CHUNK_SIZE) chunks.push(value.slice(i, i + MEDIA_CHUNK_SIZE)); return chunks; }
@@ -83,6 +85,9 @@ export const cloudSync = {
     await saveEntity('follow', record, followerId);
   },
   async fetchUserMedia(userId: string): Promise<Partial<User>> {
+    if (userMediaCache.has(userId)) return userMediaCache.get(userId) || {};
+    if (userMediaRequests.has(userId)) return userMediaRequests.get(userId) || {};
+    const request = (async () => {
     const rows = await listRows('profileMedia', userId);
     const media = rows.map((row) => parse<ProfileMediaChunk>(row.payload)).filter((value): value is ProfileMediaChunk => Boolean(value));
     const result: Partial<User> = {};
@@ -102,7 +107,15 @@ export const cloudSync = {
         });
       if (complete) result[field] = complete.map((item) => item.value).join('');
     }
+    userMediaCache.set(userId, result);
+    userMediaRequests.delete(userId);
     return result;
+    })().catch((error) => {
+      userMediaRequests.delete(userId);
+      throw error;
+    });
+    userMediaRequests.set(userId, request);
+    return request;
   },
   saveCommunity: (community: Community) => saveEntity('community', community),
   fetchCommunities: () => fetchType<Community>('community'),
