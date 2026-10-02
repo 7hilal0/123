@@ -130,12 +130,23 @@ async function entityList(url, env) {
     }).filter(Boolean))];
     if (authorIds.length) {
       const marks = authorIds.map(() => '?').join(',');
-      const eligible = await env.DB.prepare(`SELECT owner_id FROM entities WHERE entity_type = 'profileMedia' AND deleted = 0 AND json_extract(payload, '$.field') = 'avatar' AND owner_id IN (${marks}) GROUP BY owner_id HAVING SUM(length(json_extract(payload, '$.value'))) <= 200000`).bind(...authorIds).all();
-      const eligibleIds = eligible.results.map((row) => row.owner_id);
-      if (eligibleIds.length) {
-        const mediaMarks = eligibleIds.map(() => '?').join(',');
-        const media = await env.DB.prepare(`SELECT owner_id, payload FROM entities WHERE entity_type = 'profileMedia' AND deleted = 0 AND owner_id IN (${mediaMarks}) ORDER BY updated_at ASC`).bind(...eligibleIds).all();
-        smallAvatarRows = media.results;
+      const media = await env.DB.prepare(`SELECT owner_id, payload, updated_at FROM entities WHERE entity_type = 'profileMedia' AND deleted = 0 AND json_extract(payload, '$.field') = 'avatar' AND owner_id IN (${marks}) ORDER BY owner_id, updated_at ASC`).bind(...authorIds).all();
+      const groups = new Map();
+      for (const row of media.results) {
+        try {
+          const item = JSON.parse(row.payload);
+          const key = `${row.owner_id}:${item.mediaVersion || 'legacy'}`;
+          const group = groups.get(key) || { ownerId: row.owner_id, items: [] };
+          group.items.push(item);
+          groups.set(key, group);
+        } catch { /* ignore malformed media */ }
+      }
+      for (const group of groups.values()) {
+        const total = group.items[0]?.total || 0;
+        const indexes = new Set(group.items.map((item) => item.index));
+        if (total > 0 && group.items.length === total && total <= 5 && [...Array(total).keys()].every((index) => indexes.has(index))) {
+          smallAvatarRows.push(...group.items.map((item) => ({ owner_id: group.ownerId, payload: JSON.stringify(item) })));
+        }
       }
     }
   }

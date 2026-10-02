@@ -3,7 +3,7 @@ import { cloudflareApi } from './cloudflareApi';
 
 const MEDIA_CHUNK_SIZE = 48_000;
 type EntityType = 'user' | 'community' | 'post' | 'comment' | 'conversation' | 'message' | 'notification' | 'profileMedia' | 'follow';
-type ProfileMediaChunk = { id: string; userId: string; field: 'avatar' | 'banner'; index: number; total: number; value: string };
+type ProfileMediaChunk = { id: string; userId: string; field: 'avatar' | 'banner'; index: number; total: number; value: string; mediaVersion?: string };
 type FollowRecord = { id: string; followerId: string; followingId: string; following: boolean };
 
 const pause = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
@@ -31,20 +31,26 @@ export const cloudSync = {
   async saveUser(user: User): Promise<void> {
     const { avatar, banner, ...profile } = user;
     await saveEntity('user', profile as User);
+    const uploadedVersions: Partial<Record<'avatar' | 'banner', string>> = {};
     for (const item of [{ field: 'avatar' as const, value: avatar || '' }, { field: 'banner' as const, value: banner || '' }]) {
       const chunks = splitMedia(item.value);
-      const rows = chunks.map((value, index) => ({ id: `${user.id}:${item.field}:${index}`, userId: user.id, field: item.field, index, total: chunks.length, value } as ProfileMediaChunk));
+      // Never overwrite a previously complete image while this upload is in
+      // progress. A failed/closed tab therefore leaves the old GIF usable.
+      const mediaVersion = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      uploadedVersions[item.field] = mediaVersion;
+      const rows = chunks.map((value, index) => ({ id: `${user.id}:${item.field}:${mediaVersion}:${index}`, userId: user.id, field: item.field, index, total: chunks.length, value, mediaVersion } as ProfileMediaChunk));
       for (let index = 0; index < rows.length; index += 20) { await saveMediaBatch(rows.slice(index, index + 20)); await pause(120); }
     }
     const savedRows = await listRows<ProfileMediaChunk>('profileMedia', user.id);
     for (const item of [{ field: 'avatar' as const, value: avatar || '' }, { field: 'banner' as const, value: banner || '' }]) {
       const expected = splitMedia(item.value);
-      const saved = savedRows
+      const parsed = savedRows
         .map((row) => parse<ProfileMediaChunk>(row.payload))
         .filter((row): row is ProfileMediaChunk => row !== null)
         .filter((row) => row.field === item.field && row.total === expected.length);
-      const indexes = new Set(saved.map((row) => row.index));
-      if (saved.length < expected.length || [...Array(expected.length).keys()].some((index) => !indexes.has(index))) {
+      const currentRows = parsed.filter((row) => row.mediaVersion === uploadedVersions[item.field]);
+      const indexes = new Set(currentRows.map((row) => row.index));
+      if (currentRows.length !== expected.length || ![...Array(expected.length).keys()].every((index) => indexes.has(index))) {
         throw new Error(`Incomplete ${item.field} upload`);
       }
     }
@@ -81,8 +87,20 @@ export const cloudSync = {
     const media = rows.map((row) => parse<ProfileMediaChunk>(row.payload)).filter((value): value is ProfileMediaChunk => Boolean(value));
     const result: Partial<User> = {};
     for (const field of ['avatar', 'banner'] as const) {
-      const chunks = media.filter((item) => item.field === field).sort((a, b) => a.index - b.index);
-      if (chunks.length && chunks.length >= chunks[0].total) result[field] = chunks.slice(0, chunks[0].total).map((item) => item.value).join('');
+      const groups = new Map<string, ProfileMediaChunk[]>();
+      media.filter((item) => item.field === field).forEach((item) => {
+        const key = item.mediaVersion || 'legacy';
+        groups.set(key, [...(groups.get(key) || []), item]);
+      });
+      const complete = [...groups.entries()]
+        .sort(([a], [b]) => b.localeCompare(a))
+        .map(([, group]) => group.sort((a, b) => a.index - b.index))
+        .find((group) => {
+          const total = group[0]?.total || 0;
+          const indexes = new Set(group.map((item) => item.index));
+          return total > 0 && group.length === total && [...Array(total).keys()].every((index) => indexes.has(index));
+        });
+      if (complete) result[field] = complete.map((item) => item.value).join('');
     }
     return result;
   },
