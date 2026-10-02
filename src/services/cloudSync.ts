@@ -1,5 +1,6 @@
 import { User, Community, Post, Comment, Conversation, DirectMessage, NotificationItem } from '../types';
 import { cloudflareApi } from './cloudflareApi';
+import { DEFAULT_USER_AVATAR } from '../utils/avatarConstants';
 
 const MEDIA_CHUNK_SIZE = 48_000;
 type EntityType = 'user' | 'community' | 'post' | 'comment' | 'conversation' | 'message' | 'notification' | 'profileMedia' | 'follow';
@@ -62,44 +63,56 @@ function subscribePoll<T>(fetcher: () => Promise<T[]>, callback: (items: T[]) =>
 
 export const cloudSync = {
   async saveUser(user: User): Promise<void> {
-    const { avatar, banner, ...profile } = user;
-    userMediaCache.delete(user.id);
-    const uploadedVersions: Partial<Record<'avatar' | 'banner', string>> = {};
-    for (const item of [{ field: 'avatar' as const, value: avatar || '' }, { field: 'banner' as const, value: banner || '' }]) {
-      const chunks = splitMedia(item.value);
-      // Never overwrite a previously complete image while this upload is in
-      // progress. A failed/closed tab therefore leaves the old GIF usable.
-      const mediaVersion = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      uploadedVersions[item.field] = mediaVersion;
-      const rows = chunks.map((value, index) => ({ id: `${user.id}:${item.field}:${mediaVersion}:${index}`, userId: user.id, field: item.field, index, total: chunks.length, value, mediaVersion } as ProfileMediaChunk));
-      for (let index = 0; index < rows.length; index += 20) { await saveMediaBatch(rows.slice(index, index + 20)); await pause(120); }
-    }
-    const savedRows = await listRows<ProfileMediaChunk>('profileMedia', user.id);
-    for (const item of [{ field: 'avatar' as const, value: avatar || '' }, { field: 'banner' as const, value: banner || '' }]) {
-      const expected = splitMedia(item.value);
-      const parsed = savedRows
-        .map((row) => parse<ProfileMediaChunk>(row.payload))
-        .filter((row): row is ProfileMediaChunk => row !== null)
-        .filter((row) => row.field === item.field && row.total === expected.length);
-      const currentRows = parsed.filter((row) => row.mediaVersion === uploadedVersions[item.field]);
-      const indexes = new Set(currentRows.map((row) => row.index));
-      if (currentRows.length !== expected.length || ![...Array(expected.length).keys()].every((index) => indexes.has(index))) {
-        throw new Error(`Incomplete ${item.field} upload`);
+    const avatar = user.avatar || '';
+    const banner = user.banner || '';
+
+    // If avatar/banner is a lightweight thumbnail or SVG (< 180KB), include it directly in the profile entity.
+    // This guarantees other users and visitors receive the thumbnail instantly without relying on chunked media rows!
+    const profile: User = {
+      ...user,
+      avatar: avatar.length <= 180_000 ? avatar : '',
+      banner: banner.length <= 180_000 ? banner : '',
+    };
+
+    userMediaCache.set(user.id, { avatar, banner });
+
+    // Save profile entity directly with thumbnail so all users see it immediately
+    await saveEntity('user', profile, user.id);
+
+    // If media is larger than 30KB or needs full chunking, upload to media store in background
+    if (avatar.length > 30_000 || banner.length > 30_000) {
+      try {
+        const uploadedVersions: Partial<Record<'avatar' | 'banner', string>> = {};
+        for (const item of [{ field: 'avatar' as const, value: avatar }, { field: 'banner' as const, value: banner }]) {
+          if (!item.value) continue;
+          const chunks = splitMedia(item.value);
+          const mediaVersion = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          uploadedVersions[item.field] = mediaVersion;
+          const rows = chunks.map((value, index) => ({
+            id: `${user.id}:${item.field}:${mediaVersion}:${index}`,
+            userId: user.id,
+            field: item.field,
+            index,
+            total: chunks.length,
+            value,
+            mediaVersion,
+          } as ProfileMediaChunk));
+          for (let index = 0; index < rows.length; index += 20) {
+            await saveMediaBatch(rows.slice(index, index + 20));
+            await pause(100);
+          }
+        }
+      } catch (err) {
+        console.warn('[Cloudflare] Media chunks backup warning:', err);
       }
-      await cloudflareApi.cleanupProfileMedia(item.field, uploadedVersions[item.field] || '');
     }
-    // Commit the lightweight profile only after both media fields are complete.
-    // If the tab closes during upload, the old profile remains authoritative.
-    await saveEntity('user', profile as User);
-    userMediaCache.delete(user.id);
   },
   async fetchUsers(currentUserId?: string): Promise<User[]> {
     const users = await fetchType<User>('user');
-    // User profiles intentionally omit large avatar/banner data. Reassemble the
-    // separately stored chunks here so other people's images survive a refresh,
-    // not only the currently signed-in user's images.
     const followRows = await listRows('follow');
-    const follows = followRows.map((row) => parse<FollowRecord>(row.payload)).filter((value): value is FollowRecord => Boolean(value));
+    const follows = (followRows || [])
+      .map((row) => (row && row.payload ? parse<FollowRecord>(row.payload) : null))
+      .filter((value): value is FollowRecord => Boolean(value));
     const followerCounts = new Map<string, number>();
     const followingByCurrentUser = new Set<string>();
     for (const follow of follows) {
@@ -107,9 +120,12 @@ export const cloudSync = {
       followerCounts.set(follow.followingId, (followerCounts.get(follow.followingId) || 0) + 1);
       if (follow.followerId === currentUserId) followingByCurrentUser.add(follow.followingId);
     }
-    return users.map((user) => {
+    return (users || []).map((user) => {
+      const cached = userMediaCache.get(user.id);
       const hydrated = {
         ...user,
+        avatar: user.avatar || cached?.avatar || DEFAULT_USER_AVATAR,
+        banner: user.banner || cached?.banner || '',
         ...(followerCounts.has(user.id) ? { followersCount: followerCounts.get(user.id) || 0 } : {}),
         ...(currentUserId ? { isFollowing: followingByCurrentUser.has(user.id) } : {}),
       };

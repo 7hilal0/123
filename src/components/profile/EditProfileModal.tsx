@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Camera, Check, Palette, RotateCw, Save, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Camera, Check, Palette, RotateCw, Save, X, Sparkles } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { UserStatus } from '../../types';
 import { readImageFile } from '../../utils/fileUpload';
 import { DEFAULT_USER_AVATAR } from '../../utils/avatarConstants';
+import { ThumbnailSelector } from '../common/ThumbnailSelector';
 
 interface EditProfileModalProps {
   onClose: () => void;
@@ -49,7 +50,7 @@ function hslToHex(hue: number, saturation: number, lightness: number) {
 }
 
 export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) => {
-  const { currentUser, updateCurrentUserProfile, t, dir } = useApp();
+  const { currentUser, updateCurrentUserProfile, t, dir, language } = useApp();
   const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
   const [bio, setBio] = useState(currentUser?.bio || '');
   const [customStatus, setCustomStatus] = useState(currentUser?.customStatus || '');
@@ -293,6 +294,32 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
 
           <div className="mx-auto grid max-w-4xl gap-6 px-4 pb-12 pt-8 sm:px-8 lg:grid-cols-[minmax(0,1fr)_280px]">
             <div className="space-y-5">
+              {/* Thumbnail & Avatar Library Section */}
+              <section className="rounded-2xl border p-4 sm:p-5" style={{ borderColor: `${profileColor}38`, backgroundColor: `${profileColor}0b` }}>
+                <div className="mb-3.5 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-white">
+                        {language === 'ar' ? 'مكتبة الصور المصغرة والرمز الشخصي' : 'Thumbnail & Avatar Library'}
+                      </h3>
+                      <p className="text-xs text-neutral-400 mt-0.5">
+                        {language === 'ar'
+                          ? 'اختر صورة مصغرة مميزة أو ارفع صورة خاصة لتظهر للجميع في المنشورات والتعليقات'
+                          : 'Choose a preset thumbnail or upload your own to appear across DZCORE'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <ThumbnailSelector
+                  selectedUrl={avatarUrl}
+                  onSelect={(url) => setAvatarUrl(url)}
+                />
+              </section>
+
               <section className="rounded-2xl border p-4 sm:p-5" style={{ borderColor: `${profileColor}38`, backgroundColor: `${profileColor}0b` }}>
                 <div className="mb-4">
                   <h3 className="text-sm font-bold text-white">Profile information</h3>

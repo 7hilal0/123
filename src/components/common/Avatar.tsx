@@ -113,8 +113,7 @@ export const Avatar: React.FC<AvatarProps> = ({ src, alt, size = 'md', status, c
     }
   }, [src, size]);
 
-  const isLargeMedia = Boolean(src && src.length > 50_000 && size !== '2xl');
-  const displaySrc = (!src || imageFailed || (isLargeMedia && !thumbnail))
+  const displaySrc = (!src || imageFailed)
     ? DEFAULT_USER_AVATAR
     : (thumbnail || src);
 

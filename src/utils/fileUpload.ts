@@ -72,3 +72,62 @@ export const readImageFile = (
     reader.readAsDataURL(file);
   });
 };
+
+/**
+ * Creates a clean, compressed square thumbnail suitable for user avatars / thumbnails.
+ * Centers and crops to square (e.g. 256x256), converting to high-performance WebP (~15-25KB).
+ */
+export const createSquareThumbnail = (
+  fileOrDataUrl: File | string,
+  targetSize = 256,
+  quality = 0.85
+): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const processDataUrl = (dataUrl: string) => {
+      if (dataUrl.startsWith('data:image/svg+xml')) {
+        resolve(dataUrl);
+        return;
+      }
+
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = targetSize;
+        canvas.height = targetSize;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(dataUrl);
+          return;
+        }
+
+        // Center crop to square
+        const minDim = Math.min(img.width, img.height);
+        const sx = (img.width - minDim) / 2;
+        const sy = (img.height - minDim) / 2;
+
+        ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, targetSize, targetSize);
+        try {
+          const thumb = canvas.toDataURL('image/webp', quality);
+          resolve(thumb);
+        } catch {
+          resolve(dataUrl);
+        }
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    };
+
+    if (typeof fileOrDataUrl === 'string') {
+      processDataUrl(fileOrDataUrl);
+    } else {
+      if (!fileOrDataUrl.type.startsWith('image/')) {
+        reject(new Error('الملف المختار ليس صورة صالحة'));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => processDataUrl(String(e.target?.result || ''));
+      reader.onerror = () => reject(new Error('فشل قراءة الملف'));
+      reader.readAsDataURL(fileOrDataUrl);
+    }
+  });
+};
