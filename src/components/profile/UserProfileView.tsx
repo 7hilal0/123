@@ -43,7 +43,9 @@ export const UserProfileView: React.FC = () => {
     if (!user?.id) return;
     let active = true;
     cloudSync.fetchUserMedia(user.id).then((media) => {
-      if (active && (media.avatar || media.banner)) setLoadedMedia({ userId: user.id, avatar: media.avatar, banner: media.banner });
+      if (active && (Object.prototype.hasOwnProperty.call(media, 'avatar') || Object.prototype.hasOwnProperty.call(media, 'banner'))) {
+        setLoadedMedia({ userId: user.id, avatar: media.avatar, banner: media.banner });
+      }
     }).catch(() => {});
     return () => { active = false; };
   }, [user?.id]);

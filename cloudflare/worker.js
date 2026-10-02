@@ -348,6 +348,16 @@ export default {
         await env.DB.batch(statements);
         return json({ ok: true }, 200, origin);
       }
+      if (url.pathname === '/api/entities/profile-media/cleanup' && request.method === 'POST') {
+        const user = await currentUser(request, env);
+        if (!user) return json({ error: 'unauthorized' }, 401, origin);
+        const body = await request.json();
+        const field = body.field === 'banner' ? 'banner' : body.field === 'avatar' ? 'avatar' : '';
+        const mediaVersion = String(body.mediaVersion || '');
+        if (!field || !mediaVersion) return json({ error: 'invalid_media_cleanup' }, 400, origin);
+        await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'profileMedia' AND owner_id = ? AND json_extract(payload, '$.field') = ? AND COALESCE(json_extract(payload, '$.mediaVersion'), 'legacy') != ?").bind(Date.now(), user.id, field, mediaVersion).run();
+        return json({ ok: true }, 200, origin);
+      }
       if (url.pathname === '/api/entities' && request.method === 'POST') {
         const user = await currentUser(request, env);
         if (!user) return json({ error: 'unauthorized' }, 401, origin);

@@ -246,15 +246,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!active) return;
         // Local IndexedDB is only a temporary first-paint fallback. Cloudflare
         // must win so the same account shows the same image in every browser.
-        const avatar = remoteMedia.avatar || cachedMedia?.avatar;
-        const banner = remoteMedia.banner || cachedMedia?.banner;
-        if (!avatar && !banner) return;
-        setUsers((previous) => previous.map((user) => user.id === sessionUser.id ? { ...user, avatar: avatar || user.avatar, banner: banner || user.banner } : user));
-        setCurrentUser((previous) => previous?.id === sessionUser.id ? { ...previous, avatar: avatar || previous.avatar, banner: banner || previous.banner } : previous);
-        if (remoteMedia.avatar || remoteMedia.banner) {
+        const hasRemoteAvatar = Object.prototype.hasOwnProperty.call(remoteMedia, 'avatar');
+        const hasRemoteBanner = Object.prototype.hasOwnProperty.call(remoteMedia, 'banner');
+        const avatar = hasRemoteAvatar ? remoteMedia.avatar : cachedMedia?.avatar;
+        const banner = hasRemoteBanner ? remoteMedia.banner : cachedMedia?.banner;
+        if (avatar === undefined && banner === undefined) return;
+        setUsers((previous) => previous.map((user) => user.id === sessionUser.id ? { ...user, avatar: avatar ?? user.avatar, banner: banner ?? user.banner } : user));
+        setCurrentUser((previous) => previous?.id === sessionUser.id ? { ...previous, avatar: avatar ?? previous.avatar, banner: banner ?? previous.banner } : previous);
+        if (hasRemoteAvatar || hasRemoteBanner) {
           void storage.saveProfileMediaBackup(sessionUser.id, {
-            avatar: remoteMedia.avatar || avatar,
-            banner: remoteMedia.banner || banner,
+            avatar: hasRemoteAvatar ? remoteMedia.avatar : avatar,
+            banner: hasRemoteBanner ? remoteMedia.banner : banner,
           });
         }
       });

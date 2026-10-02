@@ -32,6 +32,7 @@ function subscribePoll<T>(fetcher: () => Promise<T[]>, callback: (items: T[]) =>
 export const cloudSync = {
   async saveUser(user: User): Promise<void> {
     const { avatar, banner, ...profile } = user;
+    userMediaCache.delete(user.id);
     await saveEntity('user', profile as User);
     const uploadedVersions: Partial<Record<'avatar' | 'banner', string>> = {};
     for (const item of [{ field: 'avatar' as const, value: avatar || '' }, { field: 'banner' as const, value: banner || '' }]) {
@@ -55,7 +56,9 @@ export const cloudSync = {
       if (currentRows.length !== expected.length || ![...Array(expected.length).keys()].every((index) => indexes.has(index))) {
         throw new Error(`Incomplete ${item.field} upload`);
       }
+      await cloudflareApi.cleanupProfileMedia(item.field, uploadedVersions[item.field] || '');
     }
+    userMediaCache.delete(user.id);
   },
   async fetchUsers(currentUserId?: string): Promise<User[]> {
     const users = await fetchType<User>('user');
