@@ -16,7 +16,7 @@ function json(data, status = 200, origin = '*', extra = {}) {
   });
 }
 
-const ALLOWED_ORIGINS = new Set(['https://dzcore.top', 'https://www.dzcore.top', 'https://dzcore.pages.dev', 'http://localhost:3000', 'http://localhost:5173']);
+const ALLOWED_ORIGINS = new Set(['https://dzcore.top', 'https://www.dzcore.top', 'https://dzcore.pages.dev', 'https://7hilal0.github.io', 'http://localhost:3000', 'http://localhost:5173']);
 function originFor(request) {
   const origin = request.headers.get('Origin');
   return origin && ALLOWED_ORIGINS.has(origin) ? origin : 'https://dzcore.top';
