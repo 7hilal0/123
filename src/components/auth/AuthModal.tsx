@@ -314,20 +314,21 @@ export const AuthModal: React.FC = () => {
           </div>
 
           <div className={googleBusy ? 'opacity-60 pointer-events-none' : ''}>
-            <div className="relative w-full min-h-[44px] rounded-xl overflow-hidden flex justify-center bg-emerald-500">
-              <div ref={googleButtonRef} className="w-full min-h-[44px] flex justify-center" />
+            <div className="relative w-full min-h-[72px] rounded-xl overflow-hidden flex flex-col items-center justify-center gap-1.5">
+              <img
+                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                alt="Google"
+                className="w-9 h-9"
+              />
+              <span className="text-xs font-semibold text-neutral-300">تسجيل الدخول باستخدام Google</span>
+              <div ref={googleButtonRef} className="absolute inset-0 z-10 w-full h-full opacity-0 cursor-pointer" />
               {mode === 'register' && !username.trim() && !googleBusy && (
                 <button
                   type="button"
                   aria-label="Enter username before Google signup"
                   onClick={() => setErrorMessage('Enter your username first, then continue with Google.')}
-                  className="absolute inset-0 z-20 w-full h-full bg-emerald-500 text-white font-semibold text-sm rounded-xl"
-                >
-                  <span className="inline-flex items-center justify-center gap-2.5">
-                    <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-[#4285F4] font-bold text-base">G</span>
-                    <span>تسجيل الدخول باستخدام Google</span>
-                  </span>
-                </button>
+                  className="absolute inset-0 z-20 w-full h-full bg-transparent"
+                />
               )}
             </div>
           </div>
