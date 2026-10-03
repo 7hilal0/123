@@ -963,6 +963,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const userId = currentUser.id;
+    const findComment = (list: Comment[]): Comment | null => {
+      for (const comment of list) {
+        if (comment.id === commentId) return comment;
+        if (comment.replies?.length) {
+          const found = findComment(comment.replies);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const existingComment = findComment(comments[postId] || []);
+    const previousVote = existingComment?.votes?.[userId] ?? (existingComment?.userVote === 1 ? 1 : null);
 
     setComments((prev) => {
       const existing = prev[postId] || [];
@@ -989,7 +1002,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               downvotes,
               userVote: nextUserVote,
             };
-            cloudSync.saveComment(postId, updated);
+            void cloudSync.saveComment(postId, updated);
             return updated;
           }
           if (c.replies && c.replies.length > 0) {
@@ -1000,8 +1013,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       return { ...prev, [postId]: updateVote(existing) };
     });
-  };
 
+    // Notify the comment owner only when a new like is added, not when it is removed.
+    if (existingComment && previousVote !== 1 && existingComment.author?.id !== currentUser.id) {
+      addActivityNotification(
+        existingComment.author.id,
+        'upvote',
+        currentUser,
+        language === 'ar' ? 'إعجاب جديد بتعليقك' : language === 'fr' ? 'Nouveau j’aime sur votre commentaire' : 'New like on your comment',
+        language === 'ar'
+          ? `أعجب @${currentUser.username} بتعليقك`
+          : language === 'fr'
+            ? `@${currentUser.username} a aimé votre commentaire`
+            : `@${currentUser.username} liked your comment`,
+        'comment',
+        commentId
+      );
+    }
+  };
   // Communities
   const joinCommunity = (slug: string) => {
     if (!currentUser) { setAuthModalOpen(true, 'login'); return; }
