@@ -1,9 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { X, Sparkles, User as UserIcon, Lock, Mail, ArrowRight, ArrowLeft, Upload } from 'lucide-react';
+import { X, Sparkles, User as UserIcon, Lock, Mail, ArrowRight, ArrowLeft } from 'lucide-react';
 import { readImageFile } from '../../utils/fileUpload';
-import { DEFAULT_USER_AVATAR, PRESET_AVATARS } from '../../utils/avatarConstants';
-import { ThumbnailSelector } from '../common/ThumbnailSelector';
 
 
 export const AuthModal: React.FC = () => {
@@ -166,18 +164,6 @@ export const AuthModal: React.FC = () => {
         <form onSubmit={handleSubmit} className="p-5 md:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
           {mode === 'register' && (
             <>
-              {/* Thumbnail & Avatar Selection */}
-              <div>
-                <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
-                  {t.choosePresetAvatar || 'الصورة المصغرة للحساب'}
-                </label>
-                <ThumbnailSelector
-                  compact={true}
-                  selectedUrl={avatarPreview || DEFAULT_USER_AVATAR}
-                  onSelect={(url) => setAvatarPreview(url)}
-                />
-              </div>
-
               {/* Display Name */}
               <div>
                 <label className="block text-xs font-semibold text-neutral-300 mb-1.5">

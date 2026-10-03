@@ -4,7 +4,6 @@ import { cloudSync } from '../../services/cloudSync';
 import { Avatar } from '../common/Avatar';
 import { PostCard } from '../posts/PostCard';
 import { EditProfileModal } from './EditProfileModal';
-import { ThumbnailPickerModal } from '../common/ThumbnailPickerModal';
 import {
   Calendar,
   Users,
@@ -15,7 +14,6 @@ import {
   Check,
   ArrowLeft,
   ArrowRight,
-  Sparkles
 } from 'lucide-react';
 
 export const UserProfileView: React.FC = () => {
@@ -33,12 +31,10 @@ export const UserProfileView: React.FC = () => {
     setEditProfileModalOpen,
     t,
     dir,
-    language,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'posts' | 'comments' | 'saved'>('posts');
   const [loadedMedia, setLoadedMedia] = useState<{ userId: string; avatar?: string; banner?: string } | null>(null);
-  const [showThumbnailModal, setShowThumbnailModal] = useState<boolean>(false);
 
   const targetUserId = selectedUserId || currentUser?.id;
   const user = users.find((u) => u.id === targetUserId) || currentUser;
@@ -128,30 +124,13 @@ export const UserProfileView: React.FC = () => {
         <div className="relative flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-5 sm:pt-6">
           {/* Avatar & Identifiers */}
           <div className="flex items-end gap-4">
-            <div
-              onClick={() => {
-                if (isSelf) setShowThumbnailModal(true);
-              }}
-              className={`relative rounded-full p-1 bg-transparent shadow-2xl ${
-                isSelf ? 'cursor-pointer group/self-avatar' : ''
-              }`}
-              title={
-                isSelf
-                  ? (language === 'ar' ? 'انقر لتغيير صورتك المصغرة' : 'Click to change thumbnail')
-                  : undefined
-              }
-            >
+            <div className="relative rounded-full bg-transparent p-1 shadow-2xl">
               <Avatar
                 src={displayUser.avatar}
                 alt={displayUser.displayName}
                 size="2xl"
                 status={displayUser.status}
               />
-              {isSelf && (
-                <div className="absolute inset-1 rounded-full bg-black/60 opacity-0 group-hover/self-avatar:opacity-100 flex items-center justify-center text-emerald-400 transition-opacity backdrop-blur-xs">
-                  <Sparkles className="w-6 h-6 animate-pulse" />
-                </div>
-              )}
             </div>
 
             <div className="mb-2">
@@ -175,18 +154,6 @@ export const UserProfileView: React.FC = () => {
           <div className="flex items-center gap-2 self-start sm:self-auto">
             {isSelf ? (
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowThumbnailModal(true)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all cursor-pointer shadow-sm"
-                  title={language === 'ar' ? 'اختيار صورة مصغرة للحساب' : 'Choose Account Thumbnail'}
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">
-                    {language === 'ar' ? 'الصورة المصغرة' : 'Thumbnail'}
-                  </span>
-                </button>
-
                 <button
                   onClick={() => setEditProfileModalOpen(true)}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-white border transition-colors cursor-pointer"
@@ -329,11 +296,6 @@ export const UserProfileView: React.FC = () => {
         <EditProfileModal onClose={() => setEditProfileModalOpen(false)} />
       )}
 
-      {/* Thumbnail Picker Modal */}
-      <ThumbnailPickerModal
-        isOpen={showThumbnailModal}
-        onClose={() => setShowThumbnailModal(false)}
-      />
     </div>
   );
 };
