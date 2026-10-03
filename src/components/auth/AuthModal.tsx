@@ -58,18 +58,16 @@ export const AuthModal: React.FC = () => {
         },
         ux_mode: 'popup',
       });
-      const googleButton = document.createElement('button');
-      googleButton.type = 'button';
-      googleButton.className = 'w-full min-h-[44px] rounded-xl bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold text-sm flex items-center justify-center gap-2.5 transition-colors shadow-sm';
-      googleButton.innerHTML = '<span style="background:white;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#4285F4;font-size:16px;">G</span><span>تسجيل الدخول باستخدام Google</span>';
-      googleButton.addEventListener('click', () => {
-        if (mode === 'register' && !username.trim()) {
-          setErrorMessage('Enter your username first, then continue with Google.');
-          return;
-        }
-        (window as any).google.accounts.id.prompt();
+      (window as any).google.accounts.id.renderButton(googleButtonRef.current, {
+        type: 'standard',
+        theme: 'filled_blue',
+        size: 'large',
+        text: 'continue_with',
+        shape: 'rectangular',
+        width: 400,
+        logo_alignment: 'center',
+        locale: language === 'ar' ? 'ar' : language === 'fr' ? 'fr' : 'en',
       });
-      googleButtonRef.current.appendChild(googleButton);
     };
     const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]') as HTMLScriptElement | null;
     if ((window as any).google?.accounts?.id) renderGoogleButton();
