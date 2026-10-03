@@ -120,7 +120,7 @@ interface AppContextType {
 
   // Auth
   login: (usernameOrEmail: string, password?: string) => Promise<boolean>;
-  googleLogin: (credential: string) => Promise<boolean>;
+  googleLogin: (credential: string, profile?: { username?: string; displayName?: string }) => Promise<boolean>;
   register: (username: string, displayName: string, email: string, password?: string, avatarUrl?: string) => Promise<boolean>;
   updateAccountEmail: (email: string, currentPassword: string) => Promise<boolean>;
   updateAccountPassword: (newPassword: string, currentPassword: string) => Promise<boolean>;
@@ -1443,9 +1443,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const googleLogin = async (credential: string): Promise<boolean> => {
+  const googleLogin = async (credential: string, profile?: { username?: string; displayName?: string }): Promise<boolean> => {
     try {
-      const { user: sessionUser } = await cloudflareApi.googleLogin(credential);
+      const { user: sessionUser } = await cloudflareApi.googleLogin(credential, profile);
       const cached = users.find((u) => u.id === sessionUser.id);
       const resolved: User = {
         ...(cached || {}),
