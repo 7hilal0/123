@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { PostCard } from './PostCard';
 import { Avatar } from '../common/Avatar';
 import { Comment } from '../../types';
+import { formatRelativeTime } from '../../utils/relativeTime';
 import {
   ArrowLeft,
   ArrowRight,
@@ -21,7 +22,7 @@ interface CommentItemProps {
 }
 
 const CommentItem: React.FC<CommentItemProps> = ({ comment, postId, depth = 0 }) => {
-  const { upvoteComment, addComment, deleteComment, navigateToProfile, currentUser, users, setAuthModalOpen, t } = useApp();
+  const { upvoteComment, addComment, deleteComment, navigateToProfile, currentUser, users, setAuthModalOpen, t, language } = useApp();
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyContent, setReplyContent] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -70,7 +71,7 @@ const CommentItem: React.FC<CommentItemProps> = ({ comment, postId, depth = 0 })
             </button>
             <span className="font-mono text-neutral-500">@{author.username}</span>
             <span aria-hidden="true">·</span>
-            <span>{comment.createdAt}</span>
+            <span>{formatRelativeTime(comment.timestamp, language, comment.createdAt)}</span>
 
             {comment.replies && comment.replies.length > 0 && (
               <button
