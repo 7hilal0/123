@@ -996,41 +996,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Communities
   const joinCommunity = (slug: string) => {
-    if (!currentUser) {
-      setAuthModalOpen(true, 'login');
-      return;
-    }
-
-    setCommunities((prev) =>
-      prev.map((c) => {
-        if (c.slug === slug) {
-          const updated = { ...c, isMember: true, memberCount: c.memberCount + 1 };
-          cloudSync.saveCommunity(updated);
-          showToast(language === 'ar' ? `انضممت إلى مجتمع ${c.name}` : `Joined ${c.name}`, 'success');
-          return updated;
-        }
-        return c;
-      })
-    );
+    if (!currentUser) { setAuthModalOpen(true, 'login'); return; }
+    const community = communities.find((c) => c.slug === slug);
+    if (!community) return;
+    void cloudflareApi.setCommunityMembership(community.id, true).then(() => {
+      setCommunities((prev) => prev.map((c) => c.id === community.id ? { ...c, isMember: true, memberCount: c.memberCount + 1 } : c));
+      showToast(language === 'ar' ? `انضممت إلى مجتمع ${community.name}` : `Joined ${community.name}`, 'success');
+    }).catch(() => showToast(language === 'ar' ? 'تعذر الانضمام إلى المجتمع' : 'Could not join the community', 'warning'));
   };
 
   const leaveCommunity = (slug: string) => {
-    if (!currentUser) {
-      setAuthModalOpen(true, 'login');
-      return;
-    }
-
-    setCommunities((prev) =>
-      prev.map((c) => {
-        if (c.slug === slug) {
-          const updated = { ...c, isMember: false, memberCount: Math.max(0, c.memberCount - 1) };
-          cloudSync.saveCommunity(updated);
-          showToast(language === 'ar' ? `غادرت مجتمع ${c.name}` : `Left ${c.name}`, 'info');
-          return updated;
-        }
-        return c;
-      })
-    );
+    if (!currentUser) { setAuthModalOpen(true, 'login'); return; }
+    const community = communities.find((c) => c.slug === slug);
+    if (!community) return;
+    void cloudflareApi.setCommunityMembership(community.id, false).then(() => {
+      setCommunities((prev) => prev.map((c) => c.id === community.id ? { ...c, isMember: false, memberCount: Math.max(0, c.memberCount - 1) } : c));
+      showToast(language === 'ar' ? `غادرت مجتمع ${community.name}` : `Left ${community.name}`, 'info');
+    }).catch(() => showToast(language === 'ar' ? 'تعذر مغادرة المجتمع' : 'Could not leave the community', 'warning'));
   };
 
   const createCommunity = (
@@ -1040,61 +1022,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     iconUrl?: string,
     bannerUrl?: string
   ) => {
-    if (!currentUser) {
-      setAuthModalOpen(true, 'login');
-      return;
-    }
-
+    if (!currentUser) { setAuthModalOpen(true, 'login'); return; }
     const cleanSlugPart = name.toLowerCase().replace(/[^a-z0-9]/g, '') || `hub_${Date.now()}`;
     const slug = `c/${cleanSlugPart}`;
-
     if (communities.some((c) => c.slug === slug)) {
-      showToast(
-        language === 'ar' ? 'يوجد مجتمع بهذا المعرف بالفعل!' : 'A community with this slug already exists!',
-        'warning'
-      );
+      showToast(language === 'ar' ? 'يوجد مجتمع بهذا المعرف بالفعل!' : 'A community with this slug already exists!', 'warning');
       return;
     }
-
     const newComm: Community = {
-      id: `comm_${Date.now()}`,
-      name,
-      slug,
-      description,
-      icon:
-        iconUrl ||
-        'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=200&q=80',
-      banner:
-        bannerUrl ||
-        'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
-      memberCount: 1,
-      onlineCount: 1,
-      isMember: true,
+      id: `comm_${crypto.randomUUID()}`,
+      name, slug, description,
+      icon: iconUrl || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=200&q=80',
+      banner: bannerUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+      memberCount: 0, onlineCount: 1, isMember: false,
       category: category || (language === 'ar' ? 'عام' : 'General'),
       createdAt: language === 'ar' ? 'تأسس اليوم' : 'Created today',
-      rules: [
-        { id: 'r1', title: language === 'ar' ? 'الاحترام المتبادل' : 'Mutual Respect', description: language === 'ar' ? 'النقاش البناء والمحترم هو أساس المجتمع.' : 'Constructive and polite communication.' },
-      ],
-      moderators: [
-        {
-          username: currentUser.username,
-          displayName: currentUser.displayName,
-          avatar: currentUser.avatar,
-          role: language === 'ar' ? 'مؤسس' : 'Founder',
-        },
-      ],
+      rules: [{ id: 'r1', title: language === 'ar' ? 'الاحترام المتبادل' : 'Mutual Respect', description: language === 'ar' ? 'النقاش البناء والمحترم هو أساس المجتمع.' : 'Constructive and polite communication.' }],
+      moderators: [{ username: currentUser.username, displayName: currentUser.displayName, avatar: currentUser.avatar, role: language === 'ar' ? 'مؤسس' : 'Founder' }],
     };
-
-    setCommunities((prev) => [newComm, ...prev]);
-
-    // Cloud Save Community
-    cloudSync.saveCommunity(newComm);
-
-    showToast(
-      language === 'ar' ? `تم إنشاء المجتمع وحفظه سحابياً! 🎉` : `Community saved to cloud! 🎉`,
-      'success'
-    );
-    navigateToCommunity(slug);
+    void cloudSync.saveCommunity(newComm)
+      .then(() => cloudflareApi.setCommunityMembership(newComm.id, true))
+      .then(() => {
+        setCommunities((prev) => [{ ...newComm, isMember: true, memberCount: 1 }, ...prev]);
+        showToast(language === 'ar' ? 'تم إنشاء المجتمع وحفظه سحابياً! 🎉' : 'Community saved to cloud! 🎉', 'success');
+        navigateToCommunity(slug);
+      })
+      .catch(() => showToast(language === 'ar' ? 'تعذر حفظ المجتمع على السيرفر' : 'The community could not be saved to the server', 'warning'));
   };
 
   // Messaging
