@@ -621,7 +621,50 @@ export default {
         // Notifications belong to the recipient, not the actor. Otherwise the actor
         // becomes the row owner and the recipient's private notification query cannot see it.
         const ownerId = type === 'notification' ? String(payload.recipientId) : user.id;
-        await env.DB.prepare('INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0').bind(type, entityId, ownerId, body.payload, Date.now()).run();
+
+        // Posts are written as complete JSON objects by multiple clients. A stale client
+        // can therefore accidentally overwrite newer votes from another client. Merge only
+        // the incoming vote changes with the current server copy before saving the post.
+        if (type === 'post' && !payload.deleted) {
+          const existingPost = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'post' AND entity_id = ? AND deleted = 0").bind(entityId).first();
+          if (existingPost?.payload) {
+            try {
+              const current = JSON.parse(existingPost.payload);
+              const currentVotes = { ...(current.votes || {}) };
+              const currentVoteState = { ...(current.voteState || {}) };
+              const incomingVotes = payload.votes || {};
+              const incomingVoteState = payload.voteState || {};
+
+              for (const [voterId, state] of Object.entries(incomingVoteState)) {
+                const numericState = Number(state);
+                if (numericState === 0) {
+                  delete currentVotes[voterId];
+                  currentVoteState[voterId] = 0;
+                } else if (numericState === 1 || numericState === -1) {
+                  currentVotes[voterId] = Number(incomingVotes[voterId]) === numericState ? numericState : numericState;
+                  currentVoteState[voterId] = numericState;
+                }
+              }
+
+              // Backward compatibility for posts that only contain the old votes map.
+              for (const [voterId, vote] of Object.entries(incomingVotes)) {
+                if (!(voterId in incomingVoteState) && (Number(vote) === 1 || Number(vote) === -1)) {
+                  currentVotes[voterId] = Number(vote);
+                  currentVoteState[voterId] = Number(vote);
+                }
+              }
+
+              payload.votes = currentVotes;
+              payload.voteState = currentVoteState;
+              payload.upvotes = Object.values(currentVotes).filter((vote) => Number(vote) === 1).length;
+              payload.downvotes = Object.values(currentVotes).filter((vote) => Number(vote) === -1).length;
+            } catch {
+              // Keep the incoming post if an older malformed payload cannot be merged.
+            }
+          }
+        }
+
+        await env.DB.prepare('INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0').bind(type, entityId, ownerId, JSON.stringify(payload), Date.now()).run();
         if (type === 'user') {
           await env.DB.prepare('UPDATE auth_users SET username = ?, email = ?, profile_json = ? WHERE id = ?').bind(payload.username, payload.email, body.payload, user.id).run();
         }
