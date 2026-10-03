@@ -73,3 +73,65 @@ html, body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+
+/* DZCORE UI polish */
+:root {
+  color-scheme: dark;
+  --dz-surface: rgba(17, 24, 24, 0.72);
+  --dz-border: rgba(255, 255, 255, 0.075);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: rgba(16, 185, 129, 0.32);
+  color: #fff;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  touch-action: manipulation;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgba(52, 211, 153, 0.75);
+  outline-offset: 2px;
+}
+
+img {
+  max-width: 100%;
+}
+
+@media (max-width: 767px) {
+  body {
+    background:
+      radial-gradient(circle at 50% -12%, rgba(16, 185, 129, 0.10), transparent 22rem),
+      #080b0c;
+  }
+
+  /* Give content a little more breathing room above the mobile navigation. */
+  main {
+    scroll-padding-bottom: 5.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
