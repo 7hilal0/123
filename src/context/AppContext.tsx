@@ -217,49 +217,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!active) return;
       if (!sessionUser) { setCurrentUser(null); return; }
       const cachedProfile = storage.getUsers().find((user) => user.id === sessionUser.id);
-      // Render the session and cached profile immediately. IndexedDB/GIF media
-      // is hydrated in the background and must never delay the first screen.
+      // Cloudflare is authoritative for profile media. Local data is only a
+      // fallback, so an old image from another browser must not briefly replace
+      // the newer server version after a refresh.
+      const [cachedMedia, remoteMedia] = await Promise.all([
+        storage.getProfileMediaBackup(sessionUser.id).catch(() => null),
+        cloudSync.fetchUserMedia(sessionUser.id).catch(() => ({} as Partial<User>)),
+      ]);
+      if (!active) return;
+
+      const hasRemoteAvatar = Object.prototype.hasOwnProperty.call(remoteMedia, 'avatar');
+      const hasRemoteBanner = Object.prototype.hasOwnProperty.call(remoteMedia, 'banner');
+      const avatar = hasRemoteAvatar ? remoteMedia.avatar : (sessionUser.avatar || cachedMedia?.avatar || cachedProfile?.avatar || DEFAULT_USER_AVATAR);
+      const banner = hasRemoteBanner ? remoteMedia.banner : (sessionUser.banner || cachedMedia?.banner || cachedProfile?.banner || '');
+
       const profile = {
         ...sessionUser,
         ...(cachedProfile || {}),
-        avatar: cachedProfile?.avatar || DEFAULT_USER_AVATAR,
-        banner: cachedProfile?.banner || '',
-        profileColor: cachedProfile?.profileColor,
-        displayNameColor: cachedProfile?.displayNameColor,
-        bio: cachedProfile?.bio || '',
-        status: cachedProfile?.status || 'online' as UserStatus,
-        customStatus: cachedProfile?.customStatus || '',
-        badges: cachedProfile?.badges || ['Member'],
-        karma: cachedProfile?.karma || 0,
-        joinedDate: cachedProfile?.joinedDate || 'Joined today',
-        followersCount: cachedProfile?.followersCount || 0,
-        followingCount: cachedProfile?.followingCount || 0,
-        isFollowing: cachedProfile?.isFollowing || false,
+        // Never let cachedProfile overwrite newer server media.
+        avatar,
+        banner,
+        profileColor: sessionUser.profileColor ?? cachedProfile?.profileColor,
+        displayNameColor: sessionUser.displayNameColor ?? cachedProfile?.displayNameColor,
+        bio: sessionUser.bio || cachedProfile?.bio || '',
+        status: sessionUser.status || cachedProfile?.status || 'online' as UserStatus,
+        customStatus: sessionUser.customStatus || cachedProfile?.customStatus || '',
+        badges: sessionUser.badges || cachedProfile?.badges || ['Member'],
+        karma: sessionUser.karma ?? cachedProfile?.karma ?? 0,
+        joinedDate: sessionUser.joinedDate || cachedProfile?.joinedDate || 'Joined today',
+        followersCount: sessionUser.followersCount ?? cachedProfile?.followersCount ?? 0,
+        followingCount: sessionUser.followingCount ?? cachedProfile?.followingCount ?? 0,
+        isFollowing: sessionUser.isFollowing ?? cachedProfile?.isFollowing ?? false,
       };
       setUsers((previous) => previous.some((user) => user.id === profile.id) ? previous.map((user) => user.id === profile.id ? profile : user) : [profile, ...previous]);
       setCurrentUser(profile);
 
-      void Promise.all([
-        storage.getProfileMediaBackup(sessionUser.id).catch(() => null),
-        cloudSync.fetchUserMedia(sessionUser.id).catch(() => ({} as Partial<User>)),
-      ]).then(([cachedMedia, remoteMedia]) => {
-        if (!active) return;
-        // Local IndexedDB is only a temporary first-paint fallback. Cloudflare
-        // must win so the same account shows the same image in every browser.
-        const hasRemoteAvatar = Object.prototype.hasOwnProperty.call(remoteMedia, 'avatar');
-        const hasRemoteBanner = Object.prototype.hasOwnProperty.call(remoteMedia, 'banner');
-        const avatar = hasRemoteAvatar ? remoteMedia.avatar : cachedMedia?.avatar;
-        const banner = hasRemoteBanner ? remoteMedia.banner : cachedMedia?.banner;
-        if (avatar === undefined && banner === undefined) return;
-        setUsers((previous) => previous.map((user) => user.id === sessionUser.id ? { ...user, avatar: avatar ?? user.avatar, banner: banner ?? user.banner } : user));
-        setCurrentUser((previous) => previous?.id === sessionUser.id ? { ...previous, avatar: avatar ?? previous.avatar, banner: banner ?? previous.banner } : previous);
-        if (hasRemoteAvatar || hasRemoteBanner) {
-          void storage.saveProfileMediaBackup(sessionUser.id, {
-            avatar: hasRemoteAvatar ? remoteMedia.avatar : avatar,
-            banner: hasRemoteBanner ? remoteMedia.banner : banner,
-          });
-        }
-      });
+      if (hasRemoteAvatar || hasRemoteBanner) {
+        void storage.saveProfileMediaBackup(sessionUser.id, {
+          avatar: hasRemoteAvatar ? remoteMedia.avatar : avatar,
+          banner: hasRemoteBanner ? remoteMedia.banner : banner,
+        });
+      }
     }).catch(() => {
       if (active) setCurrentUser(null);
     });
@@ -418,7 +416,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       }).catch(() => {});
-    }, 900);
+    }, 0);
 
     return () => {
       window.clearTimeout(backgroundSync);
