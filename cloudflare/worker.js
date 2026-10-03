@@ -475,7 +475,9 @@ export default {
             if (!Array.isArray(participants) || !participants.includes(user.id)) return json({ error: 'forbidden_conversation' }, 403, origin);
           } catch { return json({ error: 'forbidden_conversation' }, 403, origin); }
         }
-        const ownerId = user.id;
+        // Notifications belong to the recipient, not the actor. Otherwise the actor
+        // becomes the row owner and the recipient's private notification query cannot see it.
+        const ownerId = type === 'notification' ? String(payload.recipientId) : user.id;
         await env.DB.prepare('INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0').bind(type, entityId, ownerId, body.payload, Date.now()).run();
         if (type === 'user') {
           await env.DB.prepare('UPDATE auth_users SET username = ?, email = ?, profile_json = ? WHERE id = ?').bind(payload.username, payload.email, body.payload, user.id).run();
