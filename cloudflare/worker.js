@@ -208,6 +208,7 @@ export default {
     const origin = originFor(request);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'access-control-allow-origin': origin, 'access-control-allow-credentials': 'true', 'access-control-allow-headers': 'content-type, x-dzcore-admin-secret', 'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS' } });
     const url = new URL(request.url);
+    if (csrfRequired(request)) return json({ error: 'invalid_origin' }, 403, origin);
     try {
       if (url.pathname === '/api/health') return json({ ok: true, service: 'dzcore-cloudflare-api' }, 200, origin);
 
@@ -407,11 +408,18 @@ export default {
         if (!type || !entityId || typeof body.payload !== 'string') return json({ error: 'invalid_entity' }, 400, origin);
         let payload;
         try { payload = JSON.parse(body.payload); } catch { return json({ error: 'invalid_entity_payload' }, 400, origin); }
-        const allowedTypes = new Set(['user', 'community', 'post', 'comment', 'profileMedia', 'follow', 'conversation', 'message']);
+        const allowedTypes = new Set(['user', 'community', 'post', 'comment', 'profileMedia', 'follow', 'conversation', 'message', 'notification']);
         if (!allowedTypes.has(type)) return json({ error: 'forbidden_entity_type' }, 403, origin);
         if (type === 'user' && (entityId !== user.id || payload.id !== user.id)) return json({ error: 'forbidden_entity' }, 403, origin);
         if (type === 'profileMedia' && (body.ownerId !== user.id || payload.userId !== user.id || !entityId.startsWith(user.id + ':'))) return json({ error: 'forbidden_entity' }, 403, origin);
-        if (type === 'post' && (entityId !== payload.id || payload.author?.id !== user.id)) return json({ error: 'forbidden_entity' }, 403, origin);
+        if (type === 'post') {
+          if (payload.deleted) {
+            const existing = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'post' AND entity_id = ?").bind(entityId).first();
+            let authorId = null;
+            try { authorId = JSON.parse(existing?.payload || '{}').author?.id; } catch {}
+            if (!existing || authorId !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
+          } else if (entityId !== payload.id || payload.author?.id !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
+        }
         if (type === 'comment') {
           const existing = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'comment' AND entity_id = ?").bind(entityId).first();
           if (payload.deleted) {
@@ -421,6 +429,7 @@ export default {
           } else if (entityId !== payload.id || payload.author?.id !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
         }
         if (type === 'follow' && (payload.followerId !== user.id || entityId !== user.id + ':' + payload.followingId)) return json({ error: 'forbidden_entity' }, 403, origin);
+        if (type === 'notification' && (!payload.recipientId || payload.actor?.id !== user.id || entityId !== payload.id)) return json({ error: 'forbidden_notification' }, 403, origin);
         if (type === 'conversation' && (entityId !== payload.id || !Array.isArray(payload.participantIds) || !payload.participantIds.includes(user.id))) return json({ error: 'forbidden_conversation' }, 403, origin);
         if (type === 'message') {
           if (entityId !== payload.id || payload.senderId !== user.id || !payload.conversationId) return json({ error: 'forbidden_message' }, 403, origin);
