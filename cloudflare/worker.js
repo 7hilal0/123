@@ -441,6 +441,10 @@ export default {
         try { payload = JSON.parse(body.payload); } catch { return json({ error: 'invalid_entity_payload' }, 400, origin); }
         const allowedTypes = new Set(['user', 'community', 'post', 'comment', 'profileMedia', 'follow', 'conversation', 'message', 'notification', 'communityMember']);
         if (!allowedTypes.has(type)) return json({ error: 'forbidden_entity_type' }, 403, origin);
+        if (type === 'community') {
+          const existingCommunity = await env.DB.prepare("SELECT entity_id FROM entities WHERE entity_type = 'community' AND entity_id = ? AND deleted = 0").bind(entityId).first();
+          if (existingCommunity) return json({ error: 'community_updates_use_membership_api' }, 403, origin);
+        }
         if (type === 'user' && (entityId !== user.id || payload.id !== user.id)) return json({ error: 'forbidden_entity' }, 403, origin);
         if (type === 'profileMedia' && (body.ownerId !== user.id || payload.userId !== user.id || !entityId.startsWith(user.id + ':'))) return json({ error: 'forbidden_entity' }, 403, origin);
         if (type === 'post') {
