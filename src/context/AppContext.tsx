@@ -120,6 +120,7 @@ interface AppContextType {
 
   // Auth
   login: (usernameOrEmail: string, password?: string) => Promise<boolean>;
+  googleLogin: (credential: string) => Promise<boolean>;
   register: (username: string, displayName: string, email: string, password?: string, avatarUrl?: string) => Promise<boolean>;
   updateAccountEmail: (email: string, currentPassword: string) => Promise<boolean>;
   updateAccountPassword: (newPassword: string, currentPassword: string) => Promise<boolean>;
@@ -1442,6 +1443,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const googleLogin = async (credential: string): Promise<boolean> => {
+    try {
+      const { user: sessionUser } = await cloudflareApi.googleLogin(credential);
+      const cached = users.find((u) => u.id === sessionUser.id);
+      const resolved: User = {
+        ...(cached || {}),
+        ...sessionUser,
+        id: sessionUser.id,
+        username: sessionUser.username,
+        displayName: sessionUser.displayName || sessionUser.username,
+        email: sessionUser.email,
+        avatar: sessionUser.avatar || cached?.avatar || DEFAULT_USER_AVATAR,
+        banner: sessionUser.banner || cached?.banner || '',
+        bio: sessionUser.bio || cached?.bio || '',
+        status: sessionUser.status || cached?.status || 'online',
+        customStatus: sessionUser.customStatus || cached?.customStatus || '',
+        badges: sessionUser.badges || cached?.badges || ['Member'],
+        karma: sessionUser.karma ?? cached?.karma ?? 0,
+        joinedDate: sessionUser.joinedDate || cached?.joinedDate || 'Joined today',
+        followersCount: sessionUser.followersCount ?? cached?.followersCount ?? 0,
+        followingCount: sessionUser.followingCount ?? cached?.followingCount ?? 0,
+        isFollowing: sessionUser.isFollowing ?? cached?.isFollowing ?? false,
+      };
+      setUsers((previous) => previous.some((u) => u.id === resolved.id) ? previous.map((u) => u.id === resolved.id ? resolved : u) : [resolved, ...previous]);
+      setCurrentUser(resolved);
+      setAuthModalOpenState(false);
+      showToast(language === 'ar' ? `مرحباً، ${resolved.displayName}!` : `Welcome, ${resolved.displayName}!`, 'success');
+      return true;
+    } catch (error: any) {
+      console.error('[Google] Login failed:', error);
+      showToast(language === 'ar' ? 'تعذر تسجيل الدخول باستخدام Google.' : 'Could not sign in with Google.', 'warning');
+      return false;
+    }
+  };
+
   const register = async (
     username: string,
     displayName: string,
@@ -1633,8 +1669,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         markNotificationRead,
         unreadCount,
 
-      login,
-      register,
+        login,
+        googleLogin,
+        register,
       updateAccountEmail,
       updateAccountPassword,
       logout,
