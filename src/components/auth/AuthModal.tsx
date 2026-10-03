@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { X, Sparkles, User as UserIcon, Lock, Mail, ArrowRight, ArrowLeft } from 'lucide-react';
 import { readImageFile } from '../../utils/fileUpload';
@@ -10,6 +10,7 @@ export const AuthModal: React.FC = () => {
     authModalMode,
     setAuthModalOpen,
     login,
+    googleLogin,
     register,
     t,
     dir,
@@ -25,6 +26,40 @@ export const AuthModal: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [verificationBusy, setVerificationBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+  const [googleBusy, setGoogleBusy] = useState(false);
+
+  useEffect(() => {
+    if (!authModalOpen || !googleButtonRef.current) return;
+    let cancelled = false;
+    const renderGoogleButton = () => {
+      if (cancelled || !googleButtonRef.current || !(window as any).google?.accounts?.id) return;
+      googleButtonRef.current.innerHTML = '';
+      (window as any).google.accounts.id.initialize({
+        client_id: '991149566827-l73oec1hjpu6jb21hftr4a2e1gille3m.apps.googleusercontent.com',
+        callback: async (response: { credential: string }) => {
+          if (!response?.credential) return;
+          setGoogleBusy(true);
+          setErrorMessage('');
+          try { await googleLogin(response.credential); }
+          finally { if (!cancelled) setGoogleBusy(false); }
+        },
+        ux_mode: 'popup',
+      });
+      (window as any).google.accounts.id.renderButton(googleButtonRef.current, {
+        type: 'standard', theme: 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', width: 360, locale: 'en',
+      });
+    };
+    const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]') as HTMLScriptElement | null;
+    if ((window as any).google?.accounts?.id) renderGoogleButton();
+    else if (existing) existing.addEventListener('load', renderGoogleButton, { once: true });
+    else {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client'; script.async = true; script.defer = true; script.onload = renderGoogleButton;
+      document.head.appendChild(script);
+    }
+    return () => { cancelled = true; };
+  }, [authModalOpen, mode, googleLogin]);
 
   if (!authModalOpen) return null;
 
@@ -245,12 +280,22 @@ export const AuthModal: React.FC = () => {
 
           <button
             type="submit"
-            disabled={verificationBusy}
+            disabled={verificationBusy || googleBusy}
             className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-60 disabled:cursor-wait text-white font-semibold text-xs md:text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer"
           >
             <span>{mode === 'login' ? t.loginBtn : 'Create account'}</span>
             <SubmitArrow className="w-4 h-4" />
           </button>
+
+          <div className="flex items-center gap-3 py-1">
+            <span className="h-px flex-1 bg-white/10" />
+            <span className="text-[11px] text-neutral-500">OR</span>
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
+
+          <div className={googleBusy ? 'opacity-60 pointer-events-none' : ''}>
+            <div ref={googleButtonRef} className="flex justify-center min-h-[40px]" />
+          </div>
 
           <div className="pt-3 border-t border-white/5 text-[11px] text-neutral-400 flex items-center justify-between">
             <button
