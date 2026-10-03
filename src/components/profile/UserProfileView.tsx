@@ -71,6 +71,8 @@ export const UserProfileView: React.FC = () => {
   const isSelf = currentUser && currentUser.id === displayUser.id;
   const profileColor = displayUser.profileColor || '#10b981';
   const displayNameColor = displayUser.displayNameColor || '#ffffff';
+  // Use the stored YYYY-MM-DD portion directly so timezone conversion cannot change the day.
+  const formattedJoinedDate = String(displayUser.joinedDate || '').match(/^(\d{4})-(\d{2})-(\d{2})/)?.slice(1).join('/') || String(displayUser.joinedDate || '');
   const userPosts = posts.filter((p) => p.author.id === displayUser.id);
   const savedPosts = posts.filter((p) => p.isSaved);
 
@@ -226,14 +228,10 @@ export const UserProfileView: React.FC = () => {
             <span>{t.followers}</span>
           </div>
 
-          <div className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
-              <Calendar className="w-4 h-4 text-emerald-400" />
-            </span>
-            <span className="flex flex-col leading-tight">
-              <span className="text-[11px] font-medium text-neutral-500">${t.joinedDate}</span>
-              <span className="text-sm font-semibold text-neutral-200">${displayUser.joinedDate}</span>
-            </span>
+          <div className="flex items-center gap-1.5 text-xs text-neutral-400">
+            <Calendar className="w-4 h-4 text-neutral-500" />
+            <span>{t.joinedDate}</span>
+            <span className="font-semibold text-neutral-200">{formattedJoinedDate}</span>
           </div>
         </div>
 
