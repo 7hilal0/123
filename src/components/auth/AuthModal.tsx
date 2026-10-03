@@ -232,7 +232,7 @@ export const AuthModal: React.FC = () => {
           {/* Username */}
           <div>
             <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
-              {t.username} <span className="text-rose-400">*</span>
+              {t.username}
             </label>
             <div className="relative">
               <span className="text-neutral-500 font-mono text-xs absolute start-3.5 top-1/2 -translate-y-1/2">
