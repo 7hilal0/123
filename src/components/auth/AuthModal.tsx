@@ -285,7 +285,7 @@ export const AuthModal: React.FC = () => {
           </button>
 
           {mode === 'register' && (
-            <p className="text-[11px] text-neutral-400 text-center">You can create an account normally or continue with Google.</p>
+            <p className="text-[11px] text-rose-400 text-center font-semibold">Username</p>
           )}
 
           <div className="flex items-center gap-3 py-1">
