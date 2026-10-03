@@ -220,44 +220,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Cloudflare is authoritative for profile media. Local data is only a
       // fallback, so an old image from another browser must not briefly replace
       // the newer server version after a refresh.
-      const [cachedMedia, remoteMedia] = await Promise.all([
+      void Promise.all([
         storage.getProfileMediaBackup(sessionUser.id).catch(() => null),
         cloudSync.fetchUserMedia(sessionUser.id).catch(() => ({} as Partial<User>)),
-      ]);
-      if (!active) return;
+      ]).then(([cachedMedia, remoteMedia]) => {
+        if (!active) return;
 
-      const hasRemoteAvatar = Object.prototype.hasOwnProperty.call(remoteMedia, 'avatar');
-      const hasRemoteBanner = Object.prototype.hasOwnProperty.call(remoteMedia, 'banner');
-      const avatar = hasRemoteAvatar ? remoteMedia.avatar : (sessionUser.avatar || cachedMedia?.avatar || cachedProfile?.avatar || DEFAULT_USER_AVATAR);
-      const banner = hasRemoteBanner ? remoteMedia.banner : (sessionUser.banner || cachedMedia?.banner || cachedProfile?.banner || '');
+        const hasRemoteAvatar = Object.prototype.hasOwnProperty.call(remoteMedia, 'avatar');
+        const hasRemoteBanner = Object.prototype.hasOwnProperty.call(remoteMedia, 'banner');
+        const avatar = hasRemoteAvatar ? remoteMedia.avatar : (sessionUser.avatar || cachedMedia?.avatar || cachedProfile?.avatar || DEFAULT_USER_AVATAR);
+        const banner = hasRemoteBanner ? remoteMedia.banner : (sessionUser.banner || cachedMedia?.banner || cachedProfile?.banner || '');
 
-      const profile = {
-        ...sessionUser,
-        ...(cachedProfile || {}),
-        // Never let cachedProfile overwrite newer server media.
-        avatar,
-        banner,
-        profileColor: sessionUser.profileColor ?? cachedProfile?.profileColor,
-        displayNameColor: sessionUser.displayNameColor ?? cachedProfile?.displayNameColor,
-        bio: sessionUser.bio || cachedProfile?.bio || '',
-        status: sessionUser.status || cachedProfile?.status || 'online' as UserStatus,
-        customStatus: sessionUser.customStatus || cachedProfile?.customStatus || '',
-        badges: sessionUser.badges || cachedProfile?.badges || ['Member'],
-        karma: sessionUser.karma ?? cachedProfile?.karma ?? 0,
-        joinedDate: sessionUser.joinedDate || cachedProfile?.joinedDate || 'Joined today',
-        followersCount: sessionUser.followersCount ?? cachedProfile?.followersCount ?? 0,
-        followingCount: sessionUser.followingCount ?? cachedProfile?.followingCount ?? 0,
-        isFollowing: sessionUser.isFollowing ?? cachedProfile?.isFollowing ?? false,
-      };
-      setUsers((previous) => previous.some((user) => user.id === profile.id) ? previous.map((user) => user.id === profile.id ? profile : user) : [profile, ...previous]);
-      setCurrentUser(profile);
+        const profile = {
+          ...sessionUser,
+          ...(cachedProfile || {}),
+          // Never let cachedProfile overwrite newer server media.
+          avatar,
+          banner,
+          profileColor: sessionUser.profileColor ?? cachedProfile?.profileColor,
+          displayNameColor: sessionUser.displayNameColor ?? cachedProfile?.displayNameColor,
+          bio: sessionUser.bio || cachedProfile?.bio || '',
+          status: sessionUser.status || cachedProfile?.status || 'online' as UserStatus,
+          customStatus: sessionUser.customStatus || cachedProfile?.customStatus || '',
+          badges: sessionUser.badges || cachedProfile?.badges || ['Member'],
+          karma: sessionUser.karma ?? cachedProfile?.karma ?? 0,
+          joinedDate: sessionUser.joinedDate || cachedProfile?.joinedDate || 'Joined today',
+          followersCount: sessionUser.followersCount ?? cachedProfile?.followersCount ?? 0,
+          followingCount: sessionUser.followingCount ?? cachedProfile?.followingCount ?? 0,
+          isFollowing: sessionUser.isFollowing ?? cachedProfile?.isFollowing ?? false,
+        };
+        setUsers((previous) => previous.some((user) => user.id === profile.id) ? previous.map((user) => user.id === profile.id ? profile : user) : [profile, ...previous]);
+        setCurrentUser(profile);
 
-      if (hasRemoteAvatar || hasRemoteBanner) {
-        void storage.saveProfileMediaBackup(sessionUser.id, {
-          avatar: hasRemoteAvatar ? remoteMedia.avatar : avatar,
-          banner: hasRemoteBanner ? remoteMedia.banner : banner,
-        });
-      }
+        if (hasRemoteAvatar || hasRemoteBanner) {
+          void storage.saveProfileMediaBackup(sessionUser.id, {
+            avatar: hasRemoteAvatar ? remoteMedia.avatar : avatar,
+            banner: hasRemoteBanner ? remoteMedia.banner : banner,
+          });
+        }
+      });
     }).catch(() => {
       if (active) setCurrentUser(null);
     });
