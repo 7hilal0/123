@@ -226,9 +226,14 @@ export const UserProfileView: React.FC = () => {
             <span>{t.followers}</span>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <Calendar className="w-4 h-4 text-neutral-500" />
-            <span>{t.joinedDate}: {displayUser.joinedDate}</span>
+          <div className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
+              <Calendar className="w-4 h-4 text-emerald-400" />
+            </span>
+            <span className="flex flex-col leading-tight">
+              <span className="text-[11px] font-medium text-neutral-500">${t.joinedDate}</span>
+              <span className="text-sm font-semibold text-neutral-200">${displayUser.joinedDate}</span>
+            </span>
           </div>
         </div>
 
