@@ -205,10 +205,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-[#080a0d] text-start">
-      <div className="mx-auto min-h-screen w-full max-w-5xl bg-[#0d1014] shadow-2xl">
+    <div className="fixed inset-0 z-50 w-screen max-w-full overflow-x-hidden overflow-y-auto bg-[#080a0d] text-start">
+      <div className="mx-auto min-h-screen w-full min-w-0 max-w-5xl overflow-x-hidden bg-[#0d1014] shadow-2xl">
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/10 bg-[#0d1014]/95 px-4 backdrop-blur-xl sm:px-8">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
               onClick={() => { if (!saving) onClose(); }}
@@ -218,9 +218,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
             >
               <BackIcon className="h-5 w-5" />
             </button>
-            <div>
-              <h1 className="text-sm font-bold text-white sm:text-base">{t.editProfile}</h1>
-              <p className="text-[11px] text-neutral-500">Customize your public profile</p>
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-bold text-white sm:text-base">{t.editProfile}</h1>
+              <p className="truncate text-[11px] text-neutral-500">Customize your public profile</p>
             </div>
           </div>
           <button
@@ -246,10 +246,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
               <button
                 type="button"
                 onClick={() => bannerInputRef.current?.click()}
-                className="absolute end-4 top-4 flex items-center gap-2 rounded-xl border border-white/20 bg-black/55 px-3 py-2 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/75"
+                className="absolute end-3 top-3 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-xl border border-white/20 bg-black/55 px-3 py-2 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/75 sm:end-4 sm:top-4"
               >
                 <Camera className="h-4 w-4" />
-                {t.bannerUpload}
+                  <span className="truncate">{t.bannerUpload}</span>
               </button>
               <input
                 ref={bannerInputRef}
@@ -292,8 +292,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
             </div>
           </section>
 
-          <div className="mx-auto grid max-w-4xl gap-6 px-4 pb-12 pt-8 sm:px-8 lg:grid-cols-[minmax(0,1fr)_280px]">
-            <div className="space-y-5">
+          <div className="mx-auto grid min-w-0 max-w-4xl gap-6 px-3 pb-12 pt-8 sm:px-8 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="min-w-0 space-y-5">
               {/* Thumbnail & Avatar Library Section */}
               <section className="rounded-2xl border p-4 sm:p-5" style={{ borderColor: `${profileColor}38`, backgroundColor: `${profileColor}0b` }}>
                 <div className="mb-3.5 flex items-center justify-between">
@@ -412,7 +412,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
               </section>
             </div>
 
-            <aside className="space-y-5">
+            <aside className="min-w-0 space-y-5">
               <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-4 sm:p-5">
                 <h3 className="mb-3 text-sm font-bold text-white">Presence</h3>
                 <select
@@ -430,13 +430,13 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
           </div>
 
           <footer className="sticky bottom-0 z-20 border-t border-white/10 bg-[#0d1014]/95 px-4 py-3 backdrop-blur-xl sm:px-8">
-            <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
+            <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
               <p className="hidden text-xs text-neutral-500 sm:block">Changes are saved to your profile.</p>
-              <div className="ms-auto flex items-center gap-2">
+              <div className="ms-auto flex max-w-full items-center gap-2">
                 <button type="button" onClick={onClose} className="rounded-xl px-4 py-2.5 text-xs font-semibold text-neutral-400 transition hover:bg-white/10 hover:text-white">
                   {t.cancel}
                 </button>
-                <button type="submit" disabled={saving} className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-wait disabled:opacity-60" style={{ backgroundColor: profileColor, boxShadow: `0 10px 28px ${profileColor}45` }}>
+                <button type="submit" disabled={saving} className="flex max-w-full items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-wait disabled:opacity-60 sm:px-4" style={{ backgroundColor: profileColor, boxShadow: `0 10px 28px ${profileColor}45` }}>
                   <Save className={`h-4 w-4 ${saving ? 'animate-pulse' : ''}`} />
                   {saving ? (dir === 'rtl' ? 'جارٍ الحفظ...' : 'Saving...') : t.saveChanges}
                 </button>
