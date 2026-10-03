@@ -597,7 +597,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubscribe = cloudSync.subscribeNotifications(currentUser.id, (remote) => {
       setNotifications((previous) => {
         const merged = new Map(previous.map((item) => [item.id, item]));
-        remote.forEach((item) => merged.set(item.id, { ...merged.get(item.id), ...item }));
+        remote.forEach((item) => {
+          const previous = merged.get(item.id);
+          // Read state is sticky: once the user has read a notification, a stale
+          // remote poll must not turn it back into unread.
+          merged.set(item.id, {
+            ...previous,
+            ...item,
+            isRead: Boolean(previous?.isRead || item.isRead),
+          });
+        });
         return Array.from(merged.values())
           .sort((a, b) => b.id.localeCompare(a.id))
           .slice(0, 100);
@@ -1320,7 +1329,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Notifications
   const markAllNotificationsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setNotifications((prev) => {
+      const updated = prev.map((n) => ({ ...n, isRead: true }));
+      // Persist the read state remotely so it survives refreshes and other devices.
+      updated.forEach((notification) => {
+        void cloudSync.saveNotification(notification).catch((error) =>
+          console.error('[Cloudflare] Failed to persist notification read state:', error)
+        );
+      });
+      return updated;
+    });
     showToast(
       language === 'ar' ? 'تم تحديد جميع الإشعارات كمقروءة' : 'All notifications marked as read',
       'info'
@@ -1328,9 +1346,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const markNotificationRead = (notificationId: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
-    );
+    setNotifications((prev) => {
+      const updated = prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n));
+      const notification = updated.find((n) => n.id === notificationId);
+      if (notification) {
+        void cloudSync.saveNotification(notification).catch((error) =>
+          console.error('[Cloudflare] Failed to persist notification read state:', error)
+        );
+      }
+      return updated;
+    });
   };
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
