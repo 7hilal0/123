@@ -25,16 +25,12 @@ async function saveMediaBatch(rows: ProfileMediaChunk[]): Promise<void> {
   }
   throw lastError instanceof Error ? lastError : new Error('Profile media batch upload failed');
 }
-async function listRows<T>(type?: EntityType, ownerId?: string) {
-  try {
-    const res = await cloudflareApi.listEntities(type, ownerId);
-    return Array.isArray(res?.items) ? res.items : [];
-  } catch {
-    return [];
-  }
+async function listRows<T>(type?: EntityType, ownerId?: string, extra: Record<string, string> = {}) {
+  const res = await cloudflareApi.listEntities(type, ownerId, extra);
+  return Array.isArray(res?.items) ? res.items : [];
 }
-async function fetchType<T>(type: EntityType, predicate?: (value: T) => boolean): Promise<T[]> {
-  const rows = await listRows(type);
+async function fetchType<T>(type: EntityType, predicate?: (value: T) => boolean, ownerId?: string, extra: Record<string, string> = {}): Promise<T[]> {
+  const rows = await listRows(type, ownerId, extra);
   const values = (rows || [])
     .map((row) => (row && row.payload ? parse<T>(row.payload) : null))
     .filter((value): value is T => Boolean(value));
@@ -248,8 +244,13 @@ export const cloudSync = {
   // A failed poll must not be converted into []: that would erase the cached
   // feed and make all posts appear to disappear during a brief network error.
   subscribePosts(callback: (posts: Post[]) => void) { return subscribePoll(() => this.fetchPosts(), callback, 'posts'); },
-  saveComment: (postId: string, comment: Comment) => saveEntity('comment', { ...comment, postId } as Comment & { postId: string }, postId),
-  async deleteComments(postId: string, commentIds: string[]): Promise<boolean> { try { for (const commentId of commentIds) await saveEntity('comment', { id: commentId, postId, deleted: true, deletedAt: Date.now() } as unknown as Comment, postId); return true; } catch { return false; } },
+  saveComment: (postId: string, comment: Comment) => saveEntity('comment', { ...comment, postId } as Comment & { postId: string }, comment.author?.id),
+  async deleteComments(postId: string, commentIds: string[]): Promise<boolean> {
+    try {
+      for (const commentId of commentIds) await saveEntity('comment', { id: commentId, postId, deleted: true, deletedAt: Date.now(), author: { id: commentIds.length ? undefined : undefined } } as unknown as Comment, undefined);
+      return true;
+    } catch { return false; }
+  },
   deleteComment(postId: string, commentId: string) { return this.deleteComments(postId, [commentId]); },
   async fetchComments(postId: string) { const comments = await fetchType<Comment & { postId?: string }>('comment', (comment) => comment.postId === postId); return comments.filter((comment) => !(comment as Comment & { deleted?: boolean }).deleted); },
   saveConversation: (conversation: Conversation) => {
@@ -264,13 +265,16 @@ export const cloudSync = {
       lastSenderId: conversation.lastSenderId,
       unreadCount: conversation.unreadCount || 0,
     } as Conversation;
-    return saveEntity('conversation', compactConversation, conversation.participantIds?.[0]);
+    return saveEntity('conversation', compactConversation, undefined);
   },
   fetchConversations: (userId: string) => fetchType<Conversation>('conversation', (conversation) => Boolean(conversation.participantIds?.includes(userId) || conversation.id.includes(userId) || conversation.participant?.id === userId)),
   subscribeConversations(userId: string, callback: (items: Conversation[]) => void) { return subscribePoll(() => this.fetchConversations(userId), callback, 'conversations'); },
-  saveDirectMessage: (conversationId: string, message: DirectMessage) => saveEntity('message', { ...message, conversationId } as DirectMessage & { conversationId: string }, conversationId),
-  async fetchMessages(conversationId: string) { const messages = await fetchType<DirectMessage & { conversationId?: string }>('message', (message) => message.conversationId === conversationId); return messages.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); },
+  saveDirectMessage: (conversationId: string, message: DirectMessage) => saveEntity('message', { ...message, conversationId } as DirectMessage & { conversationId: string }, message.senderId),
+  async fetchMessages(conversationId: string) {
+    const messages = await fetchType<DirectMessage & { conversationId?: string }>('message', undefined, undefined, { conversationId });
+    return messages.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  },
   subscribeMessages(conversationId: string, callback: (items: DirectMessage[]) => void) { return subscribePoll(() => this.fetchMessages(conversationId), callback, 'messages'); },
   saveNotification: (notification: NotificationItem) => saveEntity('notification', notification, notification.recipientId),
-  subscribeNotifications(userId: string, callback: (items: NotificationItem[]) => void) { return subscribePoll(() => fetchType<NotificationItem>('notification', (notification) => notification.recipientId === userId), callback, 'notifications'); },
+  subscribeNotifications(userId: string, callback: (items: NotificationItem[]) => void) { return subscribePoll(() => fetchType<NotificationItem>('notification', undefined, userId), callback, 'notifications'); },
 };
