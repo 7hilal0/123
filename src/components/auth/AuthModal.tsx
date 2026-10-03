@@ -264,13 +264,11 @@ export const AuthModal: React.FC = () => {
             <p className="text-[11px] text-neutral-400 text-center">Choose your username and display name, then continue with Google.</p>
           )}
 
-          {mode === 'login' && (
-            <div className="flex items-center gap-3 py-1">
-              <span className="h-px flex-1 bg-white/10" />
-              <span className="text-[11px] text-neutral-500">OR</span>
-              <span className="h-px flex-1 bg-white/10" />
-            </div>
-          )}
+          <div className="flex items-center gap-3 py-1">
+            <span className="h-px flex-1 bg-white/10" />
+            <span className="text-[11px] text-neutral-500">OR</span>
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
 
           <div className={googleBusy ? 'opacity-60 pointer-events-none' : ''}>
             <div ref={googleButtonRef} className="w-full flex justify-center min-h-[40px] overflow-hidden rounded-xl" />
