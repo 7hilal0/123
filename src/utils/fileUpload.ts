@@ -33,7 +33,7 @@ export const readImageFile = (
           cropSquare: false,
           maxFrames: 36,
           maxColors: 128,
-        }).then(resolve).catch(() => resolve(result));
+        }).then(resolve).catch(reject);
         return;
       }
 
@@ -107,7 +107,7 @@ export const createSquareThumbnail = (
             maxColors: 128,
           }))
           .then(resolve)
-          .catch(() => resolve(dataUrl));
+          .catch(reject);
         return;
       }
 
