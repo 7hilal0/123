@@ -14,6 +14,8 @@ export const AuthModal: React.FC = () => {
     register,
     t,
     dir,
+    language,
+    setLanguage,
   } = useApp();
 
   const [mode, setMode] = useState<'login' | 'register'>(authModalMode || 'login');
@@ -42,8 +44,8 @@ export const AuthModal: React.FC = () => {
           setGoogleBusy(true);
           setErrorMessage('');
           try { if (mode === 'register') {
-            if (!username.trim() || !displayName.trim()) {
-              setErrorMessage('Enter your username and display name first, then continue with Google.');
+            if (!username.trim()) {
+              setErrorMessage('Enter your username first, then continue with Google.');
               return;
             }
             if (username.trim().replace(/[^a-zA-Z0-9_]/g, '').length < 3) {
@@ -51,7 +53,7 @@ export const AuthModal: React.FC = () => {
               return;
             }
           }
-          await googleLogin(response.credential, mode === 'register' ? { username: username.trim(), displayName: displayName.trim() } : undefined); }
+          await googleLogin(response.credential, mode === 'register' ? { username: username.trim(), ...(displayName.trim() ? { displayName: displayName.trim() } : {}) } : undefined); }
           finally { if (!cancelled) setGoogleBusy(false); }
         },
         ux_mode: 'popup',
@@ -61,8 +63,8 @@ export const AuthModal: React.FC = () => {
       googleButton.className = 'w-full min-h-[44px] rounded-xl bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold text-sm flex items-center justify-center gap-2.5 transition-colors shadow-sm';
       googleButton.innerHTML = '<span style="background:white;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#4285F4;font-size:16px;">G</span><span>تسجيل الدخول باستخدام Google</span>';
       googleButton.addEventListener('click', () => {
-        if (mode === 'register' && (!username.trim() || !displayName.trim())) {
-          setErrorMessage('Enter your username and display name first, then continue with Google.');
+        if (mode === 'register' && !username.trim()) {
+          setErrorMessage('Enter your username first, then continue with Google.');
           return;
         }
         (window as any).google.accounts.id.prompt();
@@ -163,12 +165,24 @@ export const AuthModal: React.FC = () => {
             </div>
           </div>
 
-          <button
-            onClick={() => setAuthModalOpen(false)}
-            className="text-neutral-400 hover:text-white p-1 rounded-lg"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as 'en' | 'ar' | 'fr')}
+              aria-label="Language"
+              className="bg-neutral-800 border border-white/10 text-neutral-200 text-xs rounded-lg px-2 py-1.5 outline-none focus:ring-1 focus:ring-emerald-500"
+            >
+              <option value="en">EN</option>
+              <option value="ar">العربية</option>
+              <option value="fr">FR</option>
+            </select>
+            <button
+              onClick={() => setAuthModalOpen(false)}
+              className="text-neutral-400 hover:text-white p-1 rounded-lg"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Mode switcher tabs */}
