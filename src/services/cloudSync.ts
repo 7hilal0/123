@@ -247,7 +247,7 @@ export const cloudSync = {
   saveComment: (postId: string, comment: Comment) => saveEntity('comment', { ...comment, postId } as Comment & { postId: string }, comment.author?.id),
   async deleteComments(postId: string, commentIds: string[]): Promise<boolean> {
     try {
-      for (const commentId of commentIds) await saveEntity('comment', { id: commentId, postId, deleted: true, deletedAt: Date.now(), author: { id: commentIds.length ? undefined : undefined } } as unknown as Comment, undefined);
+      for (const commentId of commentIds) await saveEntity('comment', { id: commentId, postId, deleted: true, deletedAt: Date.now() } as unknown as Comment, undefined);
       return true;
     } catch { return false; }
   },
