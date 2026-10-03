@@ -101,6 +101,9 @@ export const cloudSync = {
             await saveMediaBatch(rows.slice(index, index + 20));
             await pause(100);
           }
+
+          // Only remove old versions after every chunk of the new version is stored.
+          await cloudflareApi.cleanupProfileMedia(item.field, mediaVersion);
         }
       } catch (err) {
         console.warn('[Cloudflare] Media chunks backup warning:', err);
