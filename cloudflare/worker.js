@@ -596,7 +596,28 @@ export default {
             let authorId = null;
             try { authorId = JSON.parse(existing?.payload || '{}').author?.id; } catch {}
             if (!existing || authorId !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
-          } else if (entityId !== payload.id || payload.author?.id !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
+          } else {
+            if (entityId !== payload.id) return json({ error: 'forbidden_entity' }, 403, origin);
+
+            // A post author may update the full post. Other users may only
+            // change their own vote; they must never be able to rewrite the
+            // post's title/content/author by calling savePost.
+            const existingPost = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'post' AND entity_id = ? AND deleted = 0").bind(entityId).first();
+            if (!existingPost?.payload) return json({ error: 'post_not_found' }, 404, origin);
+
+            let existingAuthorId = null;
+            try { existingAuthorId = JSON.parse(existingPost.payload)?.author?.id || null; } catch {}
+            if (existingAuthorId !== user.id) {
+              const currentPost = JSON.parse(existingPost.payload);
+              payload = {
+                ...currentPost,
+                votes: payload.votes || {},
+                voteState: payload.voteState || {},
+              };
+            } else if (payload.author?.id !== user.id) {
+              return json({ error: 'forbidden_entity' }, 403, origin);
+            }
+          }
         }
         if (type === 'comment') {
           const existing = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'comment' AND entity_id = ?").bind(entityId).first();
