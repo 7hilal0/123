@@ -178,9 +178,14 @@ export const Sidebar: React.FC = () => {
                   : 'text-neutral-300 hover:bg-white/5 hover:text-white'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <User className="w-4 h-4" />
-                <span>{t.navProfile}</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <Avatar
+                  src={currentUser.avatar}
+                  alt={currentUser.displayName}
+                  size="xs"
+                  className="ring-1 ring-white/10"
+                />
+                <span className="truncate">{t.navProfile}</span>
               </div>
             </button>
           )}
