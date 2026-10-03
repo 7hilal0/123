@@ -3,6 +3,7 @@ import { Post } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { cloudSync } from '../../services/cloudSync';
 import { Avatar } from '../common/Avatar';
+import { formatRelativeTime } from '../../utils/relativeTime';
 import { DEFAULT_USER_AVATAR } from '../../utils/avatarConstants';
 import { VotesBreakdownModal } from './VotesBreakdownModal';
 import {
@@ -308,7 +309,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
             )}
 
             <span aria-hidden="true" className="text-neutral-600">·</span>
-            <span className="text-[11px] text-neutral-400">{post.createdAt}</span>
+            <span className="text-[11px] text-neutral-400">{formatRelativeTime(post.timestamp, language, post.createdAt)}</span>
 
             {post.isPinned && (
               <>
