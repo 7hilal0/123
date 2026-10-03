@@ -119,12 +119,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
     const file = event.target.files?.[0];
     if (!file) return;
     try {
-      const src = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error('فشل قراءة الصورة'));
-        reader.readAsDataURL(file);
-      });
+      const src = await readImageFile(file, target === 'avatar' ? 720 : 1400, 0.85);
       setImageZoom(1);
       setImageRotation(0);
       setImageOffset({ x: 0, y: 0 });

@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { PRESET_AVATARS, PresetThumbnail, DEFAULT_USER_AVATAR } from '../../utils/avatarConstants';
 import { createSquareThumbnail } from '../../utils/fileUpload';
 import { useApp } from '../../context/AppContext';
-import { Upload, Check, Sparkles, Filter, RefreshCw, Image as ImageIcon } from 'lucide-react';
+import { Upload, Check, Sparkles, RefreshCw } from 'lucide-react';
 
 interface ThumbnailSelectorProps {
   selectedUrl: string;
@@ -20,6 +20,7 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
   const { language, showToast } = useApp();
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [uploading, setUploading] = useState<boolean>(false);
+  const [processingGif, setProcessingGif] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const categories = [
@@ -41,11 +42,14 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
     if (!file) return;
 
     setUploading(true);
+    setProcessingGif(file.type === 'image/gif');
     try {
       const squareThumb = await createSquareThumbnail(file, 256, 0.88);
       onSelect(squareThumb);
       showToast(
-        language === 'ar' ? 'تم اختيار الصورة المصغرة بنجاح!' : 'Thumbnail selected successfully!',
+        language === 'ar'
+          ? (file.type === 'image/gif' ? 'تم ضغط GIF وحفظ حركته بنجاح!' : 'تم ضغط الصورة واختيارها بنجاح!')
+          : (file.type === 'image/gif' ? 'GIF optimized with animation preserved!' : 'Image optimized successfully!'),
         'success'
       );
     } catch (err: any) {
@@ -55,6 +59,7 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
       );
     } finally {
       setUploading(false);
+      setProcessingGif(false);
       if (e.target) e.target.value = '';
     }
   };
@@ -83,11 +88,14 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
                 : (language === 'ar' ? 'صورة مصغرة مخصصة' : 'Custom Thumbnail')}
             </span>
           </div>
-          <p className="text-[11px] text-neutral-400 mt-0.5">
+          <p className="mt-0.5 text-[11px] text-neutral-400">
             {language === 'ar'
               ? 'تظهر لجميع المستخدمين في المنشورات والتعليقات'
               : 'Visible to everyone in posts, comments and profile'}
           </p>
+          <span className="mt-1 inline-flex rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+            {language === 'ar' ? '256px • ضغط تلقائي • GIF متحرك' : '256px • auto-compressed • animated GIF'}
+          </span>
         </div>
 
         {/* Upload Custom Button */}
@@ -110,7 +118,7 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
             ) : (
               <Upload className="w-3.5 h-3.5" />
             )}
-            <span>{language === 'ar' ? 'رفع صورة' : 'Upload'}</span>
+            <span>{processingGif ? (language === 'ar' ? 'جارٍ ضغط GIF...' : 'Optimizing GIF...') : (language === 'ar' ? 'رفع صورة' : 'Upload')}</span>
           </button>
         </div>
       </div>

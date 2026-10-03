@@ -4,6 +4,8 @@
  * to ensure smooth storage in localStorage and instant client-side preview.
  */
 
+import { createAnimatedGifThumbnail } from './gifThumbnail';
+
 export const readImageFile = (
   file: File,
   maxDimension = 1200,
@@ -25,10 +27,17 @@ export const readImageFile = (
         return;
       }
 
-      // Never draw GIFs on a canvas: that would keep only the first frame.
-      // Returning the original data URL preserves the animation for avatars
-      // and banners while still allowing regular images to be optimized.
-      if (file.type === 'image/gif' || file.type === 'image/svg+xml' || file.size < 80 * 1024) {
+      if (file.type === 'image/gif') {
+        createAnimatedGifThumbnail(file, {
+          size: Math.min(maxDimension, 720),
+          cropSquare: false,
+          maxFrames: 36,
+          maxColors: 128,
+        }).then(resolve).catch(() => resolve(result));
+        return;
+      }
+
+      if (file.type === 'image/svg+xml' || file.size < 80 * 1024) {
         resolve(result);
         return;
       }
@@ -86,6 +95,19 @@ export const createSquareThumbnail = (
     const processDataUrl = (dataUrl: string) => {
       if (dataUrl.startsWith('data:image/svg+xml')) {
         resolve(dataUrl);
+        return;
+      }
+
+      if (dataUrl.startsWith('data:image/gif')) {
+        fetch(dataUrl)
+          .then((response) => response.blob())
+          .then((blob) => createAnimatedGifThumbnail(new File([blob], 'thumbnail.gif', { type: 'image/gif' }), {
+            size: targetSize,
+            maxFrames: 36,
+            maxColors: 128,
+          }))
+          .then(resolve)
+          .catch(() => resolve(dataUrl));
         return;
       }
 
