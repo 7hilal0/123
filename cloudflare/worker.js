@@ -343,8 +343,11 @@ export default {
         if (!user) return json({ error: 'unauthorized' }, 401, origin);
         const body = await request.json();
         const entities = Array.isArray(body.entities) ? body.entities : [];
-        if (!entities.length || entities.length > 20 || entities.some((item) => item.entityType !== 'profileMedia' || !item.entityId || typeof item.payload !== 'string')) return json({ error: 'invalid_entity_batch' }, 400, origin);
-        const statements = entities.map((item) => env.DB.prepare('INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0').bind(item.entityType, item.entityId, item.ownerId || user.id, item.payload, Date.now()));
+        if (!entities.length || entities.length > 20 || entities.some((item) => {
+          if (item.entityType !== 'profileMedia' || item.ownerId !== user.id || !String(item.entityId || '').startsWith(`${user.id}:`) || typeof item.payload !== 'string') return true;
+          try { return JSON.parse(item.payload).userId !== user.id; } catch { return true; }
+        })) return json({ error: 'invalid_entity_batch' }, 400, origin);
+        const statements = entities.map((item) => env.DB.prepare('INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0').bind(item.entityType, item.entityId, user.id, item.payload, Date.now()));
         await env.DB.batch(statements);
         return json({ ok: true }, 200, origin);
       }
@@ -363,6 +366,13 @@ export default {
         if (!user) return json({ error: 'unauthorized' }, 401, origin);
         const body = await request.json();
         if (!body.entityType || !body.entityId || typeof body.payload !== 'string') return json({ error: 'invalid_entity' }, 400, origin);
+        if (body.entityType === 'profileMedia') {
+          if (body.ownerId !== user.id || !String(body.entityId).startsWith(`${user.id}:`)) return json({ error: 'forbidden_entity' }, 403, origin);
+          try {
+            if (JSON.parse(body.payload).userId !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
+          } catch { return json({ error: 'invalid_entity' }, 400, origin); }
+        }
+        if (body.entityType === 'user' && body.entityId !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
         const ownerId = body.ownerId || user.id;
         await env.DB.prepare('INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0').bind(body.entityType, body.entityId, ownerId, body.payload, Date.now()).run();
         if (body.entityType === 'user' && body.entityId === user.id) {
