@@ -999,7 +999,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!currentUser) { setAuthModalOpen(true, 'login'); return; }
     const community = communities.find((c) => c.slug === slug);
     if (!community) return;
-    void cloudflareApi.setCommunityMembership(community.id, true).then(() => {
+    void cloudflareApi.setCommunityMembership(community.id, true).then((result) => {
+      if (!result.changed) return;
       setCommunities((prev) => prev.map((c) => c.id === community.id ? { ...c, isMember: true, memberCount: c.memberCount + 1 } : c));
       showToast(language === 'ar' ? `انضممت إلى مجتمع ${community.name}` : `Joined ${community.name}`, 'success');
     }).catch(() => showToast(language === 'ar' ? 'تعذر الانضمام إلى المجتمع' : 'Could not join the community', 'warning'));
@@ -1009,7 +1010,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!currentUser) { setAuthModalOpen(true, 'login'); return; }
     const community = communities.find((c) => c.slug === slug);
     if (!community) return;
-    void cloudflareApi.setCommunityMembership(community.id, false).then(() => {
+    void cloudflareApi.setCommunityMembership(community.id, false).then((result) => {
+      if (!result.changed) return;
       setCommunities((prev) => prev.map((c) => c.id === community.id ? { ...c, isMember: false, memberCount: Math.max(0, c.memberCount - 1) } : c));
       showToast(language === 'ar' ? `غادرت مجتمع ${community.name}` : `Left ${community.name}`, 'info');
     }).catch(() => showToast(language === 'ar' ? 'تعذر مغادرة المجتمع' : 'Could not leave the community', 'warning'));
