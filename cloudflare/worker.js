@@ -58,6 +58,52 @@ async function verifyPassword(password, stored) {
   return actual === expected;
 }
 
+let googleJwksCache = null;
+
+function base64UrlToBytes(value) {
+  const normalized = String(value).replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4);
+  return Uint8Array.from(atob(padded), (char) => char.charCodeAt(0));
+}
+
+function base64UrlToJson(value) {
+  return JSON.parse(new TextDecoder().decode(base64UrlToBytes(value)));
+}
+
+async function verifyGoogleCredential(token, clientId) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 3) throw new Error('invalid_google_token');
+  const [encodedHeader, encodedPayload, encodedSignature] = parts;
+  const header = base64UrlToJson(encodedHeader);
+  const claims = base64UrlToJson(encodedPayload);
+  if (header.alg !== 'RS256' || !header.kid) throw new Error('invalid_google_token');
+  if (claims.iss !== 'https://accounts.google.com' && claims.iss !== 'accounts.google.com') throw new Error('invalid_google_issuer');
+  if (claims.aud !== clientId) throw new Error('invalid_google_audience');
+  if (!claims.sub || !claims.email || claims.email_verified !== true) throw new Error('unverified_google_account');
+  if (!claims.exp || Number(claims.exp) * 1000 <= Date.now()) throw new Error('expired_google_token');
+
+  const now = Date.now();
+  if (!googleJwksCache || googleJwksCache.expiresAt <= now) {
+    const response = await fetch('https://www.googleapis.com/oauth2/v3/certs');
+    if (!response.ok) throw new Error('google_keys_unavailable');
+    const cacheControl = response.headers.get('cache-control') || '';
+    const match = cacheControl.match(/max-age=(\d+)/i);
+    const maxAge = match ? Number(match[1]) : 3600;
+    googleJwksCache = { keys: await response.json(), expiresAt: now + Math.min(Math.max(maxAge, 300), 86400) * 1000 };
+  }
+  const jwk = (googleJwksCache.keys.keys || []).find((key) => key.kid === header.kid);
+  if (!jwk) { googleJwksCache = null; throw new Error('google_key_not_found'); }
+  const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+  const valid = await crypto.subtle.verify(
+    { name: 'RSASSA-PKCS1-v1_5' },
+    key,
+    base64UrlToBytes(encodedSignature),
+    new TextEncoder().encode(encodedHeader + '.' + encodedPayload),
+  );
+  if (!valid) throw new Error('invalid_google_signature');
+  return claims;
+}
+
 function parseCookies(request) {
   return Object.fromEntries((request.headers.get('Cookie') || '').split(';').filter(Boolean).map((part) => {
     const index = part.indexOf('=');
@@ -285,6 +331,57 @@ export default {
       }
 
       if (url.pathname === '/api/auth/me' && request.method === 'GET') return json({ user: cleanUser(await currentUser(request, env)) }, 200, origin);
+      if (url.pathname === '/api/auth/google' && request.method === 'POST') {
+        const body = await request.json();
+        const claims = await verifyGoogleCredential(String(body.credential || ''), '991149566827-l73oec1hjpu6jb21hftr4a2e1gille3m.apps.googleusercontent.com');
+        const email = String(claims.email).trim().toLowerCase();
+        const googleSub = String(claims.sub);
+        const displayName = String(claims.name || email.split('@')[0] || 'Google User').trim().slice(0, 80);
+        const picture = String(claims.picture || '');
+
+        let row = await env.DB.prepare("SELECT id, username, email, password_hash, profile_json FROM auth_users WHERE lower(email) = ? LIMIT 1").bind(email).first();
+        if (!row) row = await env.DB.prepare("SELECT id, username, email, password_hash, profile_json FROM auth_users WHERE json_extract(profile_json, '$.googleSub') = ? LIMIT 1").bind(googleSub).first();
+
+        if (row) {
+          const profile = { ...JSON.parse(row.profile_json), googleSub };
+          if (!profile.email) profile.email = email;
+          if (!profile.displayName) profile.displayName = displayName;
+          if (!profile.avatar && picture) profile.avatar = picture;
+          await env.DB.prepare('UPDATE auth_users SET profile_json = ? WHERE id = ?').bind(JSON.stringify(profile), row.id).run();
+          await env.DB.prepare("UPDATE entities SET payload = ?, updated_at = ?, deleted = 0 WHERE entity_type = 'user' AND entity_id = ?").bind(JSON.stringify(profile), Date.now(), row.id).run().catch(() => {});
+          const activeBan = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'adminBan' AND entity_id = ? AND deleted = 0").bind(row.id).first();
+          if (activeBan) {
+            const ban = JSON.parse(activeBan.payload);
+            if (!ban.expiresAt || ban.expiresAt > Date.now()) return json({ error: 'account_banned' }, 403, origin);
+          }
+          const session = await createSession(row.id, env);
+          return json({ user: cleanUser({ ...profile, id: row.id, username: row.username, email: row.email || email }) }, 200, origin, { 'set-cookie': cookie(session.token, SESSION_DAYS * 86400) });
+        }
+
+        const base = ('google_' + googleSub).toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 32) || 'google_user';
+        let username = base;
+        let suffix = 1;
+        while (await env.DB.prepare('SELECT id FROM auth_users WHERE lower(username) = ?').bind(username).first()) {
+          const tail = String(suffix++);
+          username = (base.slice(0, 32 - tail.length) + tail).slice(0, 32);
+        }
+
+        const id = crypto.randomUUID();
+        const profile = { id, username, displayName, email, avatar: picture, banner: '', profileColor: '', displayNameColor: '', bio: '', status: 'online', customStatus: '', badges: ['Member'], karma: 0, joinedDate: new Date().toISOString(), followersCount: 0, followingCount: 0, isFollowing: false, googleSub };
+
+        try {
+          const unusablePassword = crypto.randomUUID() + crypto.randomUUID();
+          await env.DB.prepare('INSERT INTO auth_users (id, username, email, password_hash, profile_json, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(id, username, email, await hashPassword(unusablePassword), JSON.stringify(profile), Date.now()).run();
+          await env.DB.prepare('INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0)').bind('user', id, id, JSON.stringify(profile), Date.now()).run();
+        } catch (error) {
+          const message = String(error?.message || '');
+          if (message.includes('UNIQUE')) return json({ error: 'already_registered' }, 409, origin);
+          throw error;
+        }
+
+        const session = await createSession(id, env);
+        return json({ user: cleanUser(profile) }, 201, origin, { 'set-cookie': cookie(session.token, SESSION_DAYS * 86400) });
+      }
       if (url.pathname === '/api/auth/register' && request.method === 'POST') {
         const body = await request.json();
         const username = String(body.username || '').trim().toLowerCase();
