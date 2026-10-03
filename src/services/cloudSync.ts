@@ -3,7 +3,7 @@ import { cloudflareApi } from './cloudflareApi';
 import { DEFAULT_USER_AVATAR } from '../utils/avatarConstants';
 
 const MEDIA_CHUNK_SIZE = 48_000;
-type EntityType = 'user' | 'community' | 'post' | 'comment' | 'conversation' | 'message' | 'notification' | 'profileMedia' | 'follow';
+type EntityType = 'user' | 'community' | 'communityMember' | 'post' | 'comment' | 'conversation' | 'message' | 'notification' | 'profileMedia' | 'follow';
 type ProfileMediaChunk = { id: string; userId: string; field: 'avatar' | 'banner'; index: number; total: number; value: string; mediaVersion?: string };
 type FollowRecord = { id: string; followerId: string; followingId: string; following: boolean };
 const userMediaCache = new Map<string, { value: Partial<User>; expiresAt: number }>();
@@ -206,7 +206,13 @@ export const cloudSync = {
     return request;
   },
   saveCommunity: (community: Community) => saveEntity('community', community),
-  fetchCommunities: () => fetchType<Community>('community'),
+  async fetchCommunities(currentUserId?: string) {
+    const communities = await fetchType<Community>('community');
+    if (!currentUserId) return communities.map((community) => ({ ...community, isMember: false }));
+    const memberships = await fetchType<{ communityId: string }>('communityMember', undefined, currentUserId);
+    const joined = new Set(memberships.map((membership) => membership.communityId));
+    return communities.map((community) => ({ ...community, isMember: joined.has(community.id) }));
+  },
   savePost: (post: Post) => saveEntity('post', post, post.author?.id),
   async deletePost(postId: string): Promise<boolean> { try { await saveEntity('post', { id: postId, deleted: true, deletedAt: Date.now() } as unknown as Post); return true; } catch { return false; } },
   async fetchPosts(): Promise<Post[]> {
