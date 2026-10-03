@@ -57,7 +57,7 @@ export const AuthModal: React.FC = () => {
         ux_mode: 'popup',
       });
       (window as any).google.accounts.id.renderButton(googleButtonRef.current, {
-        type: 'standard', theme: 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', width: Math.min(320, Math.max(220, window.innerWidth - 80)), logo_alignment: 'center', locale: 'ar',
+        type: 'standard', theme: 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', width: Math.min(400, Math.max(220, googleButtonRef.current?.clientWidth || 320)), logo_alignment: 'center', locale: 'ar',
       });
     };
     const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]') as HTMLScriptElement | null;
@@ -249,63 +249,28 @@ export const AuthModal: React.FC = () => {
             </div>
           </div>
 
-          {mode === 'register' && (
-            <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
-                {t.email} <span className="text-rose-400">*</span>
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-neutral-500 absolute start-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="email"
-                  required
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-neutral-950 border border-white/10 rounded-xl ps-10 pe-3.5 py-2.5 text-xs md:text-sm text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-start"
-                />
-              </div>
-            </div>
+          {mode === 'login' && (
+            <button
+              type="submit"
+              disabled={verificationBusy || googleBusy}
+              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-60 disabled:cursor-wait text-white font-semibold text-xs md:text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer"
+            >
+              <span>{t.loginBtn}</span>
+              <SubmitArrow className="w-4 h-4" />
+            </button>
           )}
 
-          {/* Password */}
-          <div>
-            <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
-              {t.password} <span className="text-rose-400">*</span>
-            </label>
-            <div className="relative">
-              <Lock className="w-4 h-4 text-neutral-500 absolute start-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="password"
-                required
-                placeholder="••••••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-neutral-950 border border-white/10 rounded-xl ps-10 pe-3.5 py-2.5 text-xs md:text-sm text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-start"
-              />
-            </div>
-          </div>
-
-
-
-          <button
-            type="submit"
-            disabled={verificationBusy || googleBusy || mode === 'register'}
-            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-60 disabled:cursor-wait text-white font-semibold text-xs md:text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer"
-          >
-            <span>{mode === 'login' ? t.loginBtn : 'Create account with Google'}</span>
-            <SubmitArrow className="w-4 h-4" />
-          </button>
-
           {mode === 'register' && (
-            <p className="text-[11px] text-neutral-400 text-center">Enter your username and display name above, then use Google to create your account.</p>
+            <p className="text-[11px] text-neutral-400 text-center">Choose your username and display name, then continue with Google.</p>
           )}
 
-          <div className="flex items-center gap-3 py-1">
-            <span className="h-px flex-1 bg-white/10" />
-            <span className="text-[11px] text-neutral-500">OR</span>
-            <span className="h-px flex-1 bg-white/10" />
-          </div>
+          {mode === 'login' && (
+            <div className="flex items-center gap-3 py-1">
+              <span className="h-px flex-1 bg-white/10" />
+              <span className="text-[11px] text-neutral-500">OR</span>
+              <span className="h-px flex-1 bg-white/10" />
+            </div>
+          )}
 
           <div className={googleBusy ? 'opacity-60 pointer-events-none' : ''}>
             <div ref={googleButtonRef} className="w-full flex justify-center min-h-[40px] overflow-hidden rounded-xl" />
