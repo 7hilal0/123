@@ -536,6 +536,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  // Allow the admin panel to open a specific post directly with ?post=ID.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const postId = new URLSearchParams(window.location.search).get('post');
+    if (!postId) return;
+    navigateToPost(postId);
+    window.history.replaceState(window.history.state, '', window.location.pathname);
+  }, []);
+
   const navigateToProfile = (userId: string) => {
     setSelectedUserId(userId);
     setSelectedPostId(null);
