@@ -385,7 +385,66 @@ export default {
         return json({ user: cleanUser(profile) }, 201, origin, { 'set-cookie': cookie(session.token, SESSION_DAYS * 86400) });
       }
       if (url.pathname === '/api/auth/register' && request.method === 'POST') {
-        return json({ error: 'google_registration_required' }, 403, origin);
+        const body = await request.json();
+        const username = String(body.username || '').trim().toLowerCase();
+        const displayName = String(body.displayName || '').trim();
+        const email = String(body.email || '').trim().toLowerCase();
+        const password = String(body.password || '');
+
+        if (!/^[a-z0-9_]{3,32}$/.test(username)) {
+          return json({ error: 'invalid_username' }, 400, origin);
+        }
+        if (!displayName || displayName.length > 80) {
+          return json({ error: 'invalid_display_name' }, 400, origin);
+        }
+        if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+          return json({ error: 'invalid_email' }, 400, origin);
+        }
+        if (password.length < 8) {
+          return json({ error: 'weak_password' }, 400, origin);
+        }
+
+        const existing = await env.DB.prepare(
+          'SELECT id FROM auth_users WHERE lower(username) = ? OR lower(email) = ?'
+        ).bind(username, email).first();
+        if (existing) return json({ error: 'already_registered' }, 409, origin);
+
+        const id = crypto.randomUUID();
+        const profile = {
+          id,
+          username,
+          displayName,
+          email,
+          avatar: body.avatar || '',
+          banner: '',
+          bio: '',
+          status: 'online',
+          customStatus: '',
+          badges: ['Member'],
+          karma: 0,
+          joinedDate: new Date().toISOString(),
+          followersCount: 0,
+          followingCount: 0,
+          isFollowing: false
+        };
+
+        try {
+          await env.DB.prepare(
+            'INSERT INTO auth_users (id, username, email, password_hash, profile_json, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+          ).bind(id, username, email, await hashPassword(password), JSON.stringify(profile), Date.now()).run();
+          await env.DB.prepare(
+            'INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0)'
+          ).bind('user', id, id, JSON.stringify(profile), Date.now()).run();
+        } catch (error) {
+          const message = String(error?.message || '');
+          if (message.includes('UNIQUE')) return json({ error: 'already_registered' }, 409, origin);
+          throw error;
+        }
+
+        const session = await createSession(id, env);
+        return json({ user: cleanUser(profile) }, 201, origin, {
+          'set-cookie': cookie(session.token, SESSION_DAYS * 86400)
+        });
       }
 
       if (url.pathname === '/api/auth/login' && request.method === 'POST') {
