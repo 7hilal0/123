@@ -284,9 +284,7 @@ export const AuthModal: React.FC = () => {
             <SubmitArrow className="w-4 h-4" />
           </button>
 
-          {mode === 'register' && (
-            <p className="text-[11px] text-rose-400 text-center font-semibold">Username</p>
-          )}
+
 
           <div className="flex items-center gap-3 py-1">
             <span className="h-px flex-1 bg-white/10" />
