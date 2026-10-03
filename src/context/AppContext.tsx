@@ -197,6 +197,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deletedPostIdsRef = useRef<Set<string>>(new Set());
   const deletedCommentIdsRef = useRef<Set<string>>(new Set());
   const pendingVoteSavesRef = useRef<Record<string, Post>>({});
+  const emptyPostPollsRef = useRef(0);
+  const hasLoadedPostsRef = useRef(false);
 
   // Dynamically re-resolve personal vote highlights whenever the active user changes
   useEffect(() => {
@@ -381,8 +383,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           )
           .map((p) => resolvePostForUser(p, currentUser?.id));
 
-        // Cloudflare is authoritative. Do not merge old local posts into the feed.
+        if (cleanRemote.length === 0) {
+          emptyPostPollsRef.current += 1;
+          if (emptyPostPollsRef.current < 2 && hasLoadedPostsRef.current) return;
+        } else {
+          emptyPostPollsRef.current = 0;
+        }
         setPosts(cleanRemote);
+        hasLoadedPostsRef.current = true;
       }
     });
 
@@ -1272,13 +1280,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     void storage.saveProfileMediaBackup(updated.id, { avatar: updated.avatar, banner: updated.banner })
       .catch((error) => console.warn('[Storage] Profile media backup failed:', error));
 
-    // Update authored content only after the profile commit succeeds.
-    setPosts((prev) => prev.map((p) => {
-      if (p.author.id !== currentUser.id) return p;
-      const updatedPost = { ...p, author: updated };
-      void cloudSync.savePost(updatedPost);
-      return updatedPost;
-    }));
+    // Keep posts independent from profile updates. Rewriting every authored
+    // post here can race with feed sync and make posts disappear.
     setComments((prev) => {
       const next: Record<string, Comment[]> = {};
       for (const [postId, list] of Object.entries(prev)) next[postId] = list.map((c) => c.author.id === currentUser.id ? { ...c, author: updated } : c);
