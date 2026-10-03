@@ -363,7 +363,7 @@ export default {
           return json({ user: cleanUser({ ...profile, id: row.id, username: row.username, email: row.email || email }) }, 200, origin, { 'set-cookie': cookie(session.token, SESSION_DAYS * 86400) });
         }
 
-        if (!requestedUsername || requestedDisplayName.length < 1) return json({ error: 'username_and_display_name_required' }, 400, origin);
+        if (!requestedUsername) return json({ error: 'username_required' }, 400, origin);
         const username = requestedUsername.replace(/[^a-z0-9_]/g, '');
         if (username.length < 3 || username.length > 32) return json({ error: 'invalid_username' }, 400, origin);
         if (username !== requestedUsername) return json({ error: 'invalid_username' }, 400, origin);
