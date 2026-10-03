@@ -383,7 +383,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           .filter(
             (p) => Boolean(p && p.id && p.id !== 'post_official_welcome' && !p.deleted && !deletedPostIdsRef.current.has(p.id))
           )
-          .map((p) => resolvePostForUser(p, currentUser?.id));
+          .map((p) => {
+            // Never let a polling response overwrite a local vote while that
+            // vote is still being persisted. The remote snapshot can briefly
+            // be older than the optimistic state.
+            const pending = pendingVoteSavesRef.current[p.id];
+            if (!pending) return resolvePostForUser(p, currentUser?.id);
+
+            const mergedVotes = { ...(p.votes || {}) };
+            const mergedVoteState = { ...(p.voteState || {}) };
+            const pendingVotes = pending.votes || {};
+            const pendingVoteState = pending.voteState || {};
+
+            for (const [userId, state] of Object.entries(pendingVoteState)) {
+              if (state === 0) {
+                delete mergedVotes[userId];
+                mergedVoteState[userId] = 0;
+              } else if (state === 1 || state === -1) {
+                mergedVotes[userId] = pendingVotes[userId] ?? state;
+                mergedVoteState[userId] = state;
+              }
+            }
+
+            return resolvePostForUser({
+              ...p,
+              votes: mergedVotes,
+              voteState: mergedVoteState,
+              upvotes: Object.values(mergedVotes).filter((vote) => vote === 1).length,
+              downvotes: Object.values(mergedVotes).filter((vote) => vote === -1).length,
+            }, currentUser?.id);
+          });
 
         if (cleanRemote.length === 0) {
           emptyPostPollsRef.current += 1;
@@ -666,9 +695,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userVote: votes[userId] ?? null,
     };
 
+    // Mark the vote as pending before updating React state. This prevents
+    // the 10-second remote poll from replacing the optimistic vote with an
+    // older server snapshot while the save is in flight.
+    pendingVoteSavesRef.current[postId] = updated;
     setPosts((previous) => previous.map((post) => (post.id === postId ? updated : post)));
     // Save immediately, including an empty votes map after removing a vote.
-    void cloudSync.savePost(updated);
+    void cloudSync.savePost(updated).finally(() => {
+      const pending = pendingVoteSavesRef.current[postId];
+      if (pending === updated) {
+        delete pendingVoteSavesRef.current[postId];
+      }
+    });
 
     if (updated.userVote === desiredVote && existing.author.id !== currentUser.id) {
       addActivityNotification(
