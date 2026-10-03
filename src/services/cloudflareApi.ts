@@ -46,7 +46,7 @@ export const cloudflareApi = {
   saveEntityBatch: (entities: Array<{ entityType: string; entityId: string; payload: string; ownerId?: string }>) => request<{ ok: boolean }>('/api/entities/batch', { method: 'POST', body: JSON.stringify({ entities }) }),
   cleanupProfileMedia: (field: 'avatar' | 'banner', mediaVersion: string) => request<{ ok: boolean }>('/api/entities/profile-media/cleanup', { method: 'POST', body: JSON.stringify({ field, mediaVersion }) }),
   setCommunityMembership: (communityId: string, join: boolean) =>
-    request<{ joined: boolean; communityId: string }>('/api/community-membership', {
+    request<{ joined: boolean; changed: boolean; communityId: string }>('/api/community-membership', {
       method: 'POST',
       body: JSON.stringify({ communityId, join }),
     }),
