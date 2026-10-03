@@ -314,7 +314,22 @@ export const AuthModal: React.FC = () => {
           </div>
 
           <div className={googleBusy ? 'opacity-60 pointer-events-none' : ''}>
-            <div className="relative w-full min-h-[44px] rounded-xl overflow-hidden"><div className="absolute inset-0 z-0 flex items-center justify-center gap-2.5 bg-emerald-500 text-white font-semibold text-sm rounded-xl"><span className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-[#4285F4] font-bold text-base">G</span><span>تسجيل الدخول باستخدام Google</span></div><div ref={googleButtonRef} className="absolute inset-0 z-10 w-full h-full opacity-0" /></div>
+            <div className="relative w-full min-h-[44px] rounded-xl overflow-hidden flex justify-center bg-emerald-500">
+              <div ref={googleButtonRef} className="w-full min-h-[44px] flex justify-center" />
+              {mode === 'register' && !username.trim() && !googleBusy && (
+                <button
+                  type="button"
+                  aria-label="Enter username before Google signup"
+                  onClick={() => setErrorMessage('Enter your username first, then continue with Google.')}
+                  className="absolute inset-0 z-20 w-full h-full bg-emerald-500 text-white font-semibold text-sm rounded-xl"
+                >
+                  <span className="inline-flex items-center justify-center gap-2.5">
+                    <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-[#4285F4] font-bold text-base">G</span>
+                    <span>تسجيل الدخول باستخدام Google</span>
+                  </span>
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="pt-3 border-t border-white/5 text-[11px] text-neutral-400 flex items-center justify-between">
