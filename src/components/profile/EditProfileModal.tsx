@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Camera, Check, Palette, RotateCw, Save, X, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Camera, Check, Palette, RotateCw, Save, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { UserStatus } from '../../types';
 import { readImageFile } from '../../utils/fileUpload';
