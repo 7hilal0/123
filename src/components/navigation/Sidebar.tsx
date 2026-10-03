@@ -16,7 +16,6 @@ import {
   Settings
 } from 'lucide-react';
 import { UserStatus } from '../../types';
-import { ThumbnailPickerModal } from '../common/ThumbnailPickerModal';
 
 export const Sidebar: React.FC = () => {
   const {
@@ -41,7 +40,6 @@ export const Sidebar: React.FC = () => {
   } = useApp();
 
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
-  const [showThumbnailModal, setShowThumbnailModal] = useState(false);
   const statusMenuRef = useRef<HTMLDivElement>(null);
 
   // Close status menu on click outside
@@ -272,19 +270,6 @@ export const Sidebar: React.FC = () => {
                   </button>
                 ))}
 
-                <div className="pt-1.5 mt-1.5 border-t border-white/5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStatusMenuOpen(false);
-                      setShowThumbnailModal(true);
-                    }}
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-emerald-400 hover:bg-emerald-500/10 transition-colors font-medium cursor-pointer"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>{language === 'ar' ? 'تغيير الصورة المصغرة' : 'Change Thumbnail'}</span>
-                  </button>
-                </div>
               </div>
             )}
           </div>
@@ -299,11 +284,6 @@ export const Sidebar: React.FC = () => {
         )}
       </div>
 
-      {/* Thumbnail Picker Modal */}
-      <ThumbnailPickerModal
-        isOpen={showThumbnailModal}
-        onClose={() => setShowThumbnailModal(false)}
-      />
     </aside>
   );
 };
