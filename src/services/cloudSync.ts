@@ -6,8 +6,9 @@ const MEDIA_CHUNK_SIZE = 48_000;
 type EntityType = 'user' | 'community' | 'post' | 'comment' | 'conversation' | 'message' | 'notification' | 'profileMedia' | 'follow';
 type ProfileMediaChunk = { id: string; userId: string; field: 'avatar' | 'banner'; index: number; total: number; value: string; mediaVersion?: string };
 type FollowRecord = { id: string; followerId: string; followingId: string; following: boolean };
-const userMediaCache = new Map<string, Partial<User>>();
+const userMediaCache = new Map<string, { value: Partial<User>; expiresAt: number }>();
 const userMediaRequests = new Map<string, Promise<Partial<User>>>();
+const MEDIA_CACHE_TTL = 5_000;
 
 const pause = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 function splitMedia(value: string): string[] { if (!value) return ['']; const chunks: string[] = []; for (let i = 0; i < value.length; i += MEDIA_CHUNK_SIZE) chunks.push(value.slice(i, i + MEDIA_CHUNK_SIZE)); return chunks; }
@@ -70,7 +71,7 @@ export const cloudSync = {
       banner: banner.length <= 180_000 ? banner : '',
     };
 
-    userMediaCache.set(user.id, { avatar, banner });
+    userMediaCache.set(user.id, { value: { avatar, banner }, expiresAt: Date.now() + MEDIA_CACHE_TTL });
 
     // Save profile entity directly with thumbnail so all users see it immediately
     await saveEntity('user', profile, user.id);
@@ -145,7 +146,9 @@ export const cloudSync = {
       if (follow.followerId === currentUserId) followingByCurrentUser.add(follow.followingId);
     }
     return (users || []).map((user) => {
-      const cached = userMediaCache.get(user.id);
+      const cachedEntry = userMediaCache.get(user.id);
+      const cached = cachedEntry && cachedEntry.expiresAt > Date.now() ? cachedEntry.value : undefined;
+      if (cachedEntry && !cached) userMediaCache.delete(user.id);
       const remoteMedia = hydrateMedia(user.id);
       const hydrated = {
         ...user,
@@ -162,7 +165,9 @@ export const cloudSync = {
     await saveEntity('follow', record, followerId);
   },
   async fetchUserMedia(userId: string): Promise<Partial<User>> {
-    if (userMediaCache.has(userId)) return userMediaCache.get(userId) || {};
+    const cached = userMediaCache.get(userId);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+    if (cached) userMediaCache.delete(userId);
     if (userMediaRequests.has(userId)) return userMediaRequests.get(userId) || {};
     const request = (async () => {
     const rows = await listRows('profileMedia', userId);
