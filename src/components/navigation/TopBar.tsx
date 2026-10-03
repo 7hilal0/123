@@ -15,7 +15,7 @@ export const TopBar: React.FC = () => {
   const isProfilePage = activeTab === 'profile';
 
   return (
-    <header className="sticky top-0 z-30 h-16 md:h-[72px] w-full bg-neutral-950/80 backdrop-blur-2xl border-b border-white/[0.08] px-4 md:px-8 relative flex items-center justify-center shadow-[0_10px_30px_rgba(0,0,0,.12)]">
+    <header className="sticky top-0 z-30 h-16 md:h-[72px] w-full bg-neutral-950/75 backdrop-blur-2xl border-b border-white/[0.08] px-4 md:px-8 relative flex items-center justify-center shadow-[0_10px_30px_rgba(0,0,0,.14)] supports-[backdrop-filter]:bg-neutral-950/65">
       {/* Center: DZCORE Brand Logo & Name */}
       <button
         onClick={() => navigateToFeed('hot')}
@@ -31,7 +31,7 @@ export const TopBar: React.FC = () => {
       </button>
 
       {/* Far Right: Profile -> Settings Gear (with Language Settings), Other tabs -> Notifications Bell */}
-      <div className="absolute right-4 md:right-6 flex items-center">
+      <div className="absolute end-4 md:end-6 flex items-center">
         {isProfilePage ? (
           <button
             onClick={navigateToSettings}
