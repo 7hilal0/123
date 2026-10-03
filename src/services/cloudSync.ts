@@ -135,7 +135,7 @@ export const cloudSync = {
           });
         if (complete) result[field] = complete.map((item) => item.value).join('');
       }
-      if (result.avatar || result.banner) userMediaCache.set(userId, result);
+      if (result.avatar || result.banner) userMediaCache.set(userId, { value: result, expiresAt: Date.now() + MEDIA_CACHE_TTL });
       return result;
     };
     const followerCounts = new Map<string, number>();
@@ -192,7 +192,7 @@ export const cloudSync = {
     // Do not cache an incomplete/empty result. Media chunks can still be uploading,
     // and caching {} here would prevent future requests from seeing the completed image.
     if (result.avatar || result.banner) {
-      userMediaCache.set(userId, result);
+      userMediaCache.set(userId, { value: result, expiresAt: Date.now() + MEDIA_CACHE_TTL });
     } else {
       userMediaCache.delete(userId);
     }
