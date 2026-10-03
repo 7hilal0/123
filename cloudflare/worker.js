@@ -368,7 +368,9 @@ export default {
         if (!communityRow) return json({ error: 'community_not_found' }, 404, origin);
         const membershipId = user.id + ':' + communityId;
         const existing = await env.DB.prepare("SELECT entity_id FROM entities WHERE entity_type = 'communityMember' AND entity_id = ? AND deleted = 0").bind(membershipId).first();
+        let changed = false;
         if (join && !existing) {
+          changed = true;
           await env.DB.prepare("INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES ('communityMember', ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0")
             .bind(membershipId, user.id, JSON.stringify({ id: membershipId, userId: user.id, communityId }), Date.now()).run();
           const community = JSON.parse(communityRow.payload);
@@ -376,13 +378,14 @@ export default {
           community.isMember = false;
           await env.DB.prepare("UPDATE entities SET payload = ?, updated_at = ? WHERE entity_type = 'community' AND entity_id = ?").bind(JSON.stringify(community), Date.now(), communityId).run();
         } else if (!join && existing) {
+          changed = true;
           await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'communityMember' AND entity_id = ?").bind(Date.now(), membershipId).run();
           const community = JSON.parse(communityRow.payload);
           community.memberCount = Math.max(0, Number(community.memberCount || 0) - 1);
           community.isMember = false;
           await env.DB.prepare("UPDATE entities SET payload = ?, updated_at = ? WHERE entity_type = 'community' AND entity_id = ?").bind(JSON.stringify(community), Date.now(), communityId).run();
         }
-        return json({ joined: join, communityId }, 200, origin);
+        return json({ joined: join, changed, communityId }, 200, origin);
       }
 
       if (url.pathname === '/api/entities' && request.method === 'GET') {
