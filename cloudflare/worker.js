@@ -16,14 +16,17 @@ function json(data, status = 200, origin = '*', extra = {}) {
   });
 }
 
+const ALLOWED_ORIGINS = new Set(['https://dzcore.top', 'https://www.dzcore.top', 'https://dzcore.pages.dev', 'http://localhost:3000', 'http://localhost:5173']);
 function originFor(request) {
   const origin = request.headers.get('Origin');
-  if (!origin) return 'https://dzcore.pages.dev';
-  try {
-    const parsed = new URL(origin);
-    if (parsed.protocol === 'https:' || parsed.hostname === 'localhost') return origin;
-  } catch {}
-  return 'https://dzcore.pages.dev';
+  return origin && ALLOWED_ORIGINS.has(origin) ? origin : 'https://dzcore.top';
+}
+function originAllowed(request) {
+  const origin = request.headers.get('Origin');
+  return !origin || ALLOWED_ORIGINS.has(origin);
+}
+function csrfRequired(request) {
+  return ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method) && !originAllowed(request);
 }
 
 async function digest(value) {
@@ -63,7 +66,7 @@ function parseCookies(request) {
 }
 
 function cookie(value, maxAge, name = SESSION_COOKIE) {
-  return `${name}=${encodeURIComponent(value)}; Max-Age=${maxAge}; Path=/; HttpOnly; Secure; SameSite=None`;
+  return name + '=' + encodeURIComponent(value) + '; Max-Age=' + maxAge + '; Path=/; HttpOnly; Secure; SameSite=None';
 }
 
 function cleanUser(profile) {
@@ -105,11 +108,12 @@ async function createSession(userId, env) {
   return { token, expiresAt };
 }
 
-async function entityList(url, env) {
+async function entityList(url, env, user = null) {
   const type = url.searchParams.get('type');
   const ownerId = url.searchParams.get('ownerId');
   const entityId = url.searchParams.get('entityId');
   const summary = url.searchParams.get('summary') === '1';
+  const conversationId = url.searchParams.get('conversationId');
   const payloadSelect = summary && type === 'post'
     ? "json_set(json_remove(payload, '$.author.banner', '$.mediaUrl'), '$.author.avatar', CASE WHEN length(json_extract(payload, '$.author.avatar')) <= 200000 THEN json_extract(payload, '$.author.avatar') ELSE '' END) AS payload"
     : 'payload';
@@ -119,6 +123,8 @@ async function entityList(url, env) {
   if (type) { clauses.push('entity_type = ?'); values.push(type); }
   if (ownerId) { clauses.push('owner_id = ?'); values.push(ownerId); }
   if (entityId) { clauses.push('entity_id = ?'); values.push(entityId); }
+  if (['notification', 'communityMember'].includes(type) && user) { clauses.push('owner_id = ?'); values.push(user.id); }
+  if (type === 'message' && conversationId) { clauses.push("json_extract(payload, '$.conversationId') = ?"); values.push(conversationId); }
   if (clauses.length) query += ` WHERE ${clauses.join(' AND ')}`;
   query += ' ORDER BY updated_at DESC LIMIT 10000';
   const result = await env.DB.prepare(query).bind(...values).all();
@@ -160,7 +166,13 @@ async function entityList(url, env) {
       avatars.set(row.owner_id, current);
     } catch { /* ignore malformed media rows */ }
   }
-  return rows.map((row) => {
+  let visibleRows = rows;
+  if (type === 'conversation' && user) {
+    visibleRows = rows.filter((row) => {
+      try { return Array.isArray(JSON.parse(row.payload).participantIds) && JSON.parse(row.payload).participantIds.includes(user.id); } catch { return false; }
+    });
+  }
+  return visibleRows.map((row) => {
     if (summary && type === 'post') {
       const payload = JSON.parse(row.payload);
       if (payload.mediaType === 'image') payload.mediaDeferred = true;
@@ -196,6 +208,7 @@ export default {
     const origin = originFor(request);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'access-control-allow-origin': origin, 'access-control-allow-credentials': 'true', 'access-control-allow-headers': 'content-type, x-dzcore-admin-secret', 'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS' } });
     const url = new URL(request.url);
+    if (csrfRequired(request)) return json({ error: 'invalid_origin' }, 403, origin);
     try {
       if (url.pathname === '/api/health') return json({ ok: true, service: 'dzcore-cloudflare-api' }, 200, origin);
 
@@ -319,7 +332,12 @@ export default {
         if (!row || !(await verifyPassword(String(body.currentPassword || ''), row.password_hash))) return json({ error: 'invalid_current_password' }, 403, origin);
         const profile = { ...JSON.parse(row.profile_json) };
         const statements = [];
-        if (body.email) { profile.email = String(body.email).trim().toLowerCase(); statements.push(env.DB.prepare('UPDATE auth_users SET email = ?, profile_json = ? WHERE id = ?').bind(profile.email, JSON.stringify(profile), user.id)); }
+        if (body.email) {
+          profile.email = String(body.email).trim().toLowerCase();
+          const duplicate = await env.DB.prepare('SELECT id FROM auth_users WHERE lower(email) = ? AND id != ?').bind(profile.email, user.id).first();
+          if (duplicate) return json({ error: 'email_already_used' }, 409, origin);
+          statements.push(env.DB.prepare('UPDATE auth_users SET email = ?, profile_json = ? WHERE id = ?').bind(profile.email, JSON.stringify(profile), user.id));
+        }
         if (body.newPassword) statements.push(env.DB.prepare('UPDATE auth_users SET password_hash = ? WHERE id = ?').bind(await hashPassword(String(body.newPassword)), user.id));
         if (!statements.length) return json({ error: 'nothing_to_update' }, 400, origin);
         await env.DB.batch(statements);
@@ -337,7 +355,58 @@ export default {
         await saveAdminEntity(env, 'report', report.id, report, user.id);
         return json({ report: { id: report.id, status: report.status } }, 201, origin);
       }
-      if (url.pathname === '/api/entities' && request.method === 'GET') return json({ items: await entityList(url, env) }, 200, origin);
+      if (csrfRequired(request)) return json({ error: 'invalid_origin' }, 403, origin);
+
+      if (url.pathname === '/api/community-membership' && request.method === 'POST') {
+        const user = await currentUser(request, env);
+        if (!user) return json({ error: 'unauthorized' }, 401, origin);
+        const body = await request.json();
+        const communityId = String(body.communityId || '');
+        const join = Boolean(body.join);
+        if (!communityId) return json({ error: 'invalid_community' }, 400, origin);
+        const communityRow = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'community' AND entity_id = ? AND deleted = 0").bind(communityId).first();
+        if (!communityRow) return json({ error: 'community_not_found' }, 404, origin);
+        const membershipId = user.id + ':' + communityId;
+        const existing = await env.DB.prepare("SELECT entity_id FROM entities WHERE entity_type = 'communityMember' AND entity_id = ? AND deleted = 0").bind(membershipId).first();
+        let changed = false;
+        if (join && !existing) {
+          changed = true;
+          await env.DB.prepare("INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES ('communityMember', ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0")
+            .bind(membershipId, user.id, JSON.stringify({ id: membershipId, userId: user.id, communityId }), Date.now()).run();
+          const community = JSON.parse(communityRow.payload);
+          community.memberCount = Math.max(0, Number(community.memberCount || 0) + 1);
+          community.isMember = false;
+          await env.DB.prepare("UPDATE entities SET payload = ?, updated_at = ? WHERE entity_type = 'community' AND entity_id = ?").bind(JSON.stringify(community), Date.now(), communityId).run();
+        } else if (!join && existing) {
+          changed = true;
+          await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'communityMember' AND entity_id = ?").bind(Date.now(), membershipId).run();
+          const community = JSON.parse(communityRow.payload);
+          community.memberCount = Math.max(0, Number(community.memberCount || 0) - 1);
+          community.isMember = false;
+          await env.DB.prepare("UPDATE entities SET payload = ?, updated_at = ? WHERE entity_type = 'community' AND entity_id = ?").bind(JSON.stringify(community), Date.now(), communityId).run();
+        }
+        return json({ joined: join, changed, communityId }, 200, origin);
+      }
+
+      if (url.pathname === '/api/entities' && request.method === 'GET') {
+        const type = url.searchParams.get('type') || '';
+        const privateTypes = new Set(['conversation', 'message', 'notification', 'communityMember', 'report', 'adminBan']);
+        if (privateTypes.has(type) && !await currentUser(request, env)) return json({ error: 'unauthorized' }, 401, origin);
+        if (['report', 'adminBan'].includes(type)) return json({ error: 'forbidden_entity_type' }, 403, origin);
+        const user = privateTypes.has(type) ? await currentUser(request, env) : null;
+        if (type === 'message') {
+          const conversationId = url.searchParams.get('conversationId');
+          if (!conversationId || !user) return json({ error: 'invalid_conversation' }, 400, origin);
+          const conversation = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'conversation' AND entity_id = ? AND deleted = 0").bind(conversationId).first();
+          let allowed = false;
+          try {
+            const participants = JSON.parse(conversation?.payload || '{}').participantIds;
+            allowed = Array.isArray(participants) && participants.includes(user.id);
+          } catch {}
+          if (!allowed) return json({ error: 'forbidden_conversation' }, 403, origin);
+        }
+        return json({ items: await entityList(url, env, user) }, 200, origin);
+      }
       if (url.pathname === '/api/entities/batch' && request.method === 'POST') {
         const user = await currentUser(request, env);
         if (!user) return json({ error: 'unauthorized' }, 401, origin);
@@ -365,19 +434,51 @@ export default {
         const user = await currentUser(request, env);
         if (!user) return json({ error: 'unauthorized' }, 401, origin);
         const body = await request.json();
-        if (!body.entityType || !body.entityId || typeof body.payload !== 'string') return json({ error: 'invalid_entity' }, 400, origin);
-        if (body.entityType === 'profileMedia') {
-          if (body.ownerId !== user.id || !String(body.entityId).startsWith(`${user.id}:`)) return json({ error: 'forbidden_entity' }, 403, origin);
-          try {
-            if (JSON.parse(body.payload).userId !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
-          } catch { return json({ error: 'invalid_entity' }, 400, origin); }
+        const type = String(body.entityType || '');
+        const entityId = String(body.entityId || '');
+        if (!type || !entityId || typeof body.payload !== 'string') return json({ error: 'invalid_entity' }, 400, origin);
+        let payload;
+        try { payload = JSON.parse(body.payload); } catch { return json({ error: 'invalid_entity_payload' }, 400, origin); }
+        const allowedTypes = new Set(['user', 'community', 'post', 'comment', 'profileMedia', 'follow', 'conversation', 'message', 'notification', 'communityMember']);
+        if (!allowedTypes.has(type)) return json({ error: 'forbidden_entity_type' }, 403, origin);
+        if (type === 'community') {
+          const existingCommunity = await env.DB.prepare("SELECT entity_id FROM entities WHERE entity_type = 'community' AND entity_id = ? AND deleted = 0").bind(entityId).first();
+          if (existingCommunity) return json({ error: 'community_updates_use_membership_api' }, 403, origin);
         }
-        if (body.entityType === 'user' && body.entityId !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
-        const ownerId = body.ownerId || user.id;
-        await env.DB.prepare('INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0').bind(body.entityType, body.entityId, ownerId, body.payload, Date.now()).run();
-        if (body.entityType === 'user' && body.entityId === user.id) {
-          const profile = JSON.parse(body.payload);
-          await env.DB.prepare('UPDATE auth_users SET username = ?, email = ?, profile_json = ? WHERE id = ?').bind(profile.username, profile.email, body.payload, user.id).run();
+        if (type === 'user' && (entityId !== user.id || payload.id !== user.id)) return json({ error: 'forbidden_entity' }, 403, origin);
+        if (type === 'profileMedia' && (body.ownerId !== user.id || payload.userId !== user.id || !entityId.startsWith(user.id + ':'))) return json({ error: 'forbidden_entity' }, 403, origin);
+        if (type === 'post') {
+          if (payload.deleted) {
+            const existing = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'post' AND entity_id = ?").bind(entityId).first();
+            let authorId = null;
+            try { authorId = JSON.parse(existing?.payload || '{}').author?.id; } catch {}
+            if (!existing || authorId !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
+          } else if (entityId !== payload.id || payload.author?.id !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
+        }
+        if (type === 'comment') {
+          const existing = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'comment' AND entity_id = ?").bind(entityId).first();
+          if (payload.deleted) {
+            let existingAuthor = null;
+            try { existingAuthor = JSON.parse(existing?.payload || '{}').author?.id; } catch {}
+            if (!existing || existingAuthor !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
+          } else if (entityId !== payload.id || payload.author?.id !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
+        }
+        if (type === 'follow' && (payload.followerId !== user.id || entityId !== user.id + ':' + payload.followingId)) return json({ error: 'forbidden_entity' }, 403, origin);
+        if (type === 'notification' && (!payload.recipientId || payload.actor?.id !== user.id || entityId !== payload.id)) return json({ error: 'forbidden_notification' }, 403, origin);
+        if (type === 'communityMember') return json({ error: 'use_community_membership_endpoint' }, 403, origin);
+        if (type === 'conversation' && (entityId !== payload.id || !Array.isArray(payload.participantIds) || !payload.participantIds.includes(user.id))) return json({ error: 'forbidden_conversation' }, 403, origin);
+        if (type === 'message') {
+          if (entityId !== payload.id || payload.senderId !== user.id || !payload.conversationId) return json({ error: 'forbidden_message' }, 403, origin);
+          const conversation = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'conversation' AND entity_id = ? AND deleted = 0").bind(payload.conversationId).first();
+          try {
+            const participants = JSON.parse(conversation?.payload || '{}').participantIds;
+            if (!Array.isArray(participants) || !participants.includes(user.id)) return json({ error: 'forbidden_conversation' }, 403, origin);
+          } catch { return json({ error: 'forbidden_conversation' }, 403, origin); }
+        }
+        const ownerId = user.id;
+        await env.DB.prepare('INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0').bind(type, entityId, ownerId, body.payload, Date.now()).run();
+        if (type === 'user') {
+          await env.DB.prepare('UPDATE auth_users SET username = ?, email = ?, profile_json = ? WHERE id = ?').bind(payload.username, payload.email, body.payload, user.id).run();
         }
         return json({ ok: true }, 200, origin);
       }

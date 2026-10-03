@@ -230,8 +230,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         const hasRemoteAvatar = Object.prototype.hasOwnProperty.call(remoteMedia, 'avatar');
         const hasRemoteBanner = Object.prototype.hasOwnProperty.call(remoteMedia, 'banner');
-        const avatar = hasRemoteAvatar ? remoteMedia.avatar : (sessionUser.avatar || cachedMedia?.avatar || cachedProfile?.avatar || DEFAULT_USER_AVATAR);
-        const banner = hasRemoteBanner ? remoteMedia.banner : (sessionUser.banner || cachedMedia?.banner || cachedProfile?.banner || '');
+        const avatar = hasRemoteAvatar ? (remoteMedia.avatar || DEFAULT_USER_AVATAR) : (sessionUser.avatar || cachedMedia?.avatar || cachedProfile?.avatar || DEFAULT_USER_AVATAR);
+        const banner = hasRemoteBanner ? (remoteMedia.banner || '') : (sessionUser.banner || cachedMedia?.banner || cachedProfile?.banner || '');
 
         const profile = {
           ...sessionUser,
@@ -407,24 +407,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }).catch(() => {});
 
-      cloudSync.fetchUsers(currentUser?.id).then((remoteUsers) => {
-        if (remoteUsers && remoteUsers.length > 0) {
-          setUsers((local) => {
-            const remoteIds = new Set(remoteUsers.map((u) => u.id));
-            const localOnly = local.filter((u) => !remoteIds.has(u.id));
-            const mergedRemote = remoteUsers.map((remote) => {
-              const cached = local.find((user) => user.id === remote.id);
-              return {
-                ...cached,
-                ...remote,
-                avatar: remote.avatar || cached?.avatar || DEFAULT_USER_AVATAR,
-                banner: remote.banner || cached?.banner || '',
-              };
-            });
-            return [...mergedRemote, ...localOnly];
-          });
-        }
-      }).catch(() => {});
     }, 0);
 
     return () => {
@@ -433,6 +415,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
+  // Refresh the user/media catalog after the authenticated session is known.
+  // The old implementation captured currentUser=null inside a [] effect.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let active = true;
+    cloudSync.fetchCommunities(currentUser.id).then((remoteComms) => {
+      if (!active || !remoteComms?.length) return;
+      setCommunities((local) => {
+        const remoteIds = new Set(remoteComms.map((c) => c.id));
+        return [...remoteComms, ...local.filter((c) => !remoteIds.has(c.id))];
+      });
+    }).catch((error) => console.warn('[Cloudflare] communities sync failed:', error));
+
+    cloudSync.fetchUsers(currentUser.id).then((remoteUsers) => {
+      if (!active || !remoteUsers?.length) return;
+      setUsers((local) => {
+        const remoteIds = new Set(remoteUsers.map((u) => u.id));
+        const localOnly = local.filter((u) => !remoteIds.has(u.id));
+        return [
+          ...remoteUsers.map((remote) => {
+            const cached = local.find((user) => user.id === remote.id);
+            return {
+              ...cached,
+              ...remote,
+              avatar: remote.avatar || cached?.avatar || DEFAULT_USER_AVATAR,
+              banner: remote.banner || cached?.banner || '',
+            };
+          }),
+          ...localOnly,
+        ];
+      });
+    }).catch((error) => console.warn('[Cloudflare] users sync failed:', error));
+    return () => { active = false; };
+  }, [currentUser?.id]);
 
   // Sync to localStorage
   useEffect(() => { storage.saveUsers(users); }, [users]);
@@ -699,7 +715,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const effectiveSlug = postData.communitySlug || 'dz/general';
     const targetCommunity = communities.find((c) => c.slug === effectiveSlug);
     const now = Date.now();
-    const newPostId = `post_${now}`;
+    const newPostId = `post_${crypto.randomUUID()}`;
 
     const cleanAuthor: User = {
       id: currentUser.id,
@@ -744,8 +760,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPosts((prev) => [newPost, ...prev]);
     setComments((prev) => ({ ...prev, [newPostId]: [] }));
 
-    // Real-time Cloud Save
-    cloudSync.savePost(newPost);
+    // Real-time Cloud Save. Roll back the optimistic post if the server rejects it.
+    void cloudSync.savePost(newPost).catch(() => {
+      setPosts((prev) => prev.filter((post) => post.id !== newPostId));
+      setComments((prev) => {
+        const copy = { ...prev };
+        delete copy[newPostId];
+        return copy;
+      });
+      showToast(language === 'ar' ? 'تعذر حفظ المنشور على السيرفر' : 'The post could not be saved to the server', 'warning');
+    });
 
     showToast(language === 'ar' ? 'تم نشر موضوعك وحفظه في السيرفر! 🚀' : 'Post published and saved to cloud! 🚀', 'success');
     navigateToPost(newPostId);
@@ -807,7 +831,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const commentNow = Date.now();
     const newComment: Comment = {
-      id: `comment_${commentNow}`,
+      id: `comment_${crypto.randomUUID()}`,
       postId,
       author: currentUser,
       content,
@@ -980,41 +1004,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Communities
   const joinCommunity = (slug: string) => {
-    if (!currentUser) {
-      setAuthModalOpen(true, 'login');
-      return;
-    }
-
-    setCommunities((prev) =>
-      prev.map((c) => {
-        if (c.slug === slug) {
-          const updated = { ...c, isMember: true, memberCount: c.memberCount + 1 };
-          cloudSync.saveCommunity(updated);
-          showToast(language === 'ar' ? `انضممت إلى مجتمع ${c.name}` : `Joined ${c.name}`, 'success');
-          return updated;
-        }
-        return c;
-      })
-    );
+    if (!currentUser) { setAuthModalOpen(true, 'login'); return; }
+    const community = communities.find((c) => c.slug === slug);
+    if (!community) return;
+    void cloudflareApi.setCommunityMembership(community.id, true).then((result) => {
+      if (!result.changed) return;
+      setCommunities((prev) => prev.map((c) => c.id === community.id ? { ...c, isMember: true, memberCount: c.memberCount + 1 } : c));
+      showToast(language === 'ar' ? `انضممت إلى مجتمع ${community.name}` : `Joined ${community.name}`, 'success');
+    }).catch(() => showToast(language === 'ar' ? 'تعذر الانضمام إلى المجتمع' : 'Could not join the community', 'warning'));
   };
 
   const leaveCommunity = (slug: string) => {
-    if (!currentUser) {
-      setAuthModalOpen(true, 'login');
-      return;
-    }
-
-    setCommunities((prev) =>
-      prev.map((c) => {
-        if (c.slug === slug) {
-          const updated = { ...c, isMember: false, memberCount: Math.max(0, c.memberCount - 1) };
-          cloudSync.saveCommunity(updated);
-          showToast(language === 'ar' ? `غادرت مجتمع ${c.name}` : `Left ${c.name}`, 'info');
-          return updated;
-        }
-        return c;
-      })
-    );
+    if (!currentUser) { setAuthModalOpen(true, 'login'); return; }
+    const community = communities.find((c) => c.slug === slug);
+    if (!community) return;
+    void cloudflareApi.setCommunityMembership(community.id, false).then((result) => {
+      if (!result.changed) return;
+      setCommunities((prev) => prev.map((c) => c.id === community.id ? { ...c, isMember: false, memberCount: Math.max(0, c.memberCount - 1) } : c));
+      showToast(language === 'ar' ? `غادرت مجتمع ${community.name}` : `Left ${community.name}`, 'info');
+    }).catch(() => showToast(language === 'ar' ? 'تعذر مغادرة المجتمع' : 'Could not leave the community', 'warning'));
   };
 
   const createCommunity = (
@@ -1024,61 +1032,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     iconUrl?: string,
     bannerUrl?: string
   ) => {
-    if (!currentUser) {
-      setAuthModalOpen(true, 'login');
-      return;
-    }
-
+    if (!currentUser) { setAuthModalOpen(true, 'login'); return; }
     const cleanSlugPart = name.toLowerCase().replace(/[^a-z0-9]/g, '') || `hub_${Date.now()}`;
     const slug = `c/${cleanSlugPart}`;
-
     if (communities.some((c) => c.slug === slug)) {
-      showToast(
-        language === 'ar' ? 'يوجد مجتمع بهذا المعرف بالفعل!' : 'A community with this slug already exists!',
-        'warning'
-      );
+      showToast(language === 'ar' ? 'يوجد مجتمع بهذا المعرف بالفعل!' : 'A community with this slug already exists!', 'warning');
       return;
     }
-
     const newComm: Community = {
-      id: `comm_${Date.now()}`,
-      name,
-      slug,
-      description,
-      icon:
-        iconUrl ||
-        'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=200&q=80',
-      banner:
-        bannerUrl ||
-        'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
-      memberCount: 1,
-      onlineCount: 1,
-      isMember: true,
+      id: `comm_${crypto.randomUUID()}`,
+      name, slug, description,
+      icon: iconUrl || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=200&q=80',
+      banner: bannerUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+      memberCount: 0, onlineCount: 1, isMember: false,
       category: category || (language === 'ar' ? 'عام' : 'General'),
       createdAt: language === 'ar' ? 'تأسس اليوم' : 'Created today',
-      rules: [
-        { id: 'r1', title: language === 'ar' ? 'الاحترام المتبادل' : 'Mutual Respect', description: language === 'ar' ? 'النقاش البناء والمحترم هو أساس المجتمع.' : 'Constructive and polite communication.' },
-      ],
-      moderators: [
-        {
-          username: currentUser.username,
-          displayName: currentUser.displayName,
-          avatar: currentUser.avatar,
-          role: language === 'ar' ? 'مؤسس' : 'Founder',
-        },
-      ],
+      rules: [{ id: 'r1', title: language === 'ar' ? 'الاحترام المتبادل' : 'Mutual Respect', description: language === 'ar' ? 'النقاش البناء والمحترم هو أساس المجتمع.' : 'Constructive and polite communication.' }],
+      moderators: [{ username: currentUser.username, displayName: currentUser.displayName, avatar: currentUser.avatar, role: language === 'ar' ? 'مؤسس' : 'Founder' }],
     };
-
-    setCommunities((prev) => [newComm, ...prev]);
-
-    // Cloud Save Community
-    cloudSync.saveCommunity(newComm);
-
-    showToast(
-      language === 'ar' ? `تم إنشاء المجتمع وحفظه سحابياً! 🎉` : `Community saved to cloud! 🎉`,
-      'success'
-    );
-    navigateToCommunity(slug);
+    void cloudSync.saveCommunity(newComm)
+      .then(() => cloudflareApi.setCommunityMembership(newComm.id, true))
+      .then(() => {
+        setCommunities((prev) => [{ ...newComm, isMember: true, memberCount: 1 }, ...prev]);
+        showToast(language === 'ar' ? 'تم إنشاء المجتمع وحفظه سحابياً! 🎉' : 'Community saved to cloud! 🎉', 'success');
+        navigateToCommunity(slug);
+      })
+      .catch(() => showToast(language === 'ar' ? 'تعذر حفظ المجتمع على السيرفر' : 'The community could not be saved to the server', 'warning'));
   };
 
   // Messaging

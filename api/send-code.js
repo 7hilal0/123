@@ -28,10 +28,12 @@ export default async function handler(req, res) {
     return json(res, 400, { error: 'Enter a valid email address.' });
   }
 
-  const code = String(crypto.randomInt(0, 10000)).padStart(4, '0');
+  const nonce = crypto.randomUUID();
   const expiresAt = Date.now() + 10 * 60 * 1000;
-  const payload = Buffer.from(JSON.stringify({ email, code, expiresAt })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({ email, nonce, expiresAt })).toString('base64url');
   const token = `${payload}.${sign(payload, verificationSecret)}`;
+  const codeDigest = crypto.createHmac('sha256', verificationSecret).update(`${email}:${nonce}`).digest('hex');
+  const code = String(parseInt(codeDigest.slice(0, 12), 16) % 1000000).padStart(6, '0');
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',

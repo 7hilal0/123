@@ -29,8 +29,8 @@ export default function handler(req, res) {
   const code = String(req.body?.code || '').trim();
   const token = String(req.body?.token || '');
   const parts = token.split('.');
-  if (parts.length !== 2 || !/^\d{4}$/.test(code)) {
-    return json(res, 400, { error: 'Enter the four-digit code.' });
+  if (parts.length !== 2 || !/^\d{6}$/.test(code)) {
+    return json(res, 400, { error: 'Enter the six-digit code.' });
   }
 
   const [payload, signature] = parts;
@@ -40,7 +40,12 @@ export default function handler(req, res) {
 
   try {
     const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-    if (!data.email || Date.now() > Number(data.expiresAt) || !safeEqual(String(data.code), code)) {
+    if (!data.email || !data.nonce || Date.now() > Number(data.expiresAt)) {
+      return json(res, 400, { error: 'The code is incorrect or expired.' });
+    }
+    const expectedDigest = crypto.createHmac('sha256', secret).update(`${data.email}:${data.nonce}`).digest('hex');
+    const expectedCode = String(parseInt(expectedDigest.slice(0, 12), 16) % 1000000).padStart(6, '0');
+    if (!safeEqual(expectedCode, code)) {
       return json(res, 400, { error: 'The code is incorrect or expired.' });
     }
     return json(res, 200, { verified: true, email: data.email });
