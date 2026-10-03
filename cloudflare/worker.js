@@ -66,7 +66,7 @@ function parseCookies(request) {
 }
 
 function cookie(value, maxAge, name = SESSION_COOKIE) {
-  return name + '=' + encodeURIComponent(value) + '; Max-Age=' + maxAge + '; Path=/; HttpOnly; Secure; SameSite=Lax';
+  return name + '=' + encodeURIComponent(value) + '; Max-Age=' + maxAge + '; Path=/; HttpOnly; Secure; SameSite=None';
 }
 
 function cleanUser(profile) {
