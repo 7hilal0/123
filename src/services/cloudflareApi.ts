@@ -2,7 +2,7 @@ import { User } from '../types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
-async function request<T>(path: string, options: RequestInit = {}, tolerateEntityFailure = true): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}, tolerateEntityFailure = false): Promise<T> {
   try {
     const response = await fetch(`${API_BASE}${path}`, {
       ...options,
@@ -11,23 +11,16 @@ async function request<T>(path: string, options: RequestInit = {}, tolerateEntit
     });
     const contentType = response.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
-      if (path.startsWith('/api/entities') && tolerateEntityFailure) {
-        return { items: [] } as unknown as T;
-      }
-      return {} as T;
+      throw Object.assign(new Error('Cloudflare API returned a non-JSON response'), { status: response.status });
     }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      if (path.startsWith('/api/entities') && tolerateEntityFailure) {
-        return { items: [] } as unknown as T;
-      }
+      if (path.startsWith('/api/entities') && tolerateEntityFailure) return { items: [] } as unknown as T;
       throw Object.assign(new Error(data.error || 'Cloudflare API request failed'), { status: response.status, code: data.error });
     }
     return data as T;
   } catch (err: any) {
-    if (path.startsWith('/api/entities') && tolerateEntityFailure) {
-      return { items: [] } as unknown as T;
-    }
+    if (path.startsWith('/api/entities') && tolerateEntityFailure) return { items: [] } as unknown as T;
     throw err;
   }
 }
@@ -43,18 +36,11 @@ export const cloudflareApi = {
       method: 'POST',
       body: JSON.stringify({ targetType, targetId, reason }),
     }),
-  listEntities: async (type?: string, ownerId?: string, extra: Record<string, string> = {}, strict = false) => {
-    try {
-      const res = await request<{ items?: Array<{ entityType: string; entityId: string; ownerId?: string; payload: string }> }>(
-        `/api/entities?${new URLSearchParams({ ...(type ? { type } : {}), ...(ownerId ? { ownerId } : {}), ...extra })}`,
-        {},
-        !strict,
-      );
-      return { items: Array.isArray(res?.items) ? res.items : [] };
-    } catch (error) {
-      if (strict) throw error;
-      return { items: [] };
-    }
+  listEntities: async (type?: string, ownerId?: string, extra: Record<string, string> = {}) => {
+    const res = await request<{ items?: Array<{ entityType: string; entityId: string; ownerId?: string; payload: string }> }>(
+      `/api/entities?${new URLSearchParams({ ...(type ? { type } : {}), ...(ownerId ? { ownerId } : {}), ...extra })}`,
+    );
+    return { items: Array.isArray(res?.items) ? res.items : [] };
   },
   saveEntity: (entityType: string, entityId: string, payload: string, ownerId?: string) => request<{ ok: boolean }>('/api/entities', { method: 'POST', body: JSON.stringify({ entityType, entityId, payload, ownerId }) }),
   saveEntityBatch: (entities: Array<{ entityType: string; entityId: string; payload: string; ownerId?: string }>) => request<{ ok: boolean }>('/api/entities/batch', { method: 'POST', body: JSON.stringify({ entities }) }),
