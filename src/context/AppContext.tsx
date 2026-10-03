@@ -420,6 +420,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (!currentUser?.id) return;
     let active = true;
+    cloudSync.fetchCommunities(currentUser.id).then((remoteComms) => {
+      if (!active || !remoteComms?.length) return;
+      setCommunities((local) => {
+        const remoteIds = new Set(remoteComms.map((c) => c.id));
+        return [...remoteComms, ...local.filter((c) => !remoteIds.has(c.id))];
+      });
+    }).catch((error) => console.warn('[Cloudflare] communities sync failed:', error));
+
     cloudSync.fetchUsers(currentUser.id).then((remoteUsers) => {
       if (!active || !remoteUsers?.length) return;
       setUsers((local) => {
