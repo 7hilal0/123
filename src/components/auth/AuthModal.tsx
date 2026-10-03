@@ -57,7 +57,7 @@ export const AuthModal: React.FC = () => {
         ux_mode: 'popup',
       });
       (window as any).google.accounts.id.renderButton(googleButtonRef.current, {
-        type: 'standard', theme: 'outline', size: 'large', text: 'continue_with', shape: 'pill', width: 400, logo_alignment: 'center', locale: 'ar',
+        type: 'standard', theme: 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', width: Math.min(320, Math.max(220, window.innerWidth - 80)), logo_alignment: 'center', locale: 'ar',
       });
     };
     const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]') as HTMLScriptElement | null;
@@ -308,9 +308,7 @@ export const AuthModal: React.FC = () => {
           </div>
 
           <div className={googleBusy ? 'opacity-60 pointer-events-none' : ''}>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-2 shadow-lg shadow-black/20 transition-all hover:border-white/15 hover:bg-white/[0.05]">
-              <div ref={googleButtonRef} className="flex justify-center min-h-[40px]" />
-            </div>
+            <div ref={googleButtonRef} className="w-full flex justify-center min-h-[40px] overflow-hidden rounded-xl" />
           </div>
 
           <div className="pt-3 border-t border-white/5 text-[11px] text-neutral-400 flex items-center justify-between">
