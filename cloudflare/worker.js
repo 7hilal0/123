@@ -336,13 +336,18 @@ export default {
         const claims = await verifyGoogleCredential(String(body.credential || ''), '991149566827-l73oec1hjpu6jb21hftr4a2e1gille3m.apps.googleusercontent.com');
         const email = String(claims.email).trim().toLowerCase();
         const googleSub = String(claims.sub);
-        const displayName = String(claims.name || email.split('@')[0] || 'Google User').trim().slice(0, 80);
+        const requestedUsername = String(body.username || '').trim().toLowerCase();
+        const requestedDisplayName = String(body.displayName || '').trim();
+        const displayName = (requestedDisplayName || String(claims.name || email.split('@')[0] || 'Google User')).slice(0, 80);
         const picture = String(claims.picture || '');
 
         let row = await env.DB.prepare("SELECT id, username, email, password_hash, profile_json FROM auth_users WHERE lower(email) = ? LIMIT 1").bind(email).first();
         if (!row) row = await env.DB.prepare("SELECT id, username, email, password_hash, profile_json FROM auth_users WHERE json_extract(profile_json, '$.googleSub') = ? LIMIT 1").bind(googleSub).first();
 
         if (row) {
+          if (requestedUsername || requestedDisplayName) {
+            return json({ error: 'already_registered' }, 409, origin);
+          }
           const profile = { ...JSON.parse(row.profile_json), googleSub };
           if (!profile.email) profile.email = email;
           if (!profile.displayName) profile.displayName = displayName;
@@ -358,14 +363,11 @@ export default {
           return json({ user: cleanUser({ ...profile, id: row.id, username: row.username, email: row.email || email }) }, 200, origin, { 'set-cookie': cookie(session.token, SESSION_DAYS * 86400) });
         }
 
-        const base = ('google_' + googleSub).toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 32) || 'google_user';
-        let username = base;
-        let suffix = 1;
-        while (await env.DB.prepare('SELECT id FROM auth_users WHERE lower(username) = ?').bind(username).first()) {
-          const tail = String(suffix++);
-          username = (base.slice(0, 32 - tail.length) + tail).slice(0, 32);
-        }
-
+        if (!requestedUsername || requestedDisplayName.length < 1) return json({ error: 'username_and_display_name_required' }, 400, origin);
+        const username = requestedUsername.replace(/[^a-z0-9_]/g, '');
+        if (username.length < 3 || username.length > 32) return json({ error: 'invalid_username' }, 400, origin);
+        if (username !== requestedUsername) return json({ error: 'invalid_username' }, 400, origin);
+        if (await env.DB.prepare('SELECT id FROM auth_users WHERE lower(username) = ?').bind(username).first()) return json({ error: 'username_taken' }, 409, origin);
         const id = crypto.randomUUID();
         const profile = { id, username, displayName, email, avatar: picture, banner: '', profileColor: '', displayNameColor: '', bio: '', status: 'online', customStatus: '', badges: ['Member'], karma: 0, joinedDate: new Date().toISOString(), followersCount: 0, followingCount: 0, isFollowing: false, googleSub };
 
@@ -383,24 +385,9 @@ export default {
         return json({ user: cleanUser(profile) }, 201, origin, { 'set-cookie': cookie(session.token, SESSION_DAYS * 86400) });
       }
       if (url.pathname === '/api/auth/register' && request.method === 'POST') {
-        const body = await request.json();
-        const username = String(body.username || '').trim().toLowerCase();
-        const email = String(body.email || '').trim().toLowerCase();
-        const password = String(body.password || '');
-        if (!/^[a-z0-9_]{3,32}$/.test(username) || !email.includes('@') || password.length < 8) return json({ error: 'invalid_fields' }, 400, origin);
-        const id = crypto.randomUUID();
-        const profile = { id, username, displayName: String(body.displayName || username).trim(), email, avatar: body.avatar || '', banner: '', profileColor: '', displayNameColor: '', bio: '', status: 'online', customStatus: '', badges: ['Member'], karma: 0, joinedDate: new Date().toISOString(), followersCount: 0, followingCount: 0, isFollowing: false };
-        try {
-          await env.DB.prepare('INSERT INTO auth_users (id, username, email, password_hash, profile_json, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(id, username, email, await hashPassword(password), JSON.stringify(profile), Date.now()).run();
-          await env.DB.prepare('INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0)').bind('user', id, id, JSON.stringify(profile), Date.now()).run();
-        } catch (error) {
-          await env.DB.prepare('DELETE FROM auth_users WHERE id = ?').bind(id).run().catch(() => {});
-          const message = String(error?.message || 'already_registered');
-          return json({ error: message.includes('UNIQUE') ? 'already_registered' : 'registration_failed' }, message.includes('UNIQUE') ? 409 : 500, origin);
-        }
-        const session = await createSession(id, env);
-        return json({ user: cleanUser(profile) }, 201, origin, { 'set-cookie': cookie(session.token, SESSION_DAYS * 86400) });
+        return json({ error: 'google_registration_required' }, 403, origin);
       }
+
       if (url.pathname === '/api/auth/login' && request.method === 'POST') {
         const body = await request.json();
         const term = String(body.term || '').trim().toLowerCase();
