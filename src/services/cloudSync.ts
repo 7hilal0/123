@@ -201,11 +201,27 @@ export const cloudSync = {
   async deletePost(postId: string): Promise<boolean> { try { await saveEntity('post', { id: postId, deleted: true, deletedAt: Date.now() } as unknown as Post); return true; } catch { return false; } },
   async fetchPosts(): Promise<Post[]> {
     try {
-      const res = await cloudflareApi.listEntities('post', undefined, { summary: '1' }, true);
-      const rows = Array.isArray(res?.items) ? res.items : [];
-      return rows
-        .map((row) => (row && row.payload ? parse<Post>(row.payload) : null))
-        .filter((value): value is Post => Boolean(value));
+      // Prefer the lightweight post response, but fall back to the normal
+      // entity response if the summary endpoint is unavailable or returns no
+      // usable posts. This prevents a feed from appearing empty when posts
+      // still exist in D1.
+      let res = await cloudflareApi.listEntities('post', undefined, { summary: '1' }, true);
+      let rows = Array.isArray(res?.items) ? res.items : [];
+
+      const parsePosts = (items: Array<{ payload?: string }>): Post[] =>
+        items
+          .map((row) => (row && row.payload ? parse<Post>(row.payload) : null))
+          .filter((value): value is Post => Boolean(value) && !value.deleted);
+
+      let posts = parsePosts(rows);
+
+      if (posts.length === 0) {
+        res = await cloudflareApi.listEntities('post');
+        rows = Array.isArray(res?.items) ? res.items : [];
+        posts = parsePosts(rows);
+      }
+
+      return posts;
     } catch (error) {
       console.error('[Cloudflare] fetchPosts failed:', error);
       throw error;
