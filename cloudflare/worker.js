@@ -123,7 +123,7 @@ async function entityList(url, env, user = null) {
   if (type) { clauses.push('entity_type = ?'); values.push(type); }
   if (ownerId) { clauses.push('owner_id = ?'); values.push(ownerId); }
   if (entityId) { clauses.push('entity_id = ?'); values.push(entityId); }
-  if (type === 'notification' && user) { clauses.push('owner_id = ?'); values.push(user.id); }
+  if (['notification', 'communityMember'].includes(type) && user) { clauses.push('owner_id = ?'); values.push(user.id); }
   if (type === 'message' && conversationId) { clauses.push("json_extract(payload, '$.conversationId') = ?"); values.push(conversationId); }
   if (clauses.length) query += ` WHERE ${clauses.join(' AND ')}`;
   query += ' ORDER BY updated_at DESC LIMIT 10000';
@@ -357,9 +357,37 @@ export default {
       }
       if (csrfRequired(request)) return json({ error: 'invalid_origin' }, 403, origin);
 
+      if (url.pathname === '/api/community-membership' && request.method === 'POST') {
+        const user = await currentUser(request, env);
+        if (!user) return json({ error: 'unauthorized' }, 401, origin);
+        const body = await request.json();
+        const communityId = String(body.communityId || '');
+        const join = Boolean(body.join);
+        if (!communityId) return json({ error: 'invalid_community' }, 400, origin);
+        const communityRow = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'community' AND entity_id = ? AND deleted = 0").bind(communityId).first();
+        if (!communityRow) return json({ error: 'community_not_found' }, 404, origin);
+        const membershipId = user.id + ':' + communityId;
+        const existing = await env.DB.prepare("SELECT entity_id FROM entities WHERE entity_type = 'communityMember' AND entity_id = ? AND deleted = 0").bind(membershipId).first();
+        if (join && !existing) {
+          await env.DB.prepare("INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES ('communityMember', ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0")
+            .bind(membershipId, user.id, JSON.stringify({ id: membershipId, userId: user.id, communityId }), Date.now()).run();
+          const community = JSON.parse(communityRow.payload);
+          community.memberCount = Math.max(0, Number(community.memberCount || 0) + 1);
+          community.isMember = false;
+          await env.DB.prepare("UPDATE entities SET payload = ?, updated_at = ? WHERE entity_type = 'community' AND entity_id = ?").bind(JSON.stringify(community), Date.now(), communityId).run();
+        } else if (!join && existing) {
+          await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'communityMember' AND entity_id = ?").bind(Date.now(), membershipId).run();
+          const community = JSON.parse(communityRow.payload);
+          community.memberCount = Math.max(0, Number(community.memberCount || 0) - 1);
+          community.isMember = false;
+          await env.DB.prepare("UPDATE entities SET payload = ?, updated_at = ? WHERE entity_type = 'community' AND entity_id = ?").bind(JSON.stringify(community), Date.now(), communityId).run();
+        }
+        return json({ joined: join, communityId }, 200, origin);
+      }
+
       if (url.pathname === '/api/entities' && request.method === 'GET') {
         const type = url.searchParams.get('type') || '';
-        const privateTypes = new Set(['conversation', 'message', 'notification', 'report', 'adminBan']);
+        const privateTypes = new Set(['conversation', 'message', 'notification', 'communityMember', 'report', 'adminBan']);
         if (privateTypes.has(type) && !await currentUser(request, env)) return json({ error: 'unauthorized' }, 401, origin);
         if (['report', 'adminBan'].includes(type)) return json({ error: 'forbidden_entity_type' }, 403, origin);
         const user = privateTypes.has(type) ? await currentUser(request, env) : null;
@@ -408,7 +436,7 @@ export default {
         if (!type || !entityId || typeof body.payload !== 'string') return json({ error: 'invalid_entity' }, 400, origin);
         let payload;
         try { payload = JSON.parse(body.payload); } catch { return json({ error: 'invalid_entity_payload' }, 400, origin); }
-        const allowedTypes = new Set(['user', 'community', 'post', 'comment', 'profileMedia', 'follow', 'conversation', 'message', 'notification']);
+        const allowedTypes = new Set(['user', 'community', 'post', 'comment', 'profileMedia', 'follow', 'conversation', 'message', 'notification', 'communityMember']);
         if (!allowedTypes.has(type)) return json({ error: 'forbidden_entity_type' }, 403, origin);
         if (type === 'user' && (entityId !== user.id || payload.id !== user.id)) return json({ error: 'forbidden_entity' }, 403, origin);
         if (type === 'profileMedia' && (body.ownerId !== user.id || payload.userId !== user.id || !entityId.startsWith(user.id + ':'))) return json({ error: 'forbidden_entity' }, 403, origin);
@@ -430,6 +458,7 @@ export default {
         }
         if (type === 'follow' && (payload.followerId !== user.id || entityId !== user.id + ':' + payload.followingId)) return json({ error: 'forbidden_entity' }, 403, origin);
         if (type === 'notification' && (!payload.recipientId || payload.actor?.id !== user.id || entityId !== payload.id)) return json({ error: 'forbidden_notification' }, 403, origin);
+        if (type === 'communityMember') return json({ error: 'use_community_membership_endpoint' }, 403, origin);
         if (type === 'conversation' && (entityId !== payload.id || !Array.isArray(payload.participantIds) || !payload.participantIds.includes(user.id))) return json({ error: 'forbidden_conversation' }, 403, origin);
         if (type === 'message') {
           if (entityId !== payload.id || payload.senderId !== user.id || !payload.conversationId) return json({ error: 'forbidden_message' }, 403, origin);
