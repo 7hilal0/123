@@ -227,7 +227,7 @@ export const cloudSync = {
       const parsePosts = (items: Array<{ payload?: string }>): Post[] =>
         items
           .map((row) => (row && row.payload ? parse<Post>(row.payload) : null))
-          .filter((value): value is Post => Boolean(value) && !value.deleted);
+          .filter((value): value is Post => value !== null && !value.deleted);
 
       let posts = parsePosts(rows);
 
