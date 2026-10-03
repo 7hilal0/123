@@ -2,7 +2,7 @@ import { User } from '../types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}, tolerateEntityFailure = true): Promise<T> {
   try {
     const response = await fetch(`${API_BASE}${path}`, {
       ...options,
@@ -11,22 +11,21 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     });
     const contentType = response.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
-      // If the backend is not serving this route (e.g. Vite SPA returning index.html), return an empty structure
-      if (path.startsWith('/api/entities')) {
+      if (path.startsWith('/api/entities') && tolerateEntityFailure) {
         return { items: [] } as unknown as T;
       }
       return {} as T;
     }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      if (path.startsWith('/api/entities')) {
+      if (path.startsWith('/api/entities') && tolerateEntityFailure) {
         return { items: [] } as unknown as T;
       }
       throw Object.assign(new Error(data.error || 'Cloudflare API request failed'), { status: response.status, code: data.error });
     }
     return data as T;
   } catch (err: any) {
-    if (path.startsWith('/api/entities')) {
+    if (path.startsWith('/api/entities') && tolerateEntityFailure) {
       return { items: [] } as unknown as T;
     }
     throw err;
@@ -44,13 +43,16 @@ export const cloudflareApi = {
       method: 'POST',
       body: JSON.stringify({ targetType, targetId, reason }),
     }),
-  listEntities: async (type?: string, ownerId?: string, extra: Record<string, string> = {}) => {
+  listEntities: async (type?: string, ownerId?: string, extra: Record<string, string> = {}, strict = false) => {
     try {
       const res = await request<{ items?: Array<{ entityType: string; entityId: string; ownerId?: string; payload: string }> }>(
-        `/api/entities?${new URLSearchParams({ ...(type ? { type } : {}), ...(ownerId ? { ownerId } : {}), ...extra })}`
+        `/api/entities?${new URLSearchParams({ ...(type ? { type } : {}), ...(ownerId ? { ownerId } : {}), ...extra })}`,
+        {},
+        !strict,
       );
       return { items: Array.isArray(res?.items) ? res.items : [] };
-    } catch {
+    } catch (error) {
+      if (strict) throw error;
       return { items: [] };
     }
   },

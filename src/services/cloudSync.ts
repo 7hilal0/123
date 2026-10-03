@@ -175,7 +175,7 @@ export const cloudSync = {
   async deletePost(postId: string): Promise<boolean> { try { await saveEntity('post', { id: postId, deleted: true, deletedAt: Date.now() } as unknown as Post); return true; } catch { return false; } },
   async fetchPosts(): Promise<Post[]> {
     try {
-      const res = await cloudflareApi.listEntities('post', undefined, { summary: '1' });
+      const res = await cloudflareApi.listEntities('post', undefined, { summary: '1' }, true);
       const rows = Array.isArray(res?.items) ? res.items : [];
       return rows
         .map((row) => (row && row.payload ? parse<Post>(row.payload) : null))
