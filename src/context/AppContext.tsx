@@ -407,24 +407,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }).catch(() => {});
 
-      cloudSync.fetchUsers(currentUser?.id).then((remoteUsers) => {
-        if (remoteUsers && remoteUsers.length > 0) {
-          setUsers((local) => {
-            const remoteIds = new Set(remoteUsers.map((u) => u.id));
-            const localOnly = local.filter((u) => !remoteIds.has(u.id));
-            const mergedRemote = remoteUsers.map((remote) => {
-              const cached = local.find((user) => user.id === remote.id);
-              return {
-                ...cached,
-                ...remote,
-                avatar: remote.avatar || cached?.avatar || DEFAULT_USER_AVATAR,
-                banner: remote.banner || cached?.banner || '',
-              };
-            });
-            return [...mergedRemote, ...localOnly];
-          });
-        }
-      }).catch(() => {});
     }, 0);
 
     return () => {
@@ -433,6 +415,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
+  // Refresh the user/media catalog after the authenticated session is known.
+  // The old implementation captured currentUser=null inside a [] effect.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let active = true;
+    cloudSync.fetchUsers(currentUser.id).then((remoteUsers) => {
+      if (!active || !remoteUsers?.length) return;
+      setUsers((local) => {
+        const remoteIds = new Set(remoteUsers.map((u) => u.id));
+        const localOnly = local.filter((u) => !remoteIds.has(u.id));
+        return [
+          ...remoteUsers.map((remote) => {
+            const cached = local.find((user) => user.id === remote.id);
+            return {
+              ...cached,
+              ...remote,
+              avatar: remote.avatar || cached?.avatar || DEFAULT_USER_AVATAR,
+              banner: remote.banner || cached?.banner || '',
+            };
+          }),
+          ...localOnly,
+        ];
+      });
+    }).catch((error) => console.warn('[Cloudflare] users sync failed:', error));
+    return () => { active = false; };
+  }, [currentUser?.id]);
 
   // Sync to localStorage
   useEffect(() => { storage.saveUsers(users); }, [users]);
@@ -699,7 +707,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const effectiveSlug = postData.communitySlug || 'dz/general';
     const targetCommunity = communities.find((c) => c.slug === effectiveSlug);
     const now = Date.now();
-    const newPostId = `post_${now}`;
+    const newPostId = `post_${crypto.randomUUID()}`;
 
     const cleanAuthor: User = {
       id: currentUser.id,
@@ -744,8 +752,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPosts((prev) => [newPost, ...prev]);
     setComments((prev) => ({ ...prev, [newPostId]: [] }));
 
-    // Real-time Cloud Save
-    cloudSync.savePost(newPost);
+    // Real-time Cloud Save. Roll back the optimistic post if the server rejects it.
+    void cloudSync.savePost(newPost).catch(() => {
+      setPosts((prev) => prev.filter((post) => post.id !== newPostId));
+      setComments((prev) => {
+        const copy = { ...prev };
+        delete copy[newPostId];
+        return copy;
+      });
+      showToast(language === 'ar' ? 'تعذر حفظ المنشور على السيرفر' : 'The post could not be saved to the server', 'warning');
+    });
 
     showToast(language === 'ar' ? 'تم نشر موضوعك وحفظه في السيرفر! 🚀' : 'Post published and saved to cloud! 🚀', 'success');
     navigateToPost(newPostId);
@@ -807,7 +823,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const commentNow = Date.now();
     const newComment: Comment = {
-      id: `comment_${commentNow}`,
+      id: `comment_${crypto.randomUUID()}`,
       postId,
       author: currentUser,
       content,
