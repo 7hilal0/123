@@ -150,8 +150,8 @@ export const cloudSync = {
       const remoteMedia = hydrateMedia(user.id);
       const hydrated = {
         ...user,
-        avatar: user.avatar || remoteMedia.avatar || cached?.avatar || DEFAULT_USER_AVATAR,
-        banner: user.banner || remoteMedia.banner || cached?.banner || '',
+        avatar: remoteMedia.avatar || user.avatar || cached?.avatar || DEFAULT_USER_AVATAR,
+        banner: remoteMedia.banner || user.banner || cached?.banner || '',
         ...(followerCounts.has(user.id) ? { followersCount: followerCounts.get(user.id) || 0 } : {}),
         ...(currentUserId ? { isFollowing: followingByCurrentUser.has(user.id) } : {}),
       };
@@ -185,7 +185,13 @@ export const cloudSync = {
         });
       if (complete) result[field] = complete.map((item) => item.value).join('');
     }
-    userMediaCache.set(userId, result);
+    // Do not cache an incomplete/empty result. Media chunks can still be uploading,
+    // and caching {} here would prevent future requests from seeing the completed image.
+    if (result.avatar || result.banner) {
+      userMediaCache.set(userId, result);
+    } else {
+      userMediaCache.delete(userId);
+    }
     userMediaRequests.delete(userId);
     return result;
     })().catch((error) => {
