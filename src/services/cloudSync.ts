@@ -110,9 +110,34 @@ export const cloudSync = {
   async fetchUsers(currentUserId?: string): Promise<User[]> {
     const users = await fetchType<User>('user');
     const followRows = await listRows('follow');
+    const mediaRows = await listRows('profileMedia');
     const follows = (followRows || [])
       .map((row) => (row && row.payload ? parse<FollowRecord>(row.payload) : null))
       .filter((value): value is FollowRecord => Boolean(value));
+    const media = (mediaRows || [])
+      .map((row) => (row && row.payload ? parse<ProfileMediaChunk>(row.payload) : null))
+      .filter((value): value is ProfileMediaChunk => Boolean(value));
+    const hydrateMedia = (userId: string): Partial<User> => {
+      const result: Partial<User> = {};
+      for (const field of ['avatar', 'banner'] as const) {
+        const groups = new Map<string, ProfileMediaChunk[]>();
+        media.filter((item) => item.userId === userId && item.field === field).forEach((item) => {
+          const key = item.mediaVersion || 'legacy';
+          groups.set(key, [...(groups.get(key) || []), item]);
+        });
+        const complete = [...groups.entries()]
+          .sort(([x], [y]) => y.localeCompare(x))
+          .map(([, group]) => group.sort((x, y) => x.index - y.index))
+          .find((group) => {
+            const total = group[0]?.total || 0;
+            const indexes = new Set(group.map((item) => item.index));
+            return total > 0 && group.length === total && [...Array(total).keys()].every((index) => indexes.has(index));
+          });
+        if (complete) result[field] = complete.map((item) => item.value).join('');
+      }
+      if (result.avatar || result.banner) userMediaCache.set(userId, result);
+      return result;
+    };
     const followerCounts = new Map<string, number>();
     const followingByCurrentUser = new Set<string>();
     for (const follow of follows) {
@@ -122,10 +147,11 @@ export const cloudSync = {
     }
     return (users || []).map((user) => {
       const cached = userMediaCache.get(user.id);
+      const remoteMedia = hydrateMedia(user.id);
       const hydrated = {
         ...user,
-        avatar: user.avatar || cached?.avatar || DEFAULT_USER_AVATAR,
-        banner: user.banner || cached?.banner || '',
+        avatar: user.avatar || remoteMedia.avatar || cached?.avatar || DEFAULT_USER_AVATAR,
+        banner: user.banner || remoteMedia.banner || cached?.banner || '',
         ...(followerCounts.has(user.id) ? { followersCount: followerCounts.get(user.id) || 0 } : {}),
         ...(currentUserId ? { isFollowing: followingByCurrentUser.has(user.id) } : {}),
       };
@@ -180,8 +206,9 @@ export const cloudSync = {
       return rows
         .map((row) => (row && row.payload ? parse<Post>(row.payload) : null))
         .filter((value): value is Post => Boolean(value));
-    } catch {
-      return [];
+    } catch (error) {
+      console.error('[Cloudflare] fetchPosts failed:', error);
+      throw error;
     }
   },
   async fetchPost(postId: string): Promise<Post | null> {
