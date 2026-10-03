@@ -230,8 +230,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         const hasRemoteAvatar = Object.prototype.hasOwnProperty.call(remoteMedia, 'avatar');
         const hasRemoteBanner = Object.prototype.hasOwnProperty.call(remoteMedia, 'banner');
-        const avatar = hasRemoteAvatar ? remoteMedia.avatar : (sessionUser.avatar || cachedMedia?.avatar || cachedProfile?.avatar || DEFAULT_USER_AVATAR);
-        const banner = hasRemoteBanner ? remoteMedia.banner : (sessionUser.banner || cachedMedia?.banner || cachedProfile?.banner || '');
+        const avatar = hasRemoteAvatar ? (remoteMedia.avatar || DEFAULT_USER_AVATAR) : (sessionUser.avatar || cachedMedia?.avatar || cachedProfile?.avatar || DEFAULT_USER_AVATAR);
+        const banner = hasRemoteBanner ? (remoteMedia.banner || '') : (sessionUser.banner || cachedMedia?.banner || cachedProfile?.banner || '');
 
         const profile = {
           ...sessionUser,
