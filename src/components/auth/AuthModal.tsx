@@ -41,7 +41,17 @@ export const AuthModal: React.FC = () => {
           if (!response?.credential) return;
           setGoogleBusy(true);
           setErrorMessage('');
-          try { await googleLogin(response.credential); }
+          try { if (mode === 'register') {
+            if (!username.trim() || !displayName.trim()) {
+              setErrorMessage('Enter your username and display name first, then continue with Google.');
+              return;
+            }
+            if (username.trim().replace(/[^a-zA-Z0-9_]/g, '').length < 3) {
+              setErrorMessage('Username must contain at least 3 letters or numbers.');
+              return;
+            }
+          }
+          await googleLogin(response.credential, mode === 'register' ? { username: username.trim(), displayName: displayName.trim() } : undefined); }
           finally { if (!cancelled) setGoogleBusy(false); }
         },
         ux_mode: 'popup',
@@ -280,12 +290,16 @@ export const AuthModal: React.FC = () => {
 
           <button
             type="submit"
-            disabled={verificationBusy || googleBusy}
+            disabled={verificationBusy || googleBusy || mode === 'register'}
             className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-60 disabled:cursor-wait text-white font-semibold text-xs md:text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer"
           >
-            <span>{mode === 'login' ? t.loginBtn : 'Create account'}</span>
+            <span>{mode === 'login' ? t.loginBtn : 'Create account with Google'}</span>
             <SubmitArrow className="w-4 h-4" />
           </button>
+
+          {mode === 'register' && (
+            <p className="text-[11px] text-neutral-400 text-center">Enter your username and display name above, then use Google to create your account.</p>
+          )}
 
           <div className="flex items-center gap-3 py-1">
             <span className="h-px flex-1 bg-white/10" />
