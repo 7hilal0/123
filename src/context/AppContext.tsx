@@ -18,6 +18,7 @@ import { cloudflareApi } from '../services/cloudflareApi';
 import { DEFAULT_USER_AVATAR } from '../utils/avatarConstants';
 import { resolvePostForUser, resolveCommentForUser } from '../utils/voting';
 import { resolveConversationForUser } from '../utils/conversationUtils';
+import { formatRelativeTime } from '../utils/relativeTime';
 
 export interface ToastMessage {
   id: string;
@@ -759,7 +760,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userVote: null,
       votes: {},
       commentCount: 0,
-      createdAt: language === 'ar' ? 'الآن' : 'Just now',
+      createdAt: formatRelativeTime(now, language, language === 'ar' ? 'الآن' : language === 'fr' ? 'À l’instant' : 'Just now'),
       timestamp: now,
       tags: postData.tags,
       isSaved: false,
@@ -844,7 +845,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       postId,
       author: currentUser,
       content,
-      createdAt: language === 'ar' ? 'الآن' : 'Just now',
+      createdAt: formatRelativeTime(commentNow, language, language === 'ar' ? 'الآن' : language === 'fr' ? 'À l’instant' : 'Just now'),
       timestamp: commentNow,
       upvotes: 0,
       downvotes: 0,
