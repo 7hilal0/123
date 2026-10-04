@@ -407,8 +407,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             const mergedVotes = { ...(p.votes || {}) };
             const mergedVoteState = { ...(p.voteState || {}) };
+            const mergedSavedBy = { ...(p.savedBy || {}) };
             const pendingVotes = pending.votes || {};
             const pendingVoteState = pending.voteState || {};
+            const pendingSavedBy = pending.savedBy || {};
 
             for (const [userId, state] of Object.entries(pendingVoteState)) {
               if (state === 0) {
@@ -420,10 +422,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }
             }
 
+            if (currentUser && Object.prototype.hasOwnProperty.call(pendingSavedBy, currentUser.id)) {
+              if (pendingSavedBy[currentUser.id]) mergedSavedBy[currentUser.id] = true;
+              else delete mergedSavedBy[currentUser.id];
+            }
+
             return resolvePostForUser({
               ...p,
               votes: mergedVotes,
               voteState: mergedVoteState,
+              savedBy: mergedSavedBy,
               upvotes: Object.values(mergedVotes).filter((vote) => vote === 1).length,
               downvotes: Object.values(mergedVotes).filter((vote) => vote === -1).length,
             }, currentUser?.id);
