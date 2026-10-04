@@ -619,17 +619,22 @@ export default {
               const currentPost = JSON.parse(existingPost.payload);
               const currentVotes = { ...(currentPost.votes || {}) };
               const currentVoteState = { ...(currentPost.voteState || {}) };
+              const currentSavedBy = { ...(currentPost.savedBy || {}) };
               const incomingVotes = payload.votes || {};
               const incomingVoteState = payload.voteState || {};
+              const incomingSavedBy = payload.savedBy || {};
 
-              // A voter is allowed to change only their own vote. Never replace
-              // the whole votes map with a stale client snapshot: doing that
-              // caused likes from other users to disappear after polling/refresh.
+              // A user may change only their own vote/save state. Never replace
+              // another user's state with a stale client snapshot.
               const incomingState = Object.prototype.hasOwnProperty.call(incomingVoteState, user.id)
                 ? Number(incomingVoteState[user.id])
                 : (Object.prototype.hasOwnProperty.call(incomingVotes, user.id)
                   ? Number(incomingVotes[user.id])
                   : Number(currentVoteState[user.id] || currentVotes[user.id] || 0));
+              if (Object.prototype.hasOwnProperty.call(incomingSavedBy, user.id)) {
+                if (incomingSavedBy[user.id]) currentSavedBy[user.id] = true;
+                else delete currentSavedBy[user.id];
+              }
 
               if (incomingState === 1 || incomingState === -1) {
                 currentVotes[user.id] = incomingState;
@@ -643,6 +648,7 @@ export default {
                 ...currentPost,
                 votes: currentVotes,
                 voteState: currentVoteState,
+                savedBy: currentSavedBy,
                 upvotes: Object.values(currentVotes).filter((vote) => Number(vote) === 1).length,
                 downvotes: Object.values(currentVotes).filter((vote) => Number(vote) === -1).length,
               };
