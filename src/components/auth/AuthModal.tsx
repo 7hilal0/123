@@ -34,51 +34,90 @@ export const AuthModal: React.FC = () => {
   useEffect(() => {
     if (!authModalOpen || !googleButtonRef.current) return;
     let cancelled = false;
+
     const renderGoogleButton = () => {
-      if (cancelled || !googleButtonRef.current || !(window as any).google?.accounts?.id) return;
-      googleButtonRef.current.innerHTML = '';
-      (window as any).google.accounts.id.initialize({
+      const container = googleButtonRef.current;
+      const google = (window as any).google;
+      if (cancelled || !container || !google?.accounts?.id) return;
+      container.innerHTML = '';
+
+      google.accounts.id.initialize({
         client_id: '991149566827-l73oec1hjpu6jb21hftr4a2e1gille3m.apps.googleusercontent.com',
-        callback: async (response: { credential: string }) => {
-          if (!response?.credential) return;
-          setGoogleBusy(true);
-          setErrorMessage('');
-          try { if (mode === 'register') {
-            if (!username.trim()) {
-              setErrorMessage('Enter your username first, then continue with Google.');
+        callback: async (response: { credential?: string }) => {
+          if (cancelled) return;
+          if (!response?.credential) {
+            setErrorMessage('لم يتم استلام بيانات تسجيل الدخول من Google. حاول مرة أخرى.');
+            return;
+          }
+
+          if (mode === 'register') {
+            const cleanUsername = username.trim().replace(/[^a-zA-Z0-9_]/g, '');
+            if (cleanUsername.length < 3) {
+              setErrorMessage('أدخل اسم مستخدم من 3 أحرف أو أرقام على الأقل أولاً.');
               return;
             }
-            if (username.trim().replace(/[^a-zA-Z0-9_]/g, '').length < 3) {
-              setErrorMessage('Username must contain at least 3 letters or numbers.');
+            if (cleanUsername !== username.trim()) {
+              setErrorMessage('اسم المستخدم يجب أن يحتوي على أحرف إنجليزية وأرقام و _ فقط.');
               return;
             }
           }
-          await googleLogin(response.credential, mode === 'register' ? { username: username.trim(), ...(displayName.trim() ? { displayName: displayName.trim() } : {}) } : undefined); }
-          finally { if (!cancelled) setGoogleBusy(false); }
+
+          setGoogleBusy(true);
+          setErrorMessage('');
+          try {
+            const success = await googleLogin(
+              response.credential,
+              mode === 'register'
+                ? { username: username.trim(), ...(displayName.trim() ? { displayName: displayName.trim() } : {}) }
+                : undefined
+            );
+            if (!success && !cancelled) setErrorMessage('تعذر تسجيل الدخول باستخدام Google. حاول مرة أخرى.');
+          } catch (error) {
+            console.error('[Google UI] Login failed:', error);
+            if (!cancelled) setErrorMessage('حدث خطأ أثناء تسجيل الدخول باستخدام Google.');
+          } finally {
+            if (!cancelled) setGoogleBusy(false);
+          }
         },
         ux_mode: 'popup',
+        auto_select: false,
+        use_fedcm_for_button: true,
       });
-      (window as any).google.accounts.id.renderButton(googleButtonRef.current, {
+
+      const availableWidth = container.clientWidth || 400;
+      const buttonWidth = Math.min(400, Math.max(220, Math.floor(availableWidth)));
+      google.accounts.id.renderButton(container, {
         type: 'standard',
-        theme: 'filled_blue',
+        theme: 'outline',
         size: 'large',
         text: 'continue_with',
         shape: 'rectangular',
-        width: 400,
+        width: buttonWidth,
         logo_alignment: 'center',
         locale: language === 'ar' ? 'ar' : language === 'fr' ? 'fr' : 'en',
       });
     };
+
     const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]') as HTMLScriptElement | null;
     if ((window as any).google?.accounts?.id) renderGoogleButton();
     else if (existing) existing.addEventListener('load', renderGoogleButton, { once: true });
     else {
       const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client'; script.async = true; script.defer = true; script.onload = renderGoogleButton;
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = renderGoogleButton;
+      script.onerror = () => {
+        if (!cancelled) setErrorMessage('تعذر تحميل تسجيل الدخول بواسطة Google. تحقق من اتصال الإنترنت.');
+      };
       document.head.appendChild(script);
     }
-    return () => { cancelled = true; };
-  }, [authModalOpen, mode, googleLogin]);
+
+    return () => {
+      cancelled = true;
+      if (googleButtonRef.current) googleButtonRef.current.innerHTML = '';
+    };
+  }, [authModalOpen, mode, language, username, displayName, googleLogin]);
 
   if (!authModalOpen) return null;
 
@@ -313,25 +352,18 @@ export const AuthModal: React.FC = () => {
             <span className="h-px flex-1 bg-white/10" />
           </div>
 
-          <div className={googleBusy ? 'opacity-60 pointer-events-none' : ''}>
-            <div className="relative w-full min-h-[72px] rounded-xl overflow-hidden flex flex-col items-center justify-center gap-1.5">
-              <img
-                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                alt="Google"
-                className="w-9 h-9"
-              />
-              <span className="text-xs font-semibold text-neutral-300">تسجيل الدخول باستخدام Google</span>
-              <div ref={googleButtonRef} className="absolute inset-0 z-10 w-full h-full opacity-0 cursor-pointer" />
-              {mode === 'register' && !username.trim() && !googleBusy && (
-                <button
-                  type="button"
-                  aria-label="Enter username before Google signup"
-                  onClick={() => setErrorMessage('Enter your username first, then continue with Google.')}
-                  className="absolute inset-0 z-20 w-full h-full bg-transparent"
-                />
-              )}
-            </div>
+          <div className={"w-full flex justify-center transition-opacity " + (googleBusy ? "opacity-60 pointer-events-none" : "")}>
+            <div
+              ref={googleButtonRef}
+              className="w-full min-h-[44px] flex justify-center overflow-hidden rounded-xl"
+              aria-label="Continue with Google"
+            />
           </div>
+          {mode === 'register' && !username.trim() && (
+            <p className="text-[10px] text-neutral-500 text-center">
+              أدخل اسم المستخدم أولاً عند إنشاء حساب جديد.
+            </p>
+          )}
 
           <div className="pt-3 border-t border-white/5 text-[11px] text-neutral-400 flex items-center justify-between">
             <button
