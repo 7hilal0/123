@@ -281,7 +281,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
               </div>
               <div className="pb-2">
                 <h2 className="text-2xl font-bold tracking-tight" style={{ color: displayNameColor }}>{displayName || currentUser.username}</h2>
-                <p className="font-mono text-sm" style={{ color: `${profileColor}cc` }}>@{currentUser.username}</p>
+                <p className="font-mono text-sm text-neutral-400">@{currentUser.username}</p>
               </div>
             </div>
           </section>
