@@ -235,23 +235,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const avatar = hasRemoteAvatar ? (remoteMedia.avatar || DEFAULT_USER_AVATAR) : (sessionUser.avatar || cachedMedia?.avatar || cachedProfile?.avatar || DEFAULT_USER_AVATAR);
         const banner = hasRemoteBanner ? (remoteMedia.banner || '') : (sessionUser.banner || cachedMedia?.banner || cachedProfile?.banner || '');
 
+        // Cloudflare is authoritative for account/profile fields.
+        // Only media uses the local cache as a fallback when the server has
+        // no media yet. This prevents an old browser snapshot from restoring
+        // stale names, bios, colors, status, or counts after refresh.
         const profile = {
           ...sessionUser,
-          ...(cachedProfile || {}),
-          // Never let cachedProfile overwrite newer server media.
           avatar,
           banner,
-          profileColor: sessionUser.profileColor ?? cachedProfile?.profileColor,
-          displayNameColor: sessionUser.displayNameColor ?? cachedProfile?.displayNameColor,
-          bio: sessionUser.bio || cachedProfile?.bio || '',
-          status: sessionUser.status || cachedProfile?.status || 'online' as UserStatus,
-          customStatus: sessionUser.customStatus || cachedProfile?.customStatus || '',
-          badges: sessionUser.badges || cachedProfile?.badges || ['Member'],
-          karma: sessionUser.karma ?? cachedProfile?.karma ?? 0,
-          joinedDate: sessionUser.joinedDate || cachedProfile?.joinedDate || 'Joined today',
-          followersCount: sessionUser.followersCount ?? cachedProfile?.followersCount ?? 0,
-          followingCount: sessionUser.followingCount ?? cachedProfile?.followingCount ?? 0,
-          isFollowing: sessionUser.isFollowing ?? cachedProfile?.isFollowing ?? false,
+          profileColor: sessionUser.profileColor ?? '',
+          displayNameColor: sessionUser.displayNameColor ?? '',
+          bio: sessionUser.bio ?? '',
+          status: sessionUser.status ?? 'online' as UserStatus,
+          customStatus: sessionUser.customStatus ?? '',
+          badges: sessionUser.badges ?? ['Member'],
+          karma: sessionUser.karma ?? 0,
+          joinedDate: sessionUser.joinedDate ?? 'Joined today',
+          followersCount: sessionUser.followersCount ?? 0,
+          followingCount: sessionUser.followingCount ?? 0,
+          isFollowing: sessionUser.isFollowing ?? false,
         };
         setUsers((previous) => previous.some((user) => user.id === profile.id) ? previous.map((user) => user.id === profile.id ? profile : user) : [profile, ...previous]);
         setCurrentUser(profile);
