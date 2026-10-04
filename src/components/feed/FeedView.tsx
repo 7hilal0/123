@@ -301,7 +301,7 @@ export const FeedView: React.FC = () => {
               displayPosts.map((post, index) => (
                 <React.Fragment key={post.id}>
                   <PostCard post={post} />
-                  {(index + 1) % 3 === 0 && index + 1 < displayPosts.length && <RevenueAd />}
+                  {(index + 1) % 3 === 0 && <RevenueAd />}
                 </React.Fragment>
               ))
             ) : cloudSyncStatus === 'syncing' ? (
