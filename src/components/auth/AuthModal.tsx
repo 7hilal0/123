@@ -185,11 +185,11 @@ export const AuthModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 text-start">
-      <div className="bg-neutral-900 border border-white/10 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+      <div className="bg-neutral-900/95 backdrop-blur-xl border border-white/10 rounded-[28px] max-w-md w-full overflow-hidden shadow-2xl shadow-black/50 animate-in fade-in zoom-in-95">
         {/* Header */}
-        <div className="p-5 pb-4 border-b border-white/5 flex items-center justify-between">
+        <div className="p-5 pb-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-600/30 shrink-0">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white shadow-lg shadow-emerald-600/25 shrink-0">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
@@ -223,20 +223,20 @@ export const AuthModal: React.FC = () => {
         </div>
 
         {/* Mode switcher tabs */}
-        <div className="flex border-b border-white/5">
+        <div className="flex p-1.5 mx-5 mt-4 rounded-xl bg-neutral-950/70 border border-white/5">
           <button
             type="button"
             onClick={() => {
               setMode('login');
               setErrorMessage('');
             }}
-            className={`flex-1 py-3 text-xs font-semibold text-center transition-colors relative cursor-pointer ${
-              mode === 'login' ? 'text-white' : 'text-neutral-400 hover:text-neutral-200'
+            className={`flex-1 py-2.5 rounded-lg text-xs font-semibold text-center transition-all relative cursor-pointer ${
+              mode === 'login' ? 'text-white bg-white/10 shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
             <span>{t.navLogin}</span>
             {mode === 'login' && (
-              <span className="absolute bottom-0 start-0 end-0 h-0.5 bg-emerald-500 rounded-full" />
+              <span className="hidden" />
             )}
           </button>
 
@@ -247,7 +247,7 @@ export const AuthModal: React.FC = () => {
               setErrorMessage('');
             }}
             className={`flex-1 py-3 text-xs font-semibold text-center transition-colors relative cursor-pointer ${
-              mode === 'register' ? 'text-white' : 'text-neutral-400 hover:text-neutral-200'
+              mode === 'register' ? 'text-white bg-white/10 shadow-sm' : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
             <span>{t.navRegister}</span>
@@ -266,7 +266,7 @@ export const AuthModal: React.FC = () => {
         )}
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 md:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-5 md:p-6 pt-5 space-y-4 max-h-[75vh] overflow-y-auto">
           {mode === 'register' && (
             <>
               {/* Display Name */}
@@ -338,7 +338,7 @@ export const AuthModal: React.FC = () => {
           <button
             type="submit"
             disabled={verificationBusy || googleBusy}
-            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-60 disabled:cursor-wait text-white font-semibold text-xs md:text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer"
+            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-60 disabled:cursor-wait text-white font-semibold text-xs md:text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer"
           >
             <span>{mode === 'login' ? t.loginBtn : 'Create account'}</span>
             <SubmitArrow className="w-4 h-4" />
@@ -353,16 +353,17 @@ export const AuthModal: React.FC = () => {
           </div>
 
           <div className="w-full">
-            <div className={"relative w-full min-h-[44px] transition-opacity " + (googleBusy ? "opacity-60 pointer-events-none" : "")}>
-              <div
-                ref={googleButtonRef}
-                className="absolute inset-0 w-full min-h-[44px] opacity-0 overflow-hidden rounded-xl"
-                aria-label="Continue with Google"
-              />
+            <div className="relative w-full h-12 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] transition-all overflow-hidden flex items-center justify-center">
+              <span className="text-sm font-semibold text-white">Continue with Google</span>
               <img
                 src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
                 alt="Google"
-                className="absolute inset-0 z-10 w-full h-full object-contain pointer-events-none"
+                className="absolute start-3 w-6 h-6 object-contain z-10"
+              />
+              <div
+                ref={googleButtonRef}
+                className={"absolute inset-0 z-20 opacity-0 overflow-hidden rounded-xl " + (googleBusy ? "pointer-events-none" : "")}
+                aria-label="Continue with Google"
               />
             </div>
           </div>
