@@ -23,6 +23,7 @@ export const CreatePostView: React.FC = () => {
     setAuthModalOpen,
     t,
     dir,
+    language,
   } = useApp();
 
   const [mediaType, setMediaType] = useState<PostMediaType>('text');
@@ -143,15 +144,15 @@ export const CreatePostView: React.FC = () => {
       <div className="rounded-2xl border border-white/10 bg-neutral-900/70 p-3 shadow-xl shadow-black/10">
         <div className="flex items-center justify-between px-1 mb-2.5">
           <div>
-            <p className="text-xs font-semibold text-neutral-200">{dir === 'rtl' ? 'ماذا تريد أن تنشر؟' : 'What do you want to share?'}</p>
-            <p className="text-[10px] text-neutral-500">{dir === 'rtl' ? 'اختر نوعًا واحدًا، ويمكنك ترك العنوان فارغًا' : 'Choose a format; the title is optional'}</p>
+            <p className="text-xs font-semibold text-neutral-200">{dir === 'rtl' ? 'ماذا تريد أن تنشر؟' : language === 'fr' ? 'Que voulez-vous partager ?' : 'What do you want to share?'}</p>
+            <p className="text-[10px] text-neutral-500">{dir === 'rtl' ? 'اختر نوعًا واحدًا، ويمكنك ترك العنوان فارغًا' : language === 'fr' ? 'Choisissez un format ; le titre est facultatif' : 'Choose a format; the title is optional'}</p>
           </div>
-          <span className="rounded-full bg-white/5 px-2 py-1 text-[10px] text-neutral-500">2 formats</span>
+          <span className="rounded-full bg-white/5 px-2 py-1 text-[10px] text-neutral-500">{language === 'fr' ? '2 formats' : dir === 'rtl' ? 'نوعان' : '2 formats'}</span>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
           {([
-            { id: 'discussion' as const, value: 'text' as PostMediaType, icon: FileText, label: dir === 'rtl' ? 'نقاش' : 'Discussion', hint: dir === 'rtl' ? 'فكرة أو سؤال' : 'Idea or question', active: 'bg-emerald-500/10 border-emerald-500/40', iconBg: 'bg-emerald-500/10', iconText: 'text-emerald-400' },
-            { id: 'image' as const, value: 'image' as PostMediaType, icon: ImageIcon, label: dir === 'rtl' ? 'صورة / عمل فني' : 'Image / Artwork', hint: dir === 'rtl' ? 'انشر صورة فقط' : 'Image-only posts', active: 'bg-teal-500/10 border-teal-500/40', iconBg: 'bg-teal-500/10', iconText: 'text-teal-400' },
+            { id: 'discussion' as const, value: 'text' as PostMediaType, icon: FileText, label: dir === 'rtl' ? 'نقاش' : language === 'fr' ? 'Discussion' : 'Discussion', hint: dir === 'rtl' ? 'فكرة أو سؤال' : language === 'fr' ? 'Idée ou question' : 'Idea or question', active: 'bg-emerald-500/10 border-emerald-500/40', iconBg: 'bg-emerald-500/10', iconText: 'text-emerald-400' },
+            { id: 'image' as const, value: 'image' as PostMediaType, icon: ImageIcon, label: dir === 'rtl' ? 'صورة / عمل فني' : language === 'fr' ? 'Image / œuvre' : 'Image / Artwork', hint: dir === 'rtl' ? 'انشر صورة فقط' : language === 'fr' ? 'Publication avec image uniquement' : 'Image-only posts', active: 'bg-teal-500/10 border-teal-500/40', iconBg: 'bg-teal-500/10', iconText: 'text-teal-400' },
           ] as const).map((format, index) => {
             const active = postFormat === format.id;
             const Icon = format.icon;
