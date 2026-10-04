@@ -666,7 +666,20 @@ export default {
           } else if (entityId !== payload.id || payload.author?.id !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
         }
         if (type === 'follow' && (payload.followerId !== user.id || entityId !== user.id + ':' + payload.followingId)) return json({ error: 'forbidden_entity' }, 403, origin);
-        if (type === 'notification' && (!payload.recipientId || payload.actor?.id !== user.id || entityId !== payload.id)) return json({ error: 'forbidden_notification' }, 403, origin);
+        if (type === 'notification') {
+          if (!payload.recipientId || entityId !== payload.id) return json({ error: 'forbidden_notification' }, 403, origin);
+          const existingNotification = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'notification' AND entity_id = ? AND deleted = 0").bind(entityId).first();
+          if (existingNotification?.payload) {
+            let existingPayload;
+            try { existingPayload = JSON.parse(existingNotification.payload); } catch { return json({ error: 'forbidden_notification' }, 403, origin); }
+            // The recipient may update only the read flag on an existing notification.
+            if (existingPayload.recipientId !== user.id || payload.recipientId !== user.id) return json({ error: 'forbidden_notification' }, 403, origin);
+            payload = { ...existingPayload, isRead: Boolean(payload.isRead) };
+          } else if (payload.actor?.id !== user.id) {
+            // New activity notifications must be created by the actor.
+            return json({ error: 'forbidden_notification' }, 403, origin);
+          }
+        }
         if (type === 'communityMember') return json({ error: 'use_community_membership_endpoint' }, 403, origin);
         if (type === 'conversation' && (entityId !== payload.id || !Array.isArray(payload.participantIds) || !payload.participantIds.includes(user.id))) return json({ error: 'forbidden_conversation' }, 403, origin);
         if (type === 'message') {
