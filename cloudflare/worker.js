@@ -236,6 +236,23 @@ async function entityList(url, env, user = null) {
       }
       return { entityType: row.entity_type, entityId: row.entity_id, ownerId: row.owner_id, payload: JSON.stringify(payload) };
     }
+    if (type === 'user' || type === 'comment') {
+      try {
+        const payload = JSON.parse(row.payload);
+        const redactUser = (value) => {
+          if (!value || typeof value !== 'object') return;
+          delete value.email;
+          delete value.googleSub;
+          delete value.password;
+          delete value.password_hash;
+        };
+        if (type === 'user') redactUser(payload);
+        if (type === 'comment') redactUser(payload.author);
+        return { entityType: row.entity_type, entityId: row.entity_id, ownerId: row.owner_id, payload: JSON.stringify(payload) };
+      } catch {
+        return { entityType: row.entity_type, entityId: row.entity_id, ownerId: row.owner_id, payload: '{}' };
+      }
+    }
     return { entityType: row.entity_type, entityId: row.entity_id, ownerId: row.owner_id, payload: row.payload };
   });
 }
