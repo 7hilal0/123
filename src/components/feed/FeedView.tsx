@@ -15,41 +15,6 @@ import {
   Loader2
 } from 'lucide-react';
 
-const RevenueAd: React.FC = () => {
-  const adSrcDoc = `<!doctype html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;overflow:hidden;background:transparent;">
-<script>
-  atOptions = {
-    'key' : '8d8e5dc579110b0e6a1187350d066be5',
-    'format' : 'iframe',
-    'height' : 60,
-    'width' : 468,
-    'params' : {}
-  };
-</script>
-<script src="https://www.highrevenueformat.com/8d8e5dc579110b0e6a1187350d066be5/invoke.js"></script>
-</body>
-</html>`;
-
-  return (
-    <div className="w-full overflow-x-auto flex justify-center py-1" aria-label="Advertisement">
-      <iframe
-        title="Advertisement"
-        srcDoc={adSrcDoc}
-        width="468"
-        height="60"
-        frameBorder="0"
-        scrolling="no"
-        loading="lazy"
-        sandbox="allow-scripts allow-same-origin"
-        className="shrink-0 border-0"
-      />
-    </div>
-  );
-};
-
 const FeedSkeleton: React.FC = () => (
   <div className="space-y-3.5" aria-label="Loading posts">
     {[0, 1].map((item) => (
@@ -301,7 +266,6 @@ export const FeedView: React.FC = () => {
               displayPosts.map((post, index) => (
                 <React.Fragment key={post.id}>
                   <PostCard post={post} />
-                  {(index + 1) % 3 === 0 && <RevenueAd />}
                 </React.Fragment>
               ))
             ) : cloudSyncStatus === 'syncing' ? (
