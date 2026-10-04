@@ -15,44 +15,25 @@ import {
   Loader2
 } from 'lucide-react';
 
-const RevenueAd: React.FC = () => {
-  const adSrcDoc = `<!doctype html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;overflow:hidden;background:transparent;">
-<script>
-  atOptions = {
-    'key' : '8d8e5dc579110b0e6a1187350d066be5',
-    'format' : 'iframe',
-    'height' : 60,
-    'width' : 468,
-    'params' : {}
-  };
-</script>
-<script src="https://www.highrevenueformat.com/8d8e5dc579110b0e6a1187350d066be5/invoke.js"></script>
-</body>
-</html>`;
-
-  return (
-    <div
-      className="w-full flex justify-center py-2 overflow-hidden"
-      aria-label="Advertisement"
-      style={{ minHeight: 60 }}
-    >
-      <iframe
-        title="Advertisement"
-        srcDoc={adSrcDoc}
-        width="468"
-        height="60"
-        frameBorder="0"
-        scrolling="no"
-        loading="lazy"
-        className="block border-0 max-w-full"
-        style={{ width: '468px', height: '60px' }}
-      />
-    </div>
-  );
-};
+const RevenueAd: React.FC = () => (
+  <div
+    className="w-full flex justify-center py-2 overflow-hidden"
+    aria-label="Advertisement"
+    style={{ minHeight: 60 }}
+  >
+    <iframe
+      title="Advertisement"
+      src="/ad.html"
+      width="468"
+      height="60"
+      frameBorder="0"
+      scrolling="no"
+      loading="eager"
+      className="block border-0 max-w-full"
+      style={{ width: '468px', height: '60px' }}
+    />
+  </div>
+);
 
 const FeedSkeleton: React.FC = () => (
   <div className="space-y-3.5" aria-label="Loading posts">
