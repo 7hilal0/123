@@ -390,6 +390,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const pending = pendingVoteSavesRef.current[p.id];
             if (!pending) return resolvePostForUser(p, currentUser?.id);
 
+            // Keep the optimistic vote until the remote snapshot actually
+            // contains the same vote. A successful HTTP save can finish before
+            // the next poll sees the new D1 value; clearing pending in finally()
+            // would let that older snapshot make the like disappear again.
+            if (currentUser) {
+              const expectedVote = pending.votes?.[currentUser.id] ?? null;
+              const remoteVote = p.votes?.[currentUser.id] ?? null;
+              if (expectedVote === remoteVote) {
+                delete pendingVoteSavesRef.current[p.id];
+                return resolvePostForUser(p, currentUser.id);
+              }
+            }
+
             const mergedVotes = { ...(p.votes || {}) };
             const mergedVoteState = { ...(p.voteState || {}) };
             const pendingVotes = pending.votes || {};
@@ -701,11 +714,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     pendingVoteSavesRef.current[postId] = updated;
     setPosts((previous) => previous.map((post) => (post.id === postId ? updated : post)));
     // Save immediately, including an empty votes map after removing a vote.
-    void cloudSync.savePost(updated).finally(() => {
-      const pending = pendingVoteSavesRef.current[postId];
-      if (pending === updated) {
-        delete pendingVoteSavesRef.current[postId];
-      }
+    void cloudSync.savePost(updated).catch((error) => {
+      console.error('[Cloudflare] Vote save failed', error);
+      // Keep the optimistic state briefly so a transient poll cannot erase it.
+      window.setTimeout(() => {
+        if (pendingVoteSavesRef.current[postId] === updated) {
+          delete pendingVoteSavesRef.current[postId];
+        }
+      }, 30000);
     });
 
     if (updated.userVote === desiredVote && existing.author.id !== currentUser.id) {
