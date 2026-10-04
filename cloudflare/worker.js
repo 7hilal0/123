@@ -632,11 +632,15 @@ export default {
             // change their own vote; they must never be able to rewrite the
             // post's title/content/author by calling savePost.
             const existingPost = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'post' AND entity_id = ? AND deleted = 0").bind(entityId).first();
-            if (!existingPost?.payload) return json({ error: 'post_not_found' }, 404, origin);
 
-            let existingAuthorId = null;
-            try { existingAuthorId = JSON.parse(existingPost.payload)?.author?.id || null; } catch {}
-            if (existingAuthorId !== user.id) {
+            // A brand-new post has no server row yet. Allow the author to create it;
+            // only apply the vote/save merge rules when the post already exists.
+            if (!existingPost?.payload) {
+              if (payload.author?.id !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
+            } else {
+              let existingAuthorId = null;
+              try { existingAuthorId = JSON.parse(existingPost.payload)?.author?.id || null; } catch {}
+              if (existingAuthorId !== user.id) {
               const currentPost = JSON.parse(existingPost.payload);
               const currentVotes = { ...(currentPost.votes || {}) };
               const currentVoteState = { ...(currentPost.voteState || {}) };
@@ -675,6 +679,7 @@ export default {
               };
             } else if (payload.author?.id !== user.id) {
               return json({ error: 'forbidden_entity' }, 403, origin);
+              }
             }
           }
         }
