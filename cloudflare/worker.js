@@ -397,7 +397,7 @@ export default {
         if (!displayName || displayName.length > 80) {
           return json({ error: 'invalid_display_name' }, 400, origin);
         }
-        if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
           return json({ error: 'invalid_email' }, 400, origin);
         }
         if (password.length < 8) {
