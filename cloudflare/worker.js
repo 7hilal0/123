@@ -223,6 +223,10 @@ async function entityList(url, env, user = null) {
       const payload = JSON.parse(row.payload);
       if (payload.mediaType === 'image') payload.mediaDeferred = true;
       if (payload.author && typeof payload.author === 'object') {
+        delete payload.author.email;
+        delete payload.author.googleSub;
+        delete payload.author.password;
+        delete payload.author.password_hash;
         const avatarChunks = avatars.get(payload.author.id);
         if ((!payload.author.avatar || payload.author.avatar.length === 0) && avatarChunks?.length) {
           avatarChunks.sort((a, b) => a.index - b.index);
@@ -236,7 +240,7 @@ async function entityList(url, env, user = null) {
       }
       return { entityType: row.entity_type, entityId: row.entity_id, ownerId: row.owner_id, payload: JSON.stringify(payload) };
     }
-    if (type === 'user' || type === 'comment') {
+    if (type === 'user' || type === 'comment' || type === 'post') {
       try {
         const payload = JSON.parse(row.payload);
         const redactUser = (value) => {
@@ -247,7 +251,7 @@ async function entityList(url, env, user = null) {
           delete value.password_hash;
         };
         if (type === 'user') redactUser(payload);
-        if (type === 'comment') redactUser(payload.author);
+        if (type === 'comment' || type === 'post') redactUser(payload.author);
         return { entityType: row.entity_type, entityId: row.entity_id, ownerId: row.owner_id, payload: JSON.stringify(payload) };
       } catch {
         return { entityType: row.entity_type, entityId: row.entity_id, ownerId: row.owner_id, payload: '{}' };
