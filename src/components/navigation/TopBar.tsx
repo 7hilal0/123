@@ -23,7 +23,7 @@ export const TopBar: React.FC = () => {
         title="DZCORE"
       >
         <div className="w-10 h-8 rounded-xl overflow-hidden bg-neutral-900 border border-white/10 flex items-center justify-center shadow-md shadow-emerald-600/20 group-hover:scale-105 transition-transform">
-          <img src="/dzcore-logo.png" alt="DZCORE logo" className="h-full w-full object-contain" />
+          <img src="/dzcore-logo.svg" alt="DZCORE logo" className="h-full w-full object-contain" />
         </div>
         <span className="font-display font-bold text-lg md:text-xl tracking-wide text-white">
           <span className="text-emerald-500 font-extrabold">D</span>ZCORE
