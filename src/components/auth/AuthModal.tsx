@@ -352,17 +352,17 @@ export const AuthModal: React.FC = () => {
             <span className="h-px flex-1 bg-white/10" />
           </div>
 
-          <div className="w-full flex flex-col items-center gap-2">
-            <img
-              src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-              alt="Google"
-              className="w-8 h-8 object-contain"
-            />
-            <div className={"w-full flex justify-center transition-opacity " + (googleBusy ? "opacity-60 pointer-events-none" : "")}>
+          <div className="w-full">
+            <div className={"relative w-full min-h-[44px] transition-opacity " + (googleBusy ? "opacity-60 pointer-events-none" : "")}>
               <div
                 ref={googleButtonRef}
                 className="w-full min-h-[44px] flex justify-center overflow-hidden rounded-xl"
                 aria-label="Continue with Google"
+              />
+              <img
+                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                alt="Google"
+                className="absolute inset-0 z-10 w-full h-full object-contain pointer-events-none"
               />
             </div>
           </div>
