@@ -356,7 +356,7 @@ export const AuthModal: React.FC = () => {
             <div className={"relative w-full min-h-[44px] transition-opacity " + (googleBusy ? "opacity-60 pointer-events-none" : "")}>
               <div
                 ref={googleButtonRef}
-                className="w-full min-h-[44px] flex justify-center overflow-hidden rounded-xl"
+                className="absolute inset-0 w-full min-h-[44px] opacity-0 overflow-hidden rounded-xl"
                 aria-label="Continue with Google"
               />
               <img
