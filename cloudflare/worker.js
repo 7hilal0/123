@@ -161,7 +161,7 @@ async function entityList(url, env, user = null) {
   const summary = url.searchParams.get('summary') === '1';
   const conversationId = url.searchParams.get('conversationId');
   const payloadSelect = summary && type === 'post'
-    ? "json_set(json_remove(payload, '$.author.banner', '$.mediaUrl'), '$.author.avatar', CASE WHEN length(json_extract(payload, '$.author.avatar')) <= 200000 THEN json_extract(payload, '$.author.avatar') ELSE '' END) AS payload"
+    ? "json_set(json_remove(payload, '$.author.banner', '$.mediaUrl'), '$.author.avatar', CASE WHEN length(json_extract(payload, '$.author.avatar')) <= 200000 THEN json_extract(payload, '$.author.avatar') ELSE '' END, '$.commentCount', (SELECT COUNT(*) FROM entities AS comments WHERE comments.entity_type = 'comment' AND comments.deleted = 0 AND json_extract(comments.payload, '$.postId') = entities.entity_id)) AS payload"
     : 'payload';
   let query = `SELECT entity_type, entity_id, owner_id, ${payloadSelect}, deleted FROM entities`;
   const values = [];
