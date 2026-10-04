@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PostCard } from '../posts/PostCard';
 import { Avatar } from '../common/Avatar';
@@ -14,6 +14,43 @@ import {
   LogIn,
   Loader2
 } from 'lucide-react';
+
+const RevenueAd: React.FC = () => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    const configScript = document.createElement('script');
+    configScript.text = `atOptions = {
+      'key' : '8d8e5dc579110b0e6a1187350d066be5',
+      'format' : 'iframe',
+      'height' : 60,
+      'width' : 468,
+      'params' : {}
+    };`;
+
+    const adScript = document.createElement('script');
+    adScript.src = 'https://www.highrevenueformat.com/8d8e5dc579110b0e6a1187350d066be5/invoke.js';
+    adScript.async = true;
+
+    container.appendChild(configScript);
+    container.appendChild(adScript);
+
+    return () => {
+      container.innerHTML = '';
+    };
+  }, []);
+
+  return (
+    <div className="w-full overflow-x-auto flex justify-center py-1" aria-label="Advertisement">
+      <div ref={containerRef} className="shrink-0" style={{ width: 468, minHeight: 60 }} />
+    </div>
+  );
+};
 
 const FeedSkeleton: React.FC = () => (
   <div className="space-y-3.5" aria-label="Loading posts">
@@ -263,8 +300,11 @@ export const FeedView: React.FC = () => {
           {/* Posts List */}
           <div className="space-y-3.5">
             {displayPosts.length > 0 ? (
-              displayPosts.map((post) => (
-                <PostCard key={post.id} post={post} />
+              displayPosts.map((post, index) => (
+                <React.Fragment key={post.id}>
+                  <PostCard post={post} />
+                  {(index + 1) % 3 === 0 && index + 1 < displayPosts.length && <RevenueAd />}
+                </React.Fragment>
               ))
             ) : cloudSyncStatus === 'syncing' ? (
               <>
