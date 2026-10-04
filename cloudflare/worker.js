@@ -475,13 +475,21 @@ export default {
         if (!row || !(await verifyPassword(String(body.currentPassword || ''), row.password_hash))) return json({ error: 'invalid_current_password' }, 403, origin);
         const profile = { ...JSON.parse(row.profile_json) };
         const statements = [];
-        if (body.email) {
-          profile.email = String(body.email).trim().toLowerCase();
+        const normalizedEmail = body.email == null ? '' : String(body.email).trim().toLowerCase();
+        const newPassword = body.newPassword == null ? '' : String(body.newPassword);
+
+        if (body.email !== undefined) {
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) return json({ error: 'invalid_email' }, 400, origin);
+          profile.email = normalizedEmail;
           const duplicate = await env.DB.prepare('SELECT id FROM auth_users WHERE lower(email) = ? AND id != ?').bind(profile.email, user.id).first();
           if (duplicate) return json({ error: 'email_already_used' }, 409, origin);
           statements.push(env.DB.prepare('UPDATE auth_users SET email = ?, profile_json = ? WHERE id = ?').bind(profile.email, JSON.stringify(profile), user.id));
+          statements.push(env.DB.prepare("UPDATE entities SET payload = ?, updated_at = ?, deleted = 0 WHERE entity_type = 'user' AND entity_id = ?").bind(JSON.stringify(profile), Date.now(), user.id));
         }
-        if (body.newPassword) statements.push(env.DB.prepare('UPDATE auth_users SET password_hash = ? WHERE id = ?').bind(await hashPassword(String(body.newPassword)), user.id));
+        if (body.newPassword !== undefined) {
+          if (newPassword.length < 8) return json({ error: 'weak_password' }, 400, origin);
+          statements.push(env.DB.prepare('UPDATE auth_users SET password_hash = ? WHERE id = ?').bind(await hashPassword(newPassword), user.id));
+        }
         if (!statements.length) return json({ error: 'nothing_to_update' }, 400, origin);
         await env.DB.batch(statements);
         return json({ user: cleanUser({ ...profile, id: user.id, username: user.username, email: profile.email || user.email }) }, 200, origin);
