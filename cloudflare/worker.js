@@ -609,10 +609,34 @@ export default {
             try { existingAuthorId = JSON.parse(existingPost.payload)?.author?.id || null; } catch {}
             if (existingAuthorId !== user.id) {
               const currentPost = JSON.parse(existingPost.payload);
+              const currentVotes = { ...(currentPost.votes || {}) };
+              const currentVoteState = { ...(currentPost.voteState || {}) };
+              const incomingVotes = payload.votes || {};
+              const incomingVoteState = payload.voteState || {};
+
+              // A voter is allowed to change only their own vote. Never replace
+              // the whole votes map with a stale client snapshot: doing that
+              // caused likes from other users to disappear after polling/refresh.
+              const incomingState = Object.prototype.hasOwnProperty.call(incomingVoteState, user.id)
+                ? Number(incomingVoteState[user.id])
+                : (Object.prototype.hasOwnProperty.call(incomingVotes, user.id)
+                  ? Number(incomingVotes[user.id])
+                  : Number(currentVoteState[user.id] || currentVotes[user.id] || 0));
+
+              if (incomingState === 1 || incomingState === -1) {
+                currentVotes[user.id] = incomingState;
+                currentVoteState[user.id] = incomingState;
+              } else {
+                delete currentVotes[user.id];
+                currentVoteState[user.id] = 0;
+              }
+
               payload = {
                 ...currentPost,
-                votes: payload.votes || {},
-                voteState: payload.voteState || {},
+                votes: currentVotes,
+                voteState: currentVoteState,
+                upvotes: Object.values(currentVotes).filter((vote) => Number(vote) === 1).length,
+                downvotes: Object.values(currentVotes).filter((vote) => Number(vote) === -1).length,
               };
             } else if (payload.author?.id !== user.id) {
               return json({ error: 'forbidden_entity' }, 403, origin);
