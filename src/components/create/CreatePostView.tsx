@@ -59,7 +59,7 @@ export const CreatePostView: React.FC = () => {
     try {
       setIsUploading(true);
       setUploadError('');
-      const dataUrl = await readImageFile(file, 1200, 0.85);
+      const dataUrl = await readImageFile(file, 1200, 0.85, 650_000);
       setMediaUrl(dataUrl);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to process image';
