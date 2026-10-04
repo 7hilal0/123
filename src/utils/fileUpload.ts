@@ -9,7 +9,8 @@ import { createAnimatedGifThumbnail } from './gifThumbnail';
 export const readImageFile = (
   file: File,
   maxDimension = 1200,
-  quality = 0.85
+  quality = 0.85,
+  gifMaxBytes = 1_500_000
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
@@ -33,6 +34,7 @@ export const readImageFile = (
           cropSquare: false,
           maxFrames: 36,
           maxColors: 128,
+          maxBytes: gifMaxBytes,
         }).then(resolve).catch(reject);
         return;
       }
