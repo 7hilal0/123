@@ -42,6 +42,7 @@ export const AuthModal: React.FC = () => {
       container.innerHTML = '';
 
       const isDzcoreApp = typeof navigator !== 'undefined' && navigator.userAgent.includes('DZCOREApp/1.0');
+      if (isDzcoreApp) return;
 
       const googleConfig: any = {
         client_id: '991149566827-l73oec1hjpu6jb21hftr4a2e1gille3m.apps.googleusercontent.com',
@@ -198,6 +199,30 @@ export const AuthModal: React.FC = () => {
   };
 
   const SubmitArrow = dir === 'rtl' ? ArrowLeft : ArrowRight;
+  const isDzcoreApp = typeof navigator !== 'undefined' && navigator.userAgent.includes('DZCOREApp/1.0');
+
+  const startAppGoogleOAuth = () => {
+    if (!isDzcoreApp) return;
+    if (mode === 'register') {
+      const cleanUsername = username.trim().replace(/[^a-zA-Z0-9_]/g, '');
+      if (cleanUsername.length < 3) {
+        setErrorMessage('أدخل اسم مستخدم من 3 أحرف أو أرقام على الأقل أولاً.');
+        return;
+      }
+      if (cleanUsername !== username.trim()) {
+        setErrorMessage('اسم المستخدم يجب أن يحتوي على أحرف إنجليزية وأرقام و _ فقط.');
+        return;
+      }
+    }
+    setGoogleBusy(true);
+    setErrorMessage('');
+    const params = new URLSearchParams({
+      mode,
+      username: mode === 'register' ? username.trim() : '',
+      displayName: mode === 'register' ? displayName.trim() : '',
+    });
+    window.location.href = 'https://dzcore.top/api/auth/google/app-start?' + params.toString();
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 text-start">
@@ -369,7 +394,10 @@ export const AuthModal: React.FC = () => {
           </div>
 
           <div className="w-full">
-            <div className="relative w-full h-12 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] transition-all overflow-hidden flex items-center justify-center">
+            <div
+              onClick={isDzcoreApp ? startAppGoogleOAuth : undefined}
+              className={"relative w-full h-12 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] transition-all overflow-hidden flex items-center justify-center " + (isDzcoreApp ? "cursor-pointer" : "")}
+            >
               <span className="text-sm font-semibold text-white">Continue with Google</span>
               <img
                 src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
@@ -378,7 +406,7 @@ export const AuthModal: React.FC = () => {
               />
               <div
                 ref={googleButtonRef}
-                className={"absolute inset-0 z-20 opacity-0 overflow-hidden rounded-xl " + (googleBusy ? "pointer-events-none" : "")}
+                className={"absolute inset-0 z-20 opacity-0 overflow-hidden rounded-xl " + (googleBusy || isDzcoreApp ? "pointer-events-none" : "")}
                 aria-label="Continue with Google"
               />
             </div>
