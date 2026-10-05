@@ -366,9 +366,9 @@ export const DirectMessagesView: React.FC = () => {
             {showGifPicker && (
               <div className="p-3 border-t border-white/5 bg-neutral-950/95 flex justify-center">
                 <GifPicker
-                  onSelectGif={(gifUrl) => {
-                    sendDirectMessage('', gifUrl);
+                  onSelectGif={async (gifUrl) => {
                     setShowGifPicker(false);
+                    await sendDirectMessage('', gifUrl);
                   }}
                   onClose={() => setShowGifPicker(false)}
                 />
