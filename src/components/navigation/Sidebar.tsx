@@ -31,7 +31,7 @@ export const Sidebar: React.FC = () => {
       <div className="h-16 flex items-center justify-between px-5 border-b border-white/5">
         <button onClick={() => navigateToFeed('hot')} className="flex items-center gap-2.5 group text-start focus:outline-none">
           <div className="w-10 h-9 flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
-            <img src="/dzcore-logo.svg" alt="DZCORE logo" className="h-full w-full object-contain" />
+            <img src="/dzcore-logo.svg?v=3" alt="DZCORE logo" className="h-full w-full object-contain" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
