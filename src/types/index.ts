@@ -120,7 +120,7 @@ export interface Conversation {
   pinned?: boolean;
 }
 
-export type NotificationType = 'upvote' | 'downvote' | 'comment' | 'reply' | 'follow' | 'mention' | 'community';
+export type NotificationType = 'upvote' | 'downvote' | 'comment' | 'reply' | 'follow' | 'mention' | 'community' | 'message';
 
 export interface NotificationItem {
   id: string;
@@ -131,7 +131,7 @@ export interface NotificationItem {
   message: string;
   timestamp: string;
   isRead: boolean;
-  targetType: 'post' | 'comment' | 'profile' | 'community';
+  targetType: 'post' | 'comment' | 'profile' | 'community' | 'conversation';
   targetId: string;
 }
 
