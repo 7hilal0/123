@@ -243,7 +243,7 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelectGif, onClose }) =>
   };
 
   return (
-    <div className="bg-neutral-950/95 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col w-full max-w-lg h-[min(560px,78vh)] animate-in fade-in slide-in-from-bottom-3 duration-200 z-50">
+    <div className="bg-neutral-950/95 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col w-[calc(100vw-20px)] max-w-[430px] h-[58vh] min-h-[360px] max-h-[520px] animate-in fade-in slide-in-from-bottom-3 duration-200 z-50">
       {/* Top Header */}
       <div className="p-3 border-b border-white/5 flex items-center justify-between gap-2 bg-neutral-950/70">
         <div className="flex items-center gap-2">
@@ -345,7 +345,7 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelectGif, onClose }) =>
       </div>
 
       {/* GIFs Grid */}
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scroll-smooth p-3 grid grid-cols-2 gap-2.5 auto-rows-[96px] bg-neutral-950/20">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scroll-smooth p-2.5 grid grid-cols-2 gap-2 auto-rows-[88px] bg-neutral-950/20">
         {filteredGifs.map((gif) => (
           <button
             key={gif.id}
