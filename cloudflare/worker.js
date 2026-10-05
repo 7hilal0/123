@@ -275,7 +275,12 @@ export default {
     const origin = originFor(request);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'access-control-allow-origin': origin, 'access-control-allow-credentials': 'true', 'access-control-allow-headers': 'content-type, x-dzcore-admin-secret', 'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS' } });
     const url = new URL(request.url);
-    if (csrfRequired(request)) return json({ error: 'invalid_origin' }, 403, origin);
+    // Google GIS redirect mode POSTs directly from Google's origin, so it
+    // cannot pass our normal browser Origin allow-list. The callback has
+    // Google's own g_csrf_token double-submit check below, so let it reach
+    // that validation instead of returning invalid_origin here.
+    const isGoogleAppCallback = url.pathname === '/api/auth/google/app-callback' && request.method === 'POST';
+    if (!isGoogleAppCallback && csrfRequired(request)) return json({ error: 'invalid_origin' }, 403, origin);
     try {
       if (url.pathname === '/api/health') return json({ ok: true, service: 'dzcore-cloudflare-api' }, 200, origin);
 
