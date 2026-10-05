@@ -408,7 +408,14 @@ export default {
       }
 
       if (url.pathname === '/api/auth/app-exchange' && request.method === 'POST') {
-        const body = await request.json();
+        const contentType = request.headers.get('content-type') || '';
+        let body = {};
+        if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
+          const form = await request.formData();
+          body = { code: form.get('code') };
+        } else {
+          body = await request.json();
+        }
         const appCode = String(body.code || '').trim();
 
         if (!appCode || appCode.length < 20 || appCode.length > 200) {
