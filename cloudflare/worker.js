@@ -451,12 +451,11 @@ export default {
           email: userRow.email,
         };
 
-        return json(
-          { user: cleanUser(user) },
-          200,
-          origin,
-          { 'set-cookie': cookie(session.token, SESSION_DAYS * 86400) },
-        );
+        const redirectHeaders = new Headers();
+        redirectHeaders.set('Location', 'https://dzcore.top/');
+        redirectHeaders.set('Cache-Control', 'no-store');
+        redirectHeaders.append('Set-Cookie', cookie(session.token, SESSION_DAYS * 86400));
+        return new Response(null, { status: 303, headers: redirectHeaders });
       }
 
       if (url.pathname === '/api/auth/google' && request.method === 'POST') {
