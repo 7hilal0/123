@@ -469,6 +469,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
+  // Keep private-message notifications synced even when the user is not inside the chat.
+  useEffect(() => {
+    if (!currentUser?.id) {
+      setNotifications([]);
+      return;
+    }
+    return cloudSync.subscribeNotifications(currentUser.id, (remoteNotifications) => {
+      if (Array.isArray(remoteNotifications)) {
+        setNotifications(remoteNotifications);
+      }
+    });
+  }, [currentUser?.id]);
+
   // Refresh the user/media catalog after the authenticated session is known.
   // The old implementation captured currentUser=null inside a [] effect.
   useEffect(() => {
@@ -1304,8 +1317,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ]);
 
     // Save message and updated conversation to Cloud Cloudflare in real time
-    await cloudSync.saveDirectMessage(activeConversationId, newMsg);
-    await cloudSync.saveConversation(updatedConv);
+    try {
+      await cloudSync.saveDirectMessage(activeConversationId, newMsg);
+      await cloudSync.saveConversation(updatedConv);
+
+      const isGif = Boolean(mediaUrl && (
+        mediaUrl.toLowerCase().includes('.gif') ||
+        mediaUrl.toLowerCase().includes('giphy')
+      ));
+      await cloudSync.saveNotification({
+        id: `notification_msg_${newMsg.id}`,
+        recipientId: otherUser.id,
+        type: 'message',
+        actor: currentUser,
+        title: language === 'ar' ? 'رسالة خاصة جديدة' : language === 'fr' ? 'Nouveau message privé' : 'New private message',
+        message: isGif
+          ? (language === 'ar' ? 'أرسل لك GIF' : language === 'fr' ? 'vous a envoyé un GIF' : 'sent you a GIF')
+          : (language === 'ar' ? `أرسل لك: ${text.trim().slice(0, 100)}` : language === 'fr' ? `vous a envoyé : ${text.trim().slice(0, 100)}` : `sent you: ${text.trim().slice(0, 100)}`),
+        timestamp: language === 'ar' ? 'الآن' : language === 'fr' ? 'À l’instant' : 'Just now',
+        isRead: false,
+        targetType: 'conversation',
+        targetId: activeConversationId,
+      });
+      return true;
+    } catch (error) {
+      console.error('[Cloudflare] Direct message send failed:', error);
+      showToast(language === 'ar' ? 'تعذر إرسال الرسالة. حاول مرة أخرى.' : language === 'fr' ? 'Impossible d’envoyer le message. Réessayez.' : 'Could not send the message. Please try again.', 'warning');
+      return false;
+    }
   };
 
   // Follow user
