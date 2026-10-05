@@ -16,21 +16,29 @@ export const TopBar: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-30 h-16 md:h-[72px] w-full bg-neutral-950/75 backdrop-blur-2xl border-b border-white/[0.08] px-4 md:px-8 relative flex items-center justify-center shadow-[0_10px_30px_rgba(0,0,0,.14)] supports-[backdrop-filter]:bg-neutral-950/65">
-      {/* Center: DZCORE Brand Logo & Name */}
+      {/* Left: logo only */}
       <button
         onClick={() => navigateToFeed('hot')}
-        className="flex items-center gap-2.5 rounded-2xl px-3 py-1.5 group focus:outline-none cursor-pointer select-none transition-colors hover:bg-white/[0.04]"
+        className="absolute start-4 md:start-6 flex items-center justify-center focus:outline-none cursor-pointer select-none"
         title="DZCORE"
+        aria-label="DZCORE"
       >
-        <div className="w-10 h-8 rounded-xl overflow-hidden bg-neutral-900 border border-white/10 flex items-center justify-center shadow-md shadow-emerald-600/20 group-hover:scale-105 transition-transform">
-          <img src="/dzcore-logo.svg" alt="DZCORE logo" className="h-full w-full object-contain" />
-        </div>
+        <img src="/dzcore-logo.svg" alt="DZCORE logo" className="w-12 h-8 md:w-14 md:h-10 object-contain" />
+      </button>
+
+      {/* Center: text only */}
+      <button
+        onClick={() => navigateToFeed('hot')}
+        className="flex items-center rounded-2xl px-3 py-1.5 group focus:outline-none cursor-pointer select-none transition-colors hover:bg-white/[0.04]"
+        title="DZCORE"
+        aria-label="DZCORE"
+      >
         <span className="font-display font-bold text-lg md:text-xl tracking-wide text-white">
           <span className="text-emerald-500 font-extrabold">D</span>ZCORE
         </span>
       </button>
 
-      {/* Far Right: Profile -> Settings Gear (with Language Settings), Other tabs -> Notifications Bell */}
+      {/* Far right: notifications/settings */}
       <div className="absolute end-4 md:end-6 flex items-center">
         {isProfilePage ? (
           <button
