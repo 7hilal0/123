@@ -413,9 +413,15 @@ export default {
         }
         await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'googleOAuthState' AND entity_id = ? AND deleted = 0").bind(Date.now(), state).run();
 
+        const googleClientSecret = String(env.GOOGLE_CLIENT_SECRET || '').trim();
+        if (!googleClientSecret) {
+          console.error('Google OAuth client secret is not configured.');
+          return new Response('Google OAuth client secret is not configured.', { status: 500 });
+        }
         const tokenForm = new URLSearchParams({
           code: authCode,
           client_id: '991149566827-l73oec1hjpu6jb21hftr4a2e1gille3m.apps.googleusercontent.com',
+          client_secret: googleClientSecret,
           redirect_uri: 'https://dzcore.top/api/auth/google/app-callback',
           grant_type: 'authorization_code',
           code_verifier: String(statePayload.verifier || ''),
@@ -427,7 +433,13 @@ export default {
         });
         const tokenData = await tokenResponse.json().catch(() => ({}));
         const credential = String(tokenData.id_token || '');
-        if (!tokenResponse.ok || !credential) return new Response('Google token exchange failed.', { status: 502 });
+        if (!tokenResponse.ok || !credential) {
+          console.error('Google token exchange failed:', tokenResponse.status, tokenData.error, tokenData.error_description);
+          return new Response(
+            'Google token exchange failed: ' + String(tokenData.error || 'unknown_error'),
+            { status: 502 },
+          );
+        }
 
         const upstream = await fetch(new Request(new URL('/api/auth/google', url), {
           method: 'POST',
