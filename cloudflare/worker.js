@@ -352,6 +352,113 @@ export default {
       }
 
       if (url.pathname === '/api/auth/me' && request.method === 'GET') return json({ user: cleanUser(await currentUser(request, env)) }, 200, origin);
+      if (url.pathname === '/api/auth/google/app-callback' && request.method === 'POST') {
+        // Google GIS redirect mode posts credential + g_csrf_token here.
+        // Validate Google's double-submit CSRF token before processing the ID token.
+        const form = await request.formData();
+        const credential = String(form.get('credential') || '');
+        const csrfToken = String(form.get('g_csrf_token') || '');
+        const csrfCookie = parseCookies(request).g_csrf_token || '';
+        if (!credential || !csrfToken || csrfToken !== csrfCookie) {
+          return new Response('Invalid Google login request.', { status: 403 });
+        }
+
+        // Reuse the existing Google authentication endpoint so the account
+        // lookup, ban checks, and session creation stay identical.
+        const upstream = await fetch(new Request(new URL('/api/auth/google', url), {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'Origin': 'https://dzcore.top',
+          },
+          body: JSON.stringify({ credential }),
+        }));
+
+        let result = {};
+        try { result = await upstream.json(); } catch {}
+
+        if (!upstream.ok || !result.user?.id) {
+          const errorCode = String(result.error || 'google_login_failed');
+          return Response.redirect(
+            'dzcore://google-login?error=' + encodeURIComponent(errorCode),
+            302,
+          );
+        }
+
+        // Create a short-lived, one-time code. The Android app exchanges this
+        // code over HTTPS so the WebView receives its own HttpOnly session cookie.
+        const appCode = crypto.randomUUID() + crypto.randomUUID();
+        const codeHash = await digest(appCode);
+        const expiresAt = Date.now() + 2 * 60 * 1000;
+        const codePayload = {
+          id: appCode,
+          userId: result.user.id,
+          codeHash,
+          expiresAt,
+        };
+
+        await env.DB.prepare(
+          "INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES ('appLoginCode', ?, ?, ?, ?, 0)"
+        ).bind(appCode, result.user.id, JSON.stringify(codePayload), Date.now()).run();
+
+        return Response.redirect(
+          'dzcore://google-login?code=' + encodeURIComponent(appCode),
+          302,
+        );
+      }
+
+      if (url.pathname === '/api/auth/app-exchange' && request.method === 'POST') {
+        const body = await request.json();
+        const appCode = String(body.code || '').trim();
+
+        if (!appCode || appCode.length < 20 || appCode.length > 200) {
+          return json({ error: 'invalid_app_code' }, 400, origin);
+        }
+
+        const codeHash = await digest(appCode);
+        const row = await env.DB.prepare(
+          "SELECT entity_id, owner_id, payload FROM entities WHERE entity_type = 'appLoginCode' AND entity_id = ? AND deleted = 0 LIMIT 1"
+        ).bind(appCode).first();
+
+        if (!row) return json({ error: 'invalid_app_code' }, 401, origin);
+
+        let payload;
+        try { payload = JSON.parse(row.payload || '{}'); } catch { payload = null; }
+
+        if (!payload || payload.codeHash !== codeHash || Number(payload.expiresAt || 0) <= Date.now()) {
+          await env.DB.prepare(
+            "UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'appLoginCode' AND entity_id = ?"
+          ).bind(Date.now(), appCode).run();
+          return json({ error: 'expired_app_code' }, 401, origin);
+        }
+
+        // One-time use: invalidate before returning the session.
+        await env.DB.prepare(
+          "UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'appLoginCode' AND entity_id = ? AND deleted = 0"
+        ).bind(Date.now(), appCode).run();
+
+        const userRow = await env.DB.prepare(
+          'SELECT id, username, email, profile_json FROM auth_users WHERE id = ? LIMIT 1'
+        ).bind(row.owner_id).first();
+
+        if (!userRow) return json({ error: 'user_not_found' }, 401, origin);
+
+        const session = await createSession(userRow.id, env);
+        const user = {
+          ...JSON.parse(userRow.profile_json),
+          id: userRow.id,
+          username: userRow.username,
+          email: userRow.email,
+        };
+
+        return json(
+          { user: cleanUser(user) },
+          200,
+          origin,
+          { 'set-cookie': cookie(session.token, SESSION_DAYS * 86400) },
+        );
+      }
+
       if (url.pathname === '/api/auth/google' && request.method === 'POST') {
         const body = await request.json();
         const claims = await verifyGoogleCredential(String(body.credential || ''), '991149566827-l73oec1hjpu6jb21hftr4a2e1gille3m.apps.googleusercontent.com');
