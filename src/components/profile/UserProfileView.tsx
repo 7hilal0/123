@@ -14,6 +14,7 @@ import {
   Check,
   ArrowLeft,
   ArrowRight,
+  X,
 } from 'lucide-react';
 
 export const UserProfileView: React.FC = () => {
@@ -26,6 +27,7 @@ export const UserProfileView: React.FC = () => {
     toggleFollowUser,
     navigateToMessages,
     navigateToFeed,
+    navigateToProfile,
     showToast,
     editProfileModalOpen,
     setEditProfileModalOpen,
@@ -35,6 +37,9 @@ export const UserProfileView: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'posts' | 'comments' | 'saved'>('posts');
   const [loadedMedia, setLoadedMedia] = useState<{ userId: string; avatar?: string; banner?: string } | null>(null);
+  const [followListOpen, setFollowListOpen] = useState<'followers' | 'following' | null>(null);
+  const [followMembers, setFollowMembers] = useState<import('../../types').User[]>([]);
+  const [followLoading, setFollowLoading] = useState(false);
 
   const targetUserId = selectedUserId || currentUser?.id;
   const user = users.find((u) => u.id === targetUserId) || currentUser;
@@ -75,6 +80,17 @@ export const UserProfileView: React.FC = () => {
   const formattedJoinedDate = String(displayUser.joinedDate || '').match(/^(\d{4})-(\d{2})-(\d{2})/)?.slice(1).join('/') || String(displayUser.joinedDate || '');
   const userPosts = posts.filter((p) => p.author.id === displayUser.id);
   const savedPosts = posts.filter((p) => p.isSaved);
+
+  useEffect(() => {
+    if (!followListOpen || !displayUser?.id) return;
+    let active = true;
+    setFollowLoading(true);
+    cloudSync.fetchFollowMembers(displayUser.id, followListOpen)
+      .then((members) => { if (active) setFollowMembers(members); })
+      .catch(() => { if (active) setFollowMembers([]); })
+      .finally(() => { if (active) setFollowLoading(false); });
+    return () => { active = false; };
+  }, [followListOpen, displayUser?.id]);
 
   const handleShareProfile = () => {
     navigator.clipboard?.writeText(window.location.href);
@@ -222,11 +238,25 @@ export const UserProfileView: React.FC = () => {
             <span>{t.karma}</span>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setFollowListOpen('followers')}
+            className="flex items-center gap-1.5 text-start hover:text-white transition-colors cursor-pointer"
+          >
             <Users className="w-4 h-4 text-neutral-500" />
             <span className="font-semibold text-white font-mono">{displayUser.followersCount}</span>
             <span>{t.followers}</span>
-          </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setFollowListOpen('following')}
+            className="flex items-center gap-1.5 text-start hover:text-white transition-colors cursor-pointer"
+          >
+            <Users className="w-4 h-4 text-neutral-500" />
+            <span className="font-semibold text-white font-mono">{displayUser.followingCount}</span>
+            <span>{t.following}</span>
+          </button>
 
           <div className="flex items-center gap-1.5 text-xs text-neutral-400">
             <Calendar className="w-4 h-4 text-neutral-500" />
@@ -294,6 +324,60 @@ export const UserProfileView: React.FC = () => {
             </>
           )}
       </div>
+
+      {followListOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => setFollowListOpen(null)}
+        >
+          <div
+            className="w-full max-w-md max-h-[75vh] overflow-hidden rounded-2xl bg-neutral-950 border border-white/10 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+              <h2 className="text-base font-bold text-white">
+                {followListOpen === 'followers' ? t.followers : t.following}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setFollowListOpen(null)}
+                className="p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-white/5"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto max-h-[60vh] p-3 space-y-2">
+              {followLoading ? (
+                <div className="py-10 text-center text-sm text-neutral-500">Loading...</div>
+              ) : followMembers.length === 0 ? (
+                <div className="py-10 text-center text-sm text-neutral-500">
+                  {followListOpen === 'followers' ? t.followers : t.following}: 0
+                </div>
+              ) : (
+                followMembers.map((member) => (
+                  <button
+                    key={member.id}
+                    type="button"
+                    onClick={() => {
+                      setFollowListOpen(null);
+                      navigateToProfile(member.id);
+                    }}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] text-start transition-colors"
+                  >
+                    <Avatar src={member.avatar} alt={member.displayName} size="sm" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-white truncate">{member.displayName}</span>
+                      <span className="block text-xs text-neutral-500 truncate">@{member.username}</span>
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {editProfileModalOpen && (
         <EditProfileModal onClose={() => setEditProfileModalOpen(false)} />
