@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 530" width="1000" height="530">
+  <defs>
+    <linearGradient id="d" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#25d5b0"/><stop offset="1" stop-color="#16a98f"/></linearGradient>
+    <linearGradient id="u" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#20c84f"/><stop offset="1" stop-color="#00df4f"/></linearGradient>
+    <linearGradient id="r" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff253d"/><stop offset="1" stop-color="#f01831"/></linearGradient>
+  </defs>
+  <path d="M85 285 L190 180 L295 285 L245 285 L245 420 Q245 440 225 440 L155 440 Q135 440 135 420 L135 285 Z" fill="url(#u)"/>
+  <path d="M315 150 H445 Q585 150 585 265 Q585 380 445 380 H315 Z M375 205 V325 H440 Q510 325 510 265 Q510 205 440 205 Z" fill="url(#d)" fill-rule="evenodd"/>
+  <path d="M610 285 H660 V180 Q660 160 680 160 H750 Q770 160 770 180 V285 H820 Q845 285 828 305 L715 435 Q700 452 685 435 L572 305 Q555 285 580 285 Z" fill="url(#r)"/>
+</svg>
