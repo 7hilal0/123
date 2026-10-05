@@ -243,7 +243,7 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelectGif, onClose }) =>
   };
 
   return (
-    <div className="bg-neutral-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col w-full max-w-md h-[400px] animate-in fade-in zoom-in-95 z-50">
+    <div className="bg-neutral-950/95 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col w-full max-w-lg h-[min(560px,78vh)] animate-in fade-in slide-in-from-bottom-3 duration-200 z-50">
       {/* Top Header */}
       <div className="p-3 border-b border-white/5 flex items-center justify-between gap-2 bg-neutral-950/70">
         <div className="flex items-center gap-2">
@@ -327,7 +327,7 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelectGif, onClose }) =>
       </div>
 
       {/* Categories Horizontal Scroll */}
-      <div className="px-2 py-1.5 border-b border-white/5 bg-neutral-950/40 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+      <div className="px-3 py-2 border-b border-white/5 bg-neutral-950/60 flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
         {categories.map((cat) => (
           <button
             key={cat.id}
@@ -345,7 +345,7 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelectGif, onClose }) =>
       </div>
 
       {/* GIFs Grid */}
-      <div className="flex-1 overflow-y-auto p-2.5 grid grid-cols-2 gap-2 bg-neutral-950/20">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scroll-smooth p-3 grid grid-cols-2 gap-2.5 auto-rows-[96px] bg-neutral-950/20">
         {filteredGifs.map((gif) => (
           <button
             key={gif.id}
@@ -354,15 +354,16 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelectGif, onClose }) =>
               onSelectGif(gif.url);
               onClose();
             }}
-            className="group relative rounded-xl overflow-hidden bg-neutral-900 border border-white/5 hover:border-emerald-500/60 transition-all cursor-pointer aspect-video flex items-center justify-center"
+            className="group relative min-h-0 h-full rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 hover:border-emerald-500/70 hover:-translate-y-0.5 active:scale-[0.98] transition-[transform,border-color,box-shadow] duration-200 cursor-pointer flex items-center justify-center shadow-sm hover:shadow-lg"
           >
             <img
               src={gif.url}
               alt={gif.title}
               loading="lazy"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+              draggable={false}
+              className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-end p-2.5 pointer-events-none">
               <span className="text-[11px] text-white font-medium truncate drop-shadow-sm">
                 {gif.title}
               </span>
