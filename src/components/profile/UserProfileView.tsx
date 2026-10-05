@@ -248,16 +248,6 @@ export const UserProfileView: React.FC = () => {
             <span>{t.followers}</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setFollowListOpen('following')}
-            className="flex items-center gap-1.5 text-start hover:text-white transition-colors cursor-pointer"
-          >
-            <Users className="w-4 h-4 text-neutral-500" />
-            <span className="font-semibold text-white font-mono">{displayUser.followingCount}</span>
-            <span>{t.following}</span>
-          </button>
-
           <div className="flex items-center gap-1.5 text-xs text-neutral-400">
             <Calendar className="w-4 h-4 text-neutral-500" />
             <span>{t.joinedDate}</span>
