@@ -293,6 +293,7 @@ export const cloudSync = {
       lastMessageTimestamp: conversation.lastMessageTimestamp,
       lastSenderId: conversation.lastSenderId,
       unreadCount: conversation.unreadCount || 0,
+      unreadBy: conversation.unreadBy || {},
     } as Conversation;
     return saveEntity('conversation', compactConversation, undefined);
   },
