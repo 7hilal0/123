@@ -46,7 +46,10 @@ export const AuthModal: React.FC = () => {
       const googleConfig: any = {
         client_id: '991149566827-l73oec1hjpu6jb21hftr4a2e1gille3m.apps.googleusercontent.com',
         auto_select: false,
-        use_fedcm_for_button: true,
+        // FedCM button UX is not reliable inside Android WebView and can
+        // produce Google's "400 malformed request" page. Keep it disabled
+        // for the native wrapper; normal browsers can continue using it.
+        use_fedcm_for_button: !isDzcoreApp,
       };
 
       if (isDzcoreApp) {
