@@ -1246,6 +1246,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       lastMessageTime: formattedTime,
       lastMessageTimestamp: now,
       unreadCount: 0,
+      unreadBy: { [currentUser.id]: 0, [targetUserId]: 0 },
     };
 
     setConversations((prev) => [newConv, ...prev.filter((c) => c.id !== convId)]);
@@ -1309,6 +1310,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       lastMessageTimestamp: now,
       lastSenderId: currentUser.id,
       unreadCount: 0,
+      unreadBy: {
+        ...(currentConv.unreadBy || {}),
+        [currentUser.id]: 0,
+        [otherUser.id]: Math.max(0, (currentConv.unreadBy?.[otherUser.id] || 0) + 1),
+      },
     };
 
     setConversations((prev) => [
