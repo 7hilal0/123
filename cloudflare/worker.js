@@ -280,7 +280,13 @@ export default {
     // Google's own g_csrf_token double-submit check below, so let it reach
     // that validation instead of returning invalid_origin here.
     const isGoogleAppCallback = url.pathname === '/api/auth/google/app-callback' && request.method === 'POST';
-    if (!isGoogleAppCallback && csrfRequired(request)) return json({ error: 'invalid_origin' }, 403, origin);
+    const isAppExchange = url.pathname === '/api/auth/app-exchange' && request.method === 'POST';
+    // The app-exchange request is made by the native WebView/app after Google
+    // redirects back through dzcore://. Native app requests can have no
+    // browser Origin (or a non-web Origin), so the normal browser CSRF check
+    // would incorrectly return invalid_origin. The exchange uses a short-lived
+    // one-time random code, so it does not rely on browser cookies/CSRF.
+    if (!isGoogleAppCallback && !isAppExchange && csrfRequired(request)) return json({ error: 'invalid_origin' }, 403, origin);
     try {
       if (url.pathname === '/api/health') return json({ ok: true, service: 'dzcore-cloudflare-api' }, 200, origin);
 
