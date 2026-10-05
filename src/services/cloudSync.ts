@@ -139,10 +139,12 @@ export const cloudSync = {
       return result;
     };
     const followerCounts = new Map<string, number>();
+    const followingCounts = new Map<string, number>();
     const followingByCurrentUser = new Set<string>();
     for (const follow of follows) {
       if (!follow.following) continue;
       followerCounts.set(follow.followingId, (followerCounts.get(follow.followingId) || 0) + 1);
+      followingCounts.set(follow.followerId, (followingCounts.get(follow.followerId) || 0) + 1);
       if (follow.followerId === currentUserId) followingByCurrentUser.add(follow.followingId);
     }
     return (users || []).map((user) => {
@@ -155,6 +157,7 @@ export const cloudSync = {
         avatar: remoteMedia.avatar || user.avatar || cached?.avatar || DEFAULT_USER_AVATAR,
         banner: remoteMedia.banner || user.banner || cached?.banner || '',
         ...(followerCounts.has(user.id) ? { followersCount: followerCounts.get(user.id) || 0 } : {}),
+        ...(followingCounts.has(user.id) ? { followingCount: followingCounts.get(user.id) || 0 } : {}),
         ...(currentUserId ? { isFollowing: followingByCurrentUser.has(user.id) } : {}),
       };
       return hydrated;
@@ -163,6 +166,21 @@ export const cloudSync = {
   async saveFollow(followerId: string, followingId: string, following: boolean): Promise<void> {
     const record: FollowRecord = { id: `${followerId}:${followingId}`, followerId, followingId, following };
     await saveEntity('follow', record, followerId);
+  },
+  async fetchFollowMembers(userId: string, direction: 'followers' | 'following'): Promise<User[]> {
+    const [users, followRows] = await Promise.all([
+      fetchType<User>('user'),
+      listRows('follow'),
+    ]);
+    const follows = (followRows || [])
+      .map((row) => (row?.payload ? parse<FollowRecord>(row.payload) : null))
+      .filter((value): value is FollowRecord => Boolean(value) && value.following);
+    const ids = new Set(
+      follows
+        .filter((follow) => direction === 'followers' ? follow.followingId === userId : follow.followerId === userId)
+        .map((follow) => direction === 'followers' ? follow.followerId : follow.followingId)
+    );
+    return (users || []).filter((user) => ids.has(user.id));
   },
   async fetchUserMedia(userId: string): Promise<Partial<User>> {
     const cached = userMediaCache.get(userId);
