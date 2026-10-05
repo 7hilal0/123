@@ -117,6 +117,8 @@ export interface Conversation {
   lastMessageTimestamp?: number;
   lastSenderId?: string;
   unreadCount: number;
+  /** Per-user unread counts so each participant can read independently. */
+  unreadBy?: Record<string, number>;
   pinned?: boolean;
 }
 
