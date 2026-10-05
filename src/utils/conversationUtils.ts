@@ -47,8 +47,12 @@ export function resolveConversationForUser(
 
   const finalParticipant = otherUser || conv.participant;
 
-  // Compute unread count for current user: if last sender wasn't me and hasn't been read
-  const unread = conv.lastSenderId && conv.lastSenderId !== currentUser.id ? (conv.unreadCount || 1) : 0;
+  // Compute unread count per participant. The old implementation inferred `1`
+  // from lastSenderId, which made the badge return after every 10s poll even
+  // after the user opened the chat. Keep a durable per-user read state instead.
+  const unread = conv.unreadBy
+    ? Math.max(0, conv.unreadBy[currentUser.id] || 0)
+    : (conv.lastSenderId && conv.lastSenderId !== currentUser.id ? (conv.unreadCount || 1) : 0);
 
   return {
     ...conv,
