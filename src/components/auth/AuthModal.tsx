@@ -41,9 +41,23 @@ export const AuthModal: React.FC = () => {
       if (cancelled || !container || !google?.accounts?.id) return;
       container.innerHTML = '';
 
-      google.accounts.id.initialize({
+      const isDzcoreApp = typeof navigator !== 'undefined' && navigator.userAgent.includes('DZCOREApp/1.0');
+
+      const googleConfig: any = {
         client_id: '991149566827-l73oec1hjpu6jb21hftr4a2e1gille3m.apps.googleusercontent.com',
-        callback: async (response: { credential?: string }) => {
+        auto_select: false,
+        use_fedcm_for_button: true,
+      };
+
+      if (isDzcoreApp) {
+        // In the Android WebView, use Google's full-page redirect flow.
+        // The Cloudflare callback exchanges the Google credential for a
+        // one-time app code and redirects back to dzcore://google-login.
+        googleConfig.ux_mode = 'redirect';
+        googleConfig.login_uri = 'https://dzcore.top/api/auth/google/app-callback';
+      } else {
+        googleConfig.ux_mode = 'popup';
+        googleConfig.callback = async (response: { credential?: string }) => {
           if (cancelled) return;
           if (!response?.credential) {
             setErrorMessage('لم يتم استلام بيانات تسجيل الدخول من Google. حاول مرة أخرى.');
@@ -78,11 +92,10 @@ export const AuthModal: React.FC = () => {
           } finally {
             if (!cancelled) setGoogleBusy(false);
           }
-        },
-        ux_mode: 'popup',
-        auto_select: false,
-        use_fedcm_for_button: true,
-      });
+        };
+      }
+
+      google.accounts.id.initialize(googleConfig);
 
       const availableWidth = container.clientWidth || 400;
       const buttonWidth = Math.min(400, Math.max(220, Math.floor(availableWidth)));
