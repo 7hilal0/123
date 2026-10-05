@@ -1,18 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
+  <rect width="1000" height="1000" fill="#000000"/>
   <defs>
-    <linearGradient id="adminBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0f172a"/>
-      <stop offset="100%" stop-color="#022c22"/>
+    <linearGradient id="dGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#28d7b0"/>
+      <stop offset="1" stop-color="#13a98e"/>
     </linearGradient>
-    <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#10b981"/>
-      <stop offset="100%" stop-color="#059669"/>
+    <linearGradient id="upGrad" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#22c55e"/>
+      <stop offset="1" stop-color="#16d35a"/>
+    </linearGradient>
+    <linearGradient id="downGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff1f3d"/>
+      <stop offset="1" stop-color="#ed1b2f"/>
     </linearGradient>
   </defs>
-  <rect width="100" height="100" rx="50" fill="url(#adminBg)"/>
-  <circle cx="50" cy="50" r="47" fill="none" stroke="url(#emeraldGrad)" stroke-width="3"/>
-  <text x="50" y="62" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="34" text-anchor="middle" letter-spacing="-1">
-    <tspan fill="#10b981">D</tspan><tspan fill="#ffffff">Z</tspan>
-  </text>
-  <polygon points="50,14 52,18 56,19 53,22 54,26 50,24 46,26 47,22 44,19 48,18" fill="#10b981"/>
+  <path d="M185 480 L285 380 L385 480 L335 480 L335 610 Q335 630 315 630 L255 630 Q235 630 235 610 L235 480 Z" fill="url(#upGrad)"/>
+  <path d="M400 370 H515 Q640 370 640 500 Q640 630 515 630 H400 Z M455 415 V585 H510 Q570 585 570 500 Q570 415 510 415 Z" fill="url(#dGrad)" fill-rule="evenodd"/>
+  <path d="M650 480 H700 V380 Q700 360 720 360 H780 Q800 360 800 380 V480 H850 Q875 480 858 500 L750 625 Q735 642 720 625 L612 500 Q595 480 620 480 Z" fill="url(#downGrad)"/>
 </svg>
