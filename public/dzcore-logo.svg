@@ -1,20 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
-  <rect width="1000" height="1000" fill="#000000"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 530" width="1000" height="530">
   <defs>
-    <linearGradient id="dGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#28d7b0"/>
-      <stop offset="1" stop-color="#13a98e"/>
-    </linearGradient>
-    <linearGradient id="upGrad" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#22c55e"/>
-      <stop offset="1" stop-color="#16d35a"/>
-    </linearGradient>
-    <linearGradient id="downGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ff1f3d"/>
-      <stop offset="1" stop-color="#ed1b2f"/>
-    </linearGradient>
+    <linearGradient id="d" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#25d5b0"/><stop offset="1" stop-color="#16a98f"/></linearGradient>
+    <linearGradient id="u" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#20c84f"/><stop offset="1" stop-color="#00df4f"/></linearGradient>
+    <linearGradient id="r" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff253d"/><stop offset="1" stop-color="#f01831"/></linearGradient>
   </defs>
-  <path d="M185 480 L285 380 L385 480 L335 480 L335 610 Q335 630 315 630 L255 630 Q235 630 235 610 L235 480 Z" fill="url(#upGrad)"/>
-  <path d="M400 370 H515 Q640 370 640 500 Q640 630 515 630 H400 Z M455 415 V585 H510 Q570 585 570 500 Q570 415 510 415 Z" fill="url(#dGrad)" fill-rule="evenodd"/>
-  <path d="M650 480 H700 V380 Q700 360 720 360 H780 Q800 360 800 380 V480 H850 Q875 480 858 500 L750 625 Q735 642 720 625 L612 500 Q595 480 620 480 Z" fill="url(#downGrad)"/>
+  <path d="M85 285 L190 180 L295 285 L245 285 L245 420 Q245 440 225 440 L155 440 Q135 440 135 420 L135 285 Z" fill="url(#u)"/>
+  <path d="M315 150 H445 Q585 150 585 265 Q585 380 445 380 H315 Z M375 205 V325 H440 Q510 325 510 265 Q510 205 440 205 Z" fill="url(#d)" fill-rule="evenodd"/>
+  <path d="M610 285 H660 V180 Q660 160 680 160 H750 Q770 160 770 180 V285 H820 Q845 285 828 305 L715 435 Q700 452 685 435 L572 305 Q555 285 580 285 Z" fill="url(#r)"/>
 </svg>
