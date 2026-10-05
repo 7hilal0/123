@@ -23,7 +23,7 @@ export const TopBar: React.FC = () => {
         title="DZCORE"
         aria-label="DZCORE"
       >
-        <img src="/dzcore-logo.svg" alt="DZCORE logo" className="w-12 h-8 md:w-14 md:h-10 object-contain" />
+        <img src="/dzcore-logo.svg?v=3" alt="DZCORE logo" className="w-12 h-8 md:w-14 md:h-10 object-contain" />
       </button>
 
       {/* Center: text only */}
