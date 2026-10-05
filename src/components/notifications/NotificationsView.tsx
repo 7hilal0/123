@@ -22,6 +22,7 @@ export const NotificationsView: React.FC = () => {
     navigateToPost,
     navigateToProfile,
     navigateToCommunity,
+    navigateToMessages,
     navigateToFeed,
     t,
     dir,
@@ -39,6 +40,8 @@ export const NotificationsView: React.FC = () => {
       navigateToProfile(n.targetId);
     } else if (n.targetType === 'community') {
       navigateToCommunity(n.targetId);
+    } else if (n.targetType === 'conversation') {
+      navigateToMessages(n.targetId);
     }
   };
 
@@ -55,6 +58,8 @@ export const NotificationsView: React.FC = () => {
         return <UserPlus className="w-4 h-4 text-teal-400" />;
       case 'community':
         return <Compass className="w-4 h-4 text-purple-400" />;
+      case 'message':
+        return <MessageSquare className="w-4 h-4 text-cyan-400" />;
       default:
         return <Bell className="w-4 h-4 text-neutral-400" />;
     }
