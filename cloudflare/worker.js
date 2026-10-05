@@ -280,13 +280,15 @@ export default {
     // Google's own g_csrf_token double-submit check below, so let it reach
     // that validation instead of returning invalid_origin here.
     const isGoogleAppCallback = url.pathname === '/api/auth/google/app-callback' && request.method === 'POST';
+    const isGoogleAppStart = url.pathname === '/api/auth/google/app-start' && request.method === 'GET';
+    const isGoogleOAuthCallback = url.pathname === '/api/auth/google/app-callback' && request.method === 'GET';
     const isAppExchange = url.pathname === '/api/auth/app-exchange' && request.method === 'POST';
     // The app-exchange request is made by the native WebView/app after Google
     // redirects back through dzcore://. Native app requests can have no
     // browser Origin (or a non-web Origin), so the normal browser CSRF check
     // would incorrectly return invalid_origin. The exchange uses a short-lived
     // one-time random code, so it does not rely on browser cookies/CSRF.
-    if (!isGoogleAppCallback && !isAppExchange && csrfRequired(request)) return json({ error: 'invalid_origin' }, 403, origin);
+    if (!isGoogleAppCallback && !isGoogleAppStart && !isGoogleOAuthCallback && !isAppExchange && csrfRequired(request)) return json({ error: 'invalid_origin' }, 403, origin);
     try {
       if (url.pathname === '/api/health') return json({ ok: true, service: 'dzcore-cloudflare-api' }, 200, origin);
 
@@ -363,6 +365,98 @@ export default {
       }
 
       if (url.pathname === '/api/auth/me' && request.method === 'GET') return json({ user: cleanUser(await currentUser(request, env)) }, 200, origin);
+      if (url.pathname === '/api/auth/google/app-start' && request.method === 'GET') {
+        const mode = url.searchParams.get('mode') === 'register' ? 'register' : 'login';
+        const requestedUsername = String(url.searchParams.get('username') || '').trim().toLowerCase();
+        const requestedDisplayName = String(url.searchParams.get('displayName') || '').trim();
+        if (mode === 'register') {
+          const username = requestedUsername.replace(/[^a-z0-9_]/g, '');
+          if (username.length < 3 || username.length > 32 || username !== requestedUsername) {
+            return new Response('Invalid username.', { status: 400, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+          }
+        }
+        const state = crypto.randomUUID() + crypto.randomUUID();
+        const verifier = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
+        const challengeBytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+        const challenge = toBase64(challengeBytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+        const payload = { state, verifier, mode, username: requestedUsername, displayName: requestedDisplayName, expiresAt: Date.now() + 10 * 60 * 1000 };
+        await env.DB.prepare("INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES ('googleOAuthState', ?, NULL, ?, ?, 0)")
+          .bind(state, JSON.stringify(payload), Date.now()).run();
+
+        const params = new URLSearchParams({
+          client_id: '991149566827-l73oec1hjpu6jb21hftr4a2e1gille3m.apps.googleusercontent.com',
+          redirect_uri: 'https://dzcore.top/api/auth/google/app-callback',
+          response_type: 'code',
+          scope: 'openid email profile',
+          state,
+          code_challenge: challenge,
+          code_challenge_method: 'S256',
+          prompt: 'select_account',
+        });
+        return Response.redirect('https://accounts.google.com/o/oauth2/v2/auth?' + params.toString(), 302);
+      }
+
+      if (url.pathname === '/api/auth/google/app-callback' && request.method === 'GET') {
+        const state = String(url.searchParams.get('state') || '');
+        const authCode = String(url.searchParams.get('code') || '');
+        const oauthError = String(url.searchParams.get('error') || '');
+        if (!state || !authCode || oauthError) {
+          return new Response('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><p>Google sign-in was cancelled or failed. You can return to DZCORE.</p><script>setTimeout(()=>location.href="https://dzcore.top/",1500)</script>', { status: 400, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+        }
+        const stateRow = await env.DB.prepare("SELECT entity_id, payload FROM entities WHERE entity_type = 'googleOAuthState' AND entity_id = ? AND deleted = 0 LIMIT 1").bind(state).first();
+        if (!stateRow) return new Response('Invalid or expired Google login state.', { status: 400 });
+        let statePayload = null;
+        try { statePayload = JSON.parse(stateRow.payload || '{}'); } catch {}
+        if (!statePayload || statePayload.state !== state || Number(statePayload.expiresAt || 0) <= Date.now()) {
+          await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'googleOAuthState' AND entity_id = ?").bind(Date.now(), state).run();
+          return new Response('Expired Google login state.', { status: 400 });
+        }
+        await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'googleOAuthState' AND entity_id = ? AND deleted = 0").bind(Date.now(), state).run();
+
+        const tokenForm = new URLSearchParams({
+          code: authCode,
+          client_id: '991149566827-l73oec1hjpu6jb21hftr4a2e1gille3m.apps.googleusercontent.com',
+          redirect_uri: 'https://dzcore.top/api/auth/google/app-callback',
+          grant_type: 'authorization_code',
+          code_verifier: String(statePayload.verifier || ''),
+        });
+        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: tokenForm.toString(),
+        });
+        const tokenData = await tokenResponse.json().catch(() => ({}));
+        const credential = String(tokenData.id_token || '');
+        if (!tokenResponse.ok || !credential) return new Response('Google token exchange failed.', { status: 502 });
+
+        const upstream = await fetch(new Request(new URL('/api/auth/google', url), {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'Origin': 'https://dzcore.top' },
+          body: JSON.stringify({
+            credential,
+            username: statePayload.mode === 'register' ? statePayload.username : '',
+            displayName: statePayload.mode === 'register' ? statePayload.displayName : '',
+          }),
+        }));
+        let result = {};
+        try { result = await upstream.json(); } catch {}
+        const deepLink = 'dzcore://google-login?';
+        if (!upstream.ok || !result.user?.id) {
+          const errorLink = deepLink + 'error=' + encodeURIComponent(String(result.error || 'google_login_failed'));
+          return new Response('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><p>Returning to DZCORE…</p><a id="open" href="' + errorLink + '">Open DZCORE</a><script>location.replace(' + JSON.stringify(errorLink) + ');setTimeout(function(){document.getElementById("open").click()},500)</script>', { status: 200, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+        }
+
+        const appCode = crypto.randomUUID() + crypto.randomUUID();
+        const codeHash = await digest(appCode);
+        const expiresAt = Date.now() + 2 * 60 * 1000;
+        await env.DB.prepare("INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES ('appLoginCode', ?, ?, ?, ?, 0)")
+          .bind(appCode, result.user.id, JSON.stringify({ id: appCode, userId: result.user.id, codeHash, expiresAt }), Date.now()).run();
+
+        const successLink = deepLink + 'code=' + encodeURIComponent(appCode);
+        const html = '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="cache-control" content="no-store"></head><body><p>Returning to DZCORE…</p><a id="open" href="' + successLink + '">Open DZCORE</a><script>location.replace(' + JSON.stringify(successLink) + ');setTimeout(function(){document.getElementById("open").click()},500)</script></body></html>';
+        return new Response(html, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+      }
+
       if (url.pathname === '/api/auth/google/app-callback' && request.method === 'POST') {
         // Google GIS redirect mode posts credential + g_csrf_token here.
         // Validate Google's double-submit CSRF token before processing the ID token.
