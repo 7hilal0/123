@@ -28,7 +28,7 @@ const RevenueAd: React.FC = () => (
       height="60"
       frameBorder="0"
       scrolling="no"
-      loading="eager"
+      loading="lazy"
       className="block border-0 max-w-full"
       style={{ width: '468px', height: '60px' }}
     />
