@@ -239,7 +239,7 @@ export const cloudSync = {
       // entity response if the summary endpoint is unavailable or returns no
       // usable posts. This prevents a feed from appearing empty when posts
       // still exist in D1.
-      let res = await cloudflareApi.listEntities('post', undefined, { summary: '1' });
+      let res = await cloudflareApi.listEntities('post', undefined, { summary: '1', limit: '60' });
       let rows = Array.isArray(res?.items) ? res.items : [];
 
       const parsePosts = (items: Array<{ payload?: string }>): Post[] =>
@@ -250,7 +250,7 @@ export const cloudSync = {
       let posts = parsePosts(rows);
 
       if (posts.length === 0) {
-        res = await cloudflareApi.listEntities('post');
+        res = await cloudflareApi.listEntities('post', undefined, { limit: '60' });
         rows = Array.isArray(res?.items) ? res.items : [];
         posts = parsePosts(rows);
       }
