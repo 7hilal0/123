@@ -172,10 +172,7 @@ async function entityList(url, env, user = null) {
   if (['notification', 'communityMember'].includes(type) && user) { clauses.push('owner_id = ?'); values.push(user.id); }
   if (type === 'message' && conversationId) { clauses.push("json_extract(payload, '$.conversationId') = ?"); values.push(conversationId); }
   if (clauses.length) query += ` WHERE ${clauses.join(' AND ')}`;
-  // Keep public reads bounded. Large unbounded entity scans make D1 spend time
-  // parsing thousands of JSON rows before the browser can render the feed.
-  const requestedLimit = Math.max(1, Math.min(Number(url.searchParams.get('limit') || 60), 100));
-  query += ' ORDER BY updated_at DESC LIMIT ' + requestedLimit;
+  query += ' ORDER BY updated_at DESC LIMIT 10000';
   const result = await env.DB.prepare(query).bind(...values).all();
   const rows = result.results.filter((row) => !row.deleted);
   let smallAvatarRows = [];
@@ -221,3 +218,790 @@ async function entityList(url, env, user = null) {
       try { return Array.isArray(JSON.parse(row.payload).participantIds) && JSON.parse(row.payload).participantIds.includes(user.id); } catch { return false; }
     });
   }
+  return visibleRows.map((row) => {
+    if (summary && type === 'post') {
+      const payload = JSON.parse(row.payload);
+      if (payload.mediaType === 'image') payload.mediaDeferred = true;
+      if (payload.author && typeof payload.author === 'object') {
+        delete payload.author.email;
+        delete payload.author.googleSub;
+        delete payload.author.password;
+        delete payload.author.password_hash;
+        const avatarChunks = avatars.get(payload.author.id);
+        if ((!payload.author.avatar || payload.author.avatar.length === 0) && avatarChunks?.length) {
+          avatarChunks.sort((a, b) => a.index - b.index);
+          payload.author.avatar = avatarChunks.map((item) => item.value).join('');
+        }
+        if (typeof payload.author.avatar === 'string' && payload.author.avatar.length > 200000) {
+          payload.author.avatar = '';
+          payload.authorMediaDeferred = true;
+        }
+        if (typeof payload.author.banner === 'string' && payload.author.banner.length > 200000) payload.author.banner = '';
+      }
+      return { entityType: row.entity_type, entityId: row.entity_id, ownerId: row.owner_id, payload: JSON.stringify(payload) };
+    }
+    if (type === 'user' || type === 'comment' || type === 'post') {
+      try {
+        const payload = JSON.parse(row.payload);
+        const redactUser = (value) => {
+          if (!value || typeof value !== 'object') return;
+          delete value.email;
+          delete value.googleSub;
+          delete value.password;
+          delete value.password_hash;
+        };
+        if (type === 'user') redactUser(payload);
+        if (type === 'comment' || type === 'post') redactUser(payload.author);
+        return { entityType: row.entity_type, entityId: row.entity_id, ownerId: row.owner_id, payload: JSON.stringify(payload) };
+      } catch {
+        return { entityType: row.entity_type, entityId: row.entity_id, ownerId: row.owner_id, payload: '{}' };
+      }
+    }
+    return { entityType: row.entity_type, entityId: row.entity_id, ownerId: row.owner_id, payload: row.payload };
+  });
+}
+
+async function adminEntities(env, type) {
+  const rows = await env.DB.prepare('SELECT entity_id, owner_id, payload, updated_at FROM entities WHERE entity_type = ? AND deleted = 0 ORDER BY updated_at DESC LIMIT 1000').bind(type).all();
+  return rows.results.map((row) => ({ id: row.entity_id, ownerId: row.owner_id, updatedAt: row.updated_at, ...JSON.parse(row.payload) }));
+}
+
+async function saveAdminEntity(env, type, id, payload, ownerId = null) {
+  await env.DB.prepare('INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0').bind(type, id, ownerId, JSON.stringify(payload), Date.now()).run();
+}
+
+export default {
+  async fetch(request, env) {
+    const origin = originFor(request);
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'access-control-allow-origin': origin, 'access-control-allow-credentials': 'true', 'access-control-allow-headers': 'content-type, x-dzcore-admin-secret', 'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS' } });
+    const url = new URL(request.url);
+    // Google GIS redirect mode POSTs directly from Google's origin, so it
+    // cannot pass our normal browser Origin allow-list. The callback has
+    // Google's own g_csrf_token double-submit check below, so let it reach
+    // that validation instead of returning invalid_origin here.
+    const isGoogleAppCallback = url.pathname === '/api/auth/google/app-callback' && request.method === 'POST';
+    const isGoogleAppStart = url.pathname === '/api/auth/google/app-start' && request.method === 'GET';
+    const isGoogleOAuthCallback = url.pathname === '/api/auth/google/app-callback' && request.method === 'GET';
+    const isAppExchange = url.pathname === '/api/auth/app-exchange' && request.method === 'POST';
+    // The app-exchange request is made by the native WebView/app after Google
+    // redirects back through dzcore://. Native app requests can have no
+    // browser Origin (or a non-web Origin), so the normal browser CSRF check
+    // would incorrectly return invalid_origin. The exchange uses a short-lived
+    // one-time random code, so it does not rely on browser cookies/CSRF.
+    if (!isGoogleAppCallback && !isGoogleAppStart && !isGoogleOAuthCallback && !isAppExchange && csrfRequired(request)) return json({ error: 'invalid_origin' }, 403, origin);
+    try {
+      if (url.pathname === '/api/health') return json({ ok: true, service: 'dzcore-cloudflare-api' }, 200, origin);
+
+      if (url.pathname === '/api/admin/login' && request.method === 'POST') {
+        const body = await request.json();
+        if (String(body.secret || '') !== adminKey(env)) return json({ error: 'invalid_admin_secret' }, 401, origin);
+        return json({ ok: true }, 200, origin, { 'set-cookie': cookie(adminKey(env), 86400, ADMIN_COOKIE) });
+      }
+      if (url.pathname === '/api/admin/logout' && request.method === 'POST') return json({ ok: true }, 200, origin, { 'set-cookie': cookie('', 0, ADMIN_COOKIE) });
+      if (url.pathname === '/api/admin/session' && request.method === 'GET') return json({ authenticated: isAdmin(request, env) }, 200, origin);
+      if (url.pathname.startsWith('/api/admin/')) {
+        const denied = adminRequired(request, env, origin);
+        if (denied) return denied;
+
+        if (url.pathname === '/api/admin/overview' && request.method === 'GET') {
+          const [users, posts, comments, reports, banned] = await Promise.all([
+            env.DB.prepare('SELECT COUNT(*) AS count FROM auth_users').first(),
+            env.DB.prepare("SELECT COUNT(*) AS count FROM entities WHERE entity_type = 'post' AND deleted = 0").first(),
+            env.DB.prepare("SELECT COUNT(*) AS count FROM entities WHERE entity_type = 'comment' AND deleted = 0").first(),
+            env.DB.prepare("SELECT COUNT(*) AS count FROM entities WHERE entity_type = 'report' AND deleted = 0").first(),
+            env.DB.prepare("SELECT COUNT(*) AS count FROM entities WHERE entity_type = 'adminBan' AND deleted = 0").first(),
+          ]);
+          return json({ users: users?.count || 0, posts: posts?.count || 0, comments: comments?.count || 0, reports: reports?.count || 0, banned: banned?.count || 0 }, 200, origin);
+        }
+        if (url.pathname === '/api/admin/users' && request.method === 'GET') {
+          const rows = await env.DB.prepare('SELECT id, username, email, profile_json, created_at FROM auth_users ORDER BY created_at DESC LIMIT 1000').all();
+          const bans = await adminEntities(env, 'adminBan');
+          const banMap = new Map(bans.map((ban) => [ban.userId, ban]));
+          return json({ users: rows.results.map((row) => ({ id: row.id, username: row.username, email: row.email, createdAt: row.created_at, profile: cleanUser(JSON.parse(row.profile_json)), ban: banMap.get(row.id) || null })) }, 200, origin);
+        }
+        if (url.pathname === '/api/admin/reports' && request.method === 'GET') return json({ reports: await adminEntities(env, 'report') }, 200, origin);
+        if (url.pathname === '/api/admin/notifications' && request.method === 'POST') {
+          const body = await request.json();
+          if (!body.userId || !String(body.message || '').trim()) return json({ error: 'invalid_notification' }, 400, origin);
+          const notification = { id: crypto.randomUUID(), userId: body.userId, type: 'admin_warning', title: String(body.title || 'تنبيه من الإدارة').slice(0, 120), message: String(body.message).trim().slice(0, 1000), timestamp: Date.now(), read: false };
+          await saveAdminEntity(env, 'notification', notification.id, notification, body.userId);
+          return json({ notification }, 201, origin);
+        }
+        if (url.pathname === '/api/admin/actions' && request.method === 'POST') {
+          const body = await request.json();
+          const userId = String(body.userId || '');
+          const action = String(body.action || '');
+          if (!userId || !['ban', 'unban', 'delete', 'reset_password', 'resolve_report', 'delete_post'].includes(action)) return json({ error: 'invalid_action' }, 400, origin);
+          if (action === 'delete_post') {
+            await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'post' AND entity_id = ?").bind(Date.now(), userId).run();
+            return json({ ok: true, action }, 200, origin);
+          }
+          if (action === 'ban' || action === 'unban') {
+            const ban = { userId, reason: String(body.reason || '').slice(0, 500), expiresAt: action === 'ban' && body.durationDays ? Date.now() + Number(body.durationDays) * 86400000 : null, createdAt: Date.now() };
+            await saveAdminEntity(env, 'adminBan', userId, ban, userId);
+            if (action === 'unban') await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'adminBan' AND entity_id = ?").bind(Date.now(), userId).run();
+            if (action === 'ban') await env.DB.prepare('DELETE FROM auth_sessions WHERE user_id = ?').bind(userId).run();
+            return json({ ok: true, action }, 200, origin);
+          }
+          if (action === 'delete') {
+            await env.DB.batch([
+              env.DB.prepare('DELETE FROM auth_sessions WHERE user_id = ?').bind(userId),
+              env.DB.prepare('DELETE FROM auth_users WHERE id = ?').bind(userId),
+              env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE owner_id = ? OR entity_id = ?").bind(Date.now(), userId, userId),
+            ]);
+            return json({ ok: true, action }, 200, origin);
+          }
+          if (action === 'reset_password') {
+            const temporaryPassword = crypto.randomUUID().replaceAll('-', '').slice(0, 12);
+            await env.DB.prepare('UPDATE auth_users SET password_hash = ? WHERE id = ?').bind(await hashPassword(temporaryPassword), userId).run();
+            await env.DB.prepare('DELETE FROM auth_sessions WHERE user_id = ?').bind(userId).run();
+            return json({ ok: true, temporaryPassword }, 200, origin);
+          }
+          const reportId = String(body.reportId || '');
+          if (reportId) await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'report' AND entity_id = ?").bind(Date.now(), reportId).run();
+          return json({ ok: true, action }, 200, origin);
+        }
+        if (url.pathname === '/api/admin/posts' && request.method === 'GET') return json({ posts: await adminEntities(env, 'post') }, 200, origin);
+      }
+
+      if (url.pathname === '/api/auth/me' && request.method === 'GET') return json({ user: cleanUser(await currentUser(request, env)) }, 200, origin);
+      if (url.pathname === '/api/auth/google/app-start' && request.method === 'GET') {
+        const mode = url.searchParams.get('mode') === 'register' ? 'register' : 'login';
+        const requestedUsername = String(url.searchParams.get('username') || '').trim().toLowerCase();
+        const requestedDisplayName = String(url.searchParams.get('displayName') || '').trim();
+        if (mode === 'register') {
+          const username = requestedUsername.replace(/[^a-z0-9_]/g, '');
+          if (username.length < 3 || username.length > 32 || username !== requestedUsername) {
+            return new Response('Invalid username.', { status: 400, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+          }
+        }
+        const state = crypto.randomUUID() + crypto.randomUUID();
+        const verifier = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
+        const challengeBytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+        const challenge = toBase64(challengeBytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+        const payload = { state, verifier, mode, username: requestedUsername, displayName: requestedDisplayName, expiresAt: Date.now() + 10 * 60 * 1000 };
+        await env.DB.prepare("INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES ('googleOAuthState', ?, NULL, ?, ?, 0)")
+          .bind(state, JSON.stringify(payload), Date.now()).run();
+
+        const params = new URLSearchParams({
+          client_id: '991149566827-l73oec1hjpu6jb21hftr4a2e1gille3m.apps.googleusercontent.com',
+          redirect_uri: 'https://dzcore.top/api/auth/google/app-callback',
+          response_type: 'code',
+          scope: 'openid email profile',
+          state,
+          code_challenge: challenge,
+          code_challenge_method: 'S256',
+          prompt: 'select_account',
+        });
+        return Response.redirect('https://accounts.google.com/o/oauth2/v2/auth?' + params.toString(), 302);
+      }
+
+      if (url.pathname === '/api/auth/google/app-callback' && request.method === 'GET') {
+        const state = String(url.searchParams.get('state') || '');
+        const authCode = String(url.searchParams.get('code') || '');
+        const oauthError = String(url.searchParams.get('error') || '');
+        if (!state || !authCode || oauthError) {
+          return new Response('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><p>Google sign-in was cancelled or failed. You can return to DZCORE.</p><script>setTimeout(()=>location.href="https://dzcore.top/",1500)</script>', { status: 400, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+        }
+        const stateRow = await env.DB.prepare("SELECT entity_id, payload FROM entities WHERE entity_type = 'googleOAuthState' AND entity_id = ? AND deleted = 0 LIMIT 1").bind(state).first();
+        if (!stateRow) return new Response('Invalid or expired Google login state.', { status: 400 });
+        let statePayload = null;
+        try { statePayload = JSON.parse(stateRow.payload || '{}'); } catch {}
+        if (!statePayload || statePayload.state !== state || Number(statePayload.expiresAt || 0) <= Date.now()) {
+          await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'googleOAuthState' AND entity_id = ?").bind(Date.now(), state).run();
+          return new Response('Expired Google login state.', { status: 400 });
+        }
+        await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'googleOAuthState' AND entity_id = ? AND deleted = 0").bind(Date.now(), state).run();
+
+        const googleClientSecret = String(env.GOOGLE_CLIENT_SECRET || '').trim();
+        if (!googleClientSecret) {
+          console.error('Google OAuth client secret is not configured.');
+          return new Response('Google OAuth client secret is not configured.', { status: 500 });
+        }
+        const tokenForm = new URLSearchParams({
+          code: authCode,
+          client_id: '991149566827-l73oec1hjpu6jb21hftr4a2e1gille3m.apps.googleusercontent.com',
+          client_secret: googleClientSecret,
+          redirect_uri: 'https://dzcore.top/api/auth/google/app-callback',
+          grant_type: 'authorization_code',
+          code_verifier: String(statePayload.verifier || ''),
+        });
+        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: tokenForm.toString(),
+        });
+        const tokenData = await tokenResponse.json().catch(() => ({}));
+        const credential = String(tokenData.id_token || '');
+        if (!tokenResponse.ok || !credential) {
+          console.error('Google token exchange failed:', tokenResponse.status, tokenData.error, tokenData.error_description);
+          return new Response(
+            'Google token exchange failed: ' + String(tokenData.error || 'unknown_error'),
+            { status: 502 },
+          );
+        }
+
+        const upstream = await fetch(new Request(new URL('/api/auth/google', url), {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'Origin': 'https://dzcore.top' },
+          body: JSON.stringify({
+            credential,
+            username: statePayload.mode === 'register' ? statePayload.username : '',
+            displayName: statePayload.mode === 'register' ? statePayload.displayName : '',
+          }),
+        }));
+        let result = {};
+        try { result = await upstream.json(); } catch {}
+        const deepLink = 'dzcore://google-login?';
+        if (!upstream.ok || !result.user?.id) {
+          const errorLink = deepLink + 'error=' + encodeURIComponent(String(result.error || 'google_login_failed'));
+          return new Response('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><p>Returning to DZCORE…</p><a id="open" href="' + errorLink + '">Open DZCORE</a><script>location.replace(' + JSON.stringify(errorLink) + ');setTimeout(function(){document.getElementById("open").click()},500)</script>', { status: 200, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+        }
+
+        const appCode = crypto.randomUUID() + crypto.randomUUID();
+        const codeHash = await digest(appCode);
+        const expiresAt = Date.now() + 2 * 60 * 1000;
+        await env.DB.prepare("INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES ('appLoginCode', ?, ?, ?, ?, 0)")
+          .bind(appCode, result.user.id, JSON.stringify({ id: appCode, userId: result.user.id, codeHash, expiresAt }), Date.now()).run();
+
+        const successLink = deepLink + 'code=' + encodeURIComponent(appCode);
+        const html = '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="cache-control" content="no-store"></head><body><p>Returning to DZCORE…</p><a id="open" href="' + successLink + '">Open DZCORE</a><script>location.replace(' + JSON.stringify(successLink) + ');setTimeout(function(){document.getElementById("open").click()},500)</script></body></html>';
+        return new Response(html, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+      }
+
+      if (url.pathname === '/api/auth/google/app-callback' && request.method === 'POST') {
+        // Google GIS redirect mode posts credential + g_csrf_token here.
+        // Validate Google's double-submit CSRF token before processing the ID token.
+        const form = await request.formData();
+        const credential = String(form.get('credential') || '');
+        const csrfToken = String(form.get('g_csrf_token') || '');
+        const csrfCookie = parseCookies(request).g_csrf_token || '';
+        if (!credential || !csrfToken || csrfToken !== csrfCookie) {
+          return new Response('Invalid Google login request.', { status: 403 });
+        }
+
+        // Reuse the existing Google authentication endpoint so the account
+        // lookup, ban checks, and session creation stay identical.
+        const upstream = await fetch(new Request(new URL('/api/auth/google', url), {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'Origin': 'https://dzcore.top',
+          },
+          body: JSON.stringify({ credential }),
+        }));
+
+        let result = {};
+        try { result = await upstream.json(); } catch {}
+
+        if (!upstream.ok || !result.user?.id) {
+          const errorCode = String(result.error || 'google_login_failed');
+          return Response.redirect(
+            'dzcore://google-login?error=' + encodeURIComponent(errorCode),
+            302,
+          );
+        }
+
+        // Create a short-lived, one-time code. The Android app exchanges this
+        // code over HTTPS so the WebView receives its own HttpOnly session cookie.
+        const appCode = crypto.randomUUID() + crypto.randomUUID();
+        const codeHash = await digest(appCode);
+        const expiresAt = Date.now() + 2 * 60 * 1000;
+        const codePayload = {
+          id: appCode,
+          userId: result.user.id,
+          codeHash,
+          expiresAt,
+        };
+
+        await env.DB.prepare(
+          "INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES ('appLoginCode', ?, ?, ?, ?, 0)"
+        ).bind(appCode, result.user.id, JSON.stringify(codePayload), Date.now()).run();
+
+        return Response.redirect(
+          'dzcore://google-login?code=' + encodeURIComponent(appCode),
+          302,
+        );
+      }
+
+      if (url.pathname === '/api/auth/app-exchange' && request.method === 'POST') {
+        const contentType = request.headers.get('content-type') || '';
+        let body = {};
+        if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
+          const form = await request.formData();
+          body = { code: form.get('code') };
+        } else {
+          body = await request.json();
+        }
+        const appCode = String(body.code || '').trim();
+
+        if (!appCode || appCode.length < 20 || appCode.length > 200) {
+          return json({ error: 'invalid_app_code' }, 400, origin);
+        }
+
+        const codeHash = await digest(appCode);
+        const row = await env.DB.prepare(
+          "SELECT entity_id, owner_id, payload FROM entities WHERE entity_type = 'appLoginCode' AND entity_id = ? AND deleted = 0 LIMIT 1"
+        ).bind(appCode).first();
+
+        if (!row) return json({ error: 'invalid_app_code' }, 401, origin);
+
+        let payload;
+        try { payload = JSON.parse(row.payload || '{}'); } catch { payload = null; }
+
+        if (!payload || payload.codeHash !== codeHash || Number(payload.expiresAt || 0) <= Date.now()) {
+          await env.DB.prepare(
+            "UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'appLoginCode' AND entity_id = ?"
+          ).bind(Date.now(), appCode).run();
+          return json({ error: 'expired_app_code' }, 401, origin);
+        }
+
+        // One-time use: invalidate before returning the session.
+        await env.DB.prepare(
+          "UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'appLoginCode' AND entity_id = ? AND deleted = 0"
+        ).bind(Date.now(), appCode).run();
+
+        const userRow = await env.DB.prepare(
+          'SELECT id, username, email, profile_json FROM auth_users WHERE id = ? LIMIT 1'
+        ).bind(row.owner_id).first();
+
+        if (!userRow) return json({ error: 'user_not_found' }, 401, origin);
+
+        const session = await createSession(userRow.id, env);
+        const user = {
+          ...JSON.parse(userRow.profile_json),
+          id: userRow.id,
+          username: userRow.username,
+          email: userRow.email,
+        };
+
+        const redirectHeaders = new Headers();
+        redirectHeaders.set('Location', 'https://dzcore.top/');
+        redirectHeaders.set('Cache-Control', 'no-store');
+        redirectHeaders.append('Set-Cookie', cookie(session.token, SESSION_DAYS * 86400));
+        return new Response(null, { status: 303, headers: redirectHeaders });
+      }
+
+      if (url.pathname === '/api/auth/google' && request.method === 'POST') {
+        const body = await request.json();
+        const claims = await verifyGoogleCredential(String(body.credential || ''), '991149566827-l73oec1hjpu6jb21hftr4a2e1gille3m.apps.googleusercontent.com');
+        const email = String(claims.email).trim().toLowerCase();
+        const googleSub = String(claims.sub);
+        const requestedUsername = String(body.username || '').trim().toLowerCase();
+        const requestedDisplayName = String(body.displayName || '').trim();
+        const displayName = (requestedDisplayName || String(claims.name || email.split('@')[0] || 'Google User')).slice(0, 80);
+        const picture = String(claims.picture || '');
+
+        let row = await env.DB.prepare("SELECT id, username, email, password_hash, profile_json FROM auth_users WHERE lower(email) = ? LIMIT 1").bind(email).first();
+        if (!row) row = await env.DB.prepare("SELECT id, username, email, password_hash, profile_json FROM auth_users WHERE json_extract(profile_json, '$.googleSub') = ? LIMIT 1").bind(googleSub).first();
+
+        if (row) {
+          if (requestedUsername || requestedDisplayName) {
+            return json({ error: 'already_registered' }, 409, origin);
+          }
+          const profile = { ...JSON.parse(row.profile_json), googleSub };
+          if (!profile.email) profile.email = email;
+          if (!profile.displayName) profile.displayName = displayName;
+          if (!profile.avatar && picture) profile.avatar = picture;
+          await env.DB.prepare('UPDATE auth_users SET profile_json = ? WHERE id = ?').bind(JSON.stringify(profile), row.id).run();
+          await env.DB.prepare("UPDATE entities SET payload = ?, updated_at = ?, deleted = 0 WHERE entity_type = 'user' AND entity_id = ?").bind(JSON.stringify(profile), Date.now(), row.id).run().catch(() => {});
+          const activeBan = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'adminBan' AND entity_id = ? AND deleted = 0").bind(row.id).first();
+          if (activeBan) {
+            const ban = JSON.parse(activeBan.payload);
+            if (!ban.expiresAt || ban.expiresAt > Date.now()) return json({ error: 'account_banned' }, 403, origin);
+          }
+          const session = await createSession(row.id, env);
+          return json({ user: cleanUser({ ...profile, id: row.id, username: row.username, email: row.email || email }) }, 200, origin, { 'set-cookie': cookie(session.token, SESSION_DAYS * 86400) });
+        }
+
+        if (!requestedUsername) return json({ error: 'username_required' }, 400, origin);
+        const username = requestedUsername.replace(/[^a-z0-9_]/g, '');
+        if (username.length < 3 || username.length > 32) return json({ error: 'invalid_username' }, 400, origin);
+        if (username !== requestedUsername) return json({ error: 'invalid_username' }, 400, origin);
+        if (await env.DB.prepare('SELECT id FROM auth_users WHERE lower(username) = ?').bind(username).first()) return json({ error: 'username_taken' }, 409, origin);
+        const id = crypto.randomUUID();
+        const profile = { id, username, displayName, email, avatar: picture, banner: '', profileColor: '', displayNameColor: '', bio: '', status: 'online', customStatus: '', badges: ['Member'], karma: 0, joinedDate: new Date().toISOString(), followersCount: 0, followingCount: 0, isFollowing: false, googleSub };
+
+        try {
+          const unusablePassword = crypto.randomUUID() + crypto.randomUUID();
+          await env.DB.prepare('INSERT INTO auth_users (id, username, email, password_hash, profile_json, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(id, username, email, await hashPassword(unusablePassword), JSON.stringify(profile), Date.now()).run();
+          await env.DB.prepare('INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0)').bind('user', id, id, JSON.stringify(profile), Date.now()).run();
+        } catch (error) {
+          const message = String(error?.message || '');
+          if (message.includes('UNIQUE')) return json({ error: 'already_registered' }, 409, origin);
+          throw error;
+        }
+
+        const session = await createSession(id, env);
+        return json({ user: cleanUser(profile) }, 201, origin, { 'set-cookie': cookie(session.token, SESSION_DAYS * 86400) });
+      }
+      if (url.pathname === '/api/auth/register' && request.method === 'POST') {
+        const body = await request.json();
+        const username = String(body.username || '').trim().toLowerCase();
+        const displayName = String(body.displayName || '').trim();
+        const email = String(body.email || '').trim().toLowerCase();
+        const password = String(body.password || '');
+
+        if (!/^[a-z0-9_]{3,32}$/.test(username)) {
+          return json({ error: 'invalid_username' }, 400, origin);
+        }
+        if (!displayName || displayName.length > 80) {
+          return json({ error: 'invalid_display_name' }, 400, origin);
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          return json({ error: 'invalid_email' }, 400, origin);
+        }
+        if (password.length < 8) {
+          return json({ error: 'weak_password' }, 400, origin);
+        }
+
+        const existing = await env.DB.prepare(
+          'SELECT id FROM auth_users WHERE lower(username) = ? OR lower(email) = ?'
+        ).bind(username, email).first();
+        if (existing) return json({ error: 'already_registered' }, 409, origin);
+
+        const id = crypto.randomUUID();
+        const profile = {
+          id,
+          username,
+          displayName,
+          email,
+          avatar: body.avatar || '',
+          banner: '',
+          bio: '',
+          status: 'online',
+          customStatus: '',
+          badges: ['Member'],
+          karma: 0,
+          joinedDate: new Date().toISOString(),
+          followersCount: 0,
+          followingCount: 0,
+          isFollowing: false
+        };
+
+        try {
+          await env.DB.prepare(
+            'INSERT INTO auth_users (id, username, email, password_hash, profile_json, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+          ).bind(id, username, email, await hashPassword(password), JSON.stringify(profile), Date.now()).run();
+          await env.DB.prepare(
+            'INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0)'
+          ).bind('user', id, id, JSON.stringify(profile), Date.now()).run();
+        } catch (error) {
+          const message = String(error?.message || '');
+          if (message.includes('UNIQUE')) return json({ error: 'already_registered' }, 409, origin);
+          throw error;
+        }
+
+        const session = await createSession(id, env);
+        return json({ user: cleanUser(profile) }, 201, origin, {
+          'set-cookie': cookie(session.token, SESSION_DAYS * 86400)
+        });
+      }
+
+      if (url.pathname === '/api/auth/login' && request.method === 'POST') {
+        const body = await request.json();
+        const term = String(body.term || '').trim().toLowerCase();
+        const row = await env.DB.prepare('SELECT id, username, email, password_hash, profile_json FROM auth_users WHERE lower(email) = ? OR lower(username) = ?').bind(term, term).first();
+        if (!row || !(await verifyPassword(String(body.password || ''), row.password_hash))) return json({ error: 'invalid_credentials' }, 401, origin);
+        const activeBan = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'adminBan' AND entity_id = ? AND deleted = 0").bind(row.id).first();
+        if (activeBan) {
+          const ban = JSON.parse(activeBan.payload);
+          if (!ban.expiresAt || ban.expiresAt > Date.now()) return json({ error: 'account_banned' }, 403, origin);
+          await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'adminBan' AND entity_id = ?").bind(Date.now(), row.id).run();
+        }
+        const session = await createSession(row.id, env);
+        const user = { ...JSON.parse(row.profile_json), id: row.id, username: row.username, email: row.email };
+        return json({ user: cleanUser(user) }, 200, origin, { 'set-cookie': cookie(session.token, SESSION_DAYS * 86400) });
+      }
+      if (url.pathname === '/api/auth/logout' && request.method === 'POST') {
+        const token = parseCookies(request)[SESSION_COOKIE];
+        if (token) await env.DB.prepare('DELETE FROM auth_sessions WHERE token_hash = ?').bind(await digest(token)).run();
+        return json({ ok: true }, 200, origin, { 'set-cookie': cookie('', 0) });
+      }
+      if (url.pathname === '/api/auth/account' && request.method === 'PUT') {
+        const user = await currentUser(request, env);
+        if (!user) return json({ error: 'unauthorized' }, 401, origin);
+        const body = await request.json();
+        const row = await env.DB.prepare('SELECT password_hash, profile_json FROM auth_users WHERE id = ?').bind(user.id).first();
+        if (!row || !(await verifyPassword(String(body.currentPassword || ''), row.password_hash))) return json({ error: 'invalid_current_password' }, 403, origin);
+        const profile = { ...JSON.parse(row.profile_json) };
+        const statements = [];
+        const normalizedEmail = body.email == null ? '' : String(body.email).trim().toLowerCase();
+        const newPassword = body.newPassword == null ? '' : String(body.newPassword);
+
+        if (body.email !== undefined) {
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) return json({ error: 'invalid_email' }, 400, origin);
+          profile.email = normalizedEmail;
+          const duplicate = await env.DB.prepare('SELECT id FROM auth_users WHERE lower(email) = ? AND id != ?').bind(profile.email, user.id).first();
+          if (duplicate) return json({ error: 'email_already_used' }, 409, origin);
+          statements.push(env.DB.prepare('UPDATE auth_users SET email = ?, profile_json = ? WHERE id = ?').bind(profile.email, JSON.stringify(profile), user.id));
+          statements.push(env.DB.prepare("UPDATE entities SET payload = ?, updated_at = ?, deleted = 0 WHERE entity_type = 'user' AND entity_id = ?").bind(JSON.stringify(profile), Date.now(), user.id));
+        }
+        if (body.newPassword !== undefined) {
+          if (newPassword.length < 8) return json({ error: 'weak_password' }, 400, origin);
+          statements.push(env.DB.prepare('UPDATE auth_users SET password_hash = ? WHERE id = ?').bind(await hashPassword(newPassword), user.id));
+        }
+        if (!statements.length) return json({ error: 'nothing_to_update' }, 400, origin);
+        await env.DB.batch(statements);
+        return json({ user: cleanUser({ ...profile, id: user.id, username: user.username, email: profile.email || user.email }) }, 200, origin);
+      }
+      if (url.pathname === '/api/reports' && request.method === 'POST') {
+        const user = await currentUser(request, env);
+        if (!user) return json({ error: 'unauthorized' }, 401, origin);
+        const body = await request.json();
+        const targetType = String(body.targetType || '');
+        const targetId = String(body.targetId || '');
+        const reason = String(body.reason || '').trim();
+        if (!['post', 'user', 'comment'].includes(targetType) || !targetId || !reason) return json({ error: 'invalid_report' }, 400, origin);
+        const report = { id: crypto.randomUUID(), reporterId: user.id, reporterUsername: user.username, targetType, targetId, reason: reason.slice(0, 1000), status: 'open', createdAt: Date.now() };
+        await saveAdminEntity(env, 'report', report.id, report, user.id);
+        return json({ report: { id: report.id, status: report.status } }, 201, origin);
+      }
+      if (csrfRequired(request)) return json({ error: 'invalid_origin' }, 403, origin);
+
+      if (url.pathname === '/api/community-membership' && request.method === 'POST') {
+        const user = await currentUser(request, env);
+        if (!user) return json({ error: 'unauthorized' }, 401, origin);
+        const body = await request.json();
+        const communityId = String(body.communityId || '');
+        const join = Boolean(body.join);
+        if (!communityId) return json({ error: 'invalid_community' }, 400, origin);
+        const communityRow = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'community' AND entity_id = ? AND deleted = 0").bind(communityId).first();
+        if (!communityRow) return json({ error: 'community_not_found' }, 404, origin);
+        const membershipId = user.id + ':' + communityId;
+        const existing = await env.DB.prepare("SELECT entity_id FROM entities WHERE entity_type = 'communityMember' AND entity_id = ? AND deleted = 0").bind(membershipId).first();
+        let changed = false;
+        if (join && !existing) {
+          changed = true;
+          await env.DB.prepare("INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES ('communityMember', ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0")
+            .bind(membershipId, user.id, JSON.stringify({ id: membershipId, userId: user.id, communityId }), Date.now()).run();
+          const community = JSON.parse(communityRow.payload);
+          community.memberCount = Math.max(0, Number(community.memberCount || 0) + 1);
+          community.isMember = false;
+          await env.DB.prepare("UPDATE entities SET payload = ?, updated_at = ? WHERE entity_type = 'community' AND entity_id = ?").bind(JSON.stringify(community), Date.now(), communityId).run();
+        } else if (!join && existing) {
+          changed = true;
+          await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'communityMember' AND entity_id = ?").bind(Date.now(), membershipId).run();
+          const community = JSON.parse(communityRow.payload);
+          community.memberCount = Math.max(0, Number(community.memberCount || 0) - 1);
+          community.isMember = false;
+          await env.DB.prepare("UPDATE entities SET payload = ?, updated_at = ? WHERE entity_type = 'community' AND entity_id = ?").bind(JSON.stringify(community), Date.now(), communityId).run();
+        }
+        return json({ joined: join, changed, communityId }, 200, origin);
+      }
+
+      if (url.pathname === '/api/entities' && request.method === 'GET') {
+        const type = url.searchParams.get('type') || '';
+        const privateTypes = new Set(['conversation', 'message', 'notification', 'communityMember', 'report', 'adminBan']);
+        if (privateTypes.has(type) && !await currentUser(request, env)) return json({ error: 'unauthorized' }, 401, origin);
+        if (['report', 'adminBan'].includes(type)) return json({ error: 'forbidden_entity_type' }, 403, origin);
+        const user = privateTypes.has(type) ? await currentUser(request, env) : null;
+        if (type === 'message') {
+          const conversationId = url.searchParams.get('conversationId');
+          if (!conversationId || !user) return json({ error: 'invalid_conversation' }, 400, origin);
+          const conversation = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'conversation' AND entity_id = ? AND deleted = 0").bind(conversationId).first();
+          let allowed = false;
+          try {
+            const participants = JSON.parse(conversation?.payload || '{}').participantIds;
+            allowed = Array.isArray(participants) && participants.includes(user.id);
+          } catch {}
+          if (!allowed) return json({ error: 'forbidden_conversation' }, 403, origin);
+        }
+        return json({ items: await entityList(url, env, user) }, 200, origin);
+      }
+      if (url.pathname === '/api/entities/batch' && request.method === 'POST') {
+        const user = await currentUser(request, env);
+        if (!user) return json({ error: 'unauthorized' }, 401, origin);
+        const body = await request.json();
+        const entities = Array.isArray(body.entities) ? body.entities : [];
+        if (!entities.length || entities.length > 20 || entities.some((item) => {
+          if (item.entityType !== 'profileMedia' || item.ownerId !== user.id || !String(item.entityId || '').startsWith(`${user.id}:`) || typeof item.payload !== 'string') return true;
+          try { return JSON.parse(item.payload).userId !== user.id; } catch { return true; }
+        })) return json({ error: 'invalid_entity_batch' }, 400, origin);
+        const statements = entities.map((item) => env.DB.prepare('INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0').bind(item.entityType, item.entityId, user.id, item.payload, Date.now()));
+        await env.DB.batch(statements);
+        return json({ ok: true }, 200, origin);
+      }
+      if (url.pathname === '/api/entities/profile-media/cleanup' && request.method === 'POST') {
+        const user = await currentUser(request, env);
+        if (!user) return json({ error: 'unauthorized' }, 401, origin);
+        const body = await request.json();
+        const field = body.field === 'banner' ? 'banner' : body.field === 'avatar' ? 'avatar' : '';
+        const mediaVersion = String(body.mediaVersion || '');
+        if (!field || !mediaVersion) return json({ error: 'invalid_media_cleanup' }, 400, origin);
+        await env.DB.prepare("UPDATE entities SET deleted = 1, updated_at = ? WHERE entity_type = 'profileMedia' AND owner_id = ? AND json_extract(payload, '$.field') = ? AND COALESCE(json_extract(payload, '$.mediaVersion'), 'legacy') != ?").bind(Date.now(), user.id, field, mediaVersion).run();
+        return json({ ok: true }, 200, origin);
+      }
+      if (url.pathname === '/api/entities' && request.method === 'POST') {
+        const user = await currentUser(request, env);
+        if (!user) return json({ error: 'unauthorized' }, 401, origin);
+        const body = await request.json();
+        const type = String(body.entityType || '');
+        const entityId = String(body.entityId || '');
+        if (!type || !entityId || typeof body.payload !== 'string') return json({ error: 'invalid_entity' }, 400, origin);
+        let payload;
+        try { payload = JSON.parse(body.payload); } catch { return json({ error: 'invalid_entity_payload' }, 400, origin); }
+        const allowedTypes = new Set(['user', 'community', 'post', 'comment', 'profileMedia', 'follow', 'conversation', 'message', 'notification', 'communityMember']);
+        if (!allowedTypes.has(type)) return json({ error: 'forbidden_entity_type' }, 403, origin);
+        if (type === 'community') {
+          const existingCommunity = await env.DB.prepare("SELECT entity_id FROM entities WHERE entity_type = 'community' AND entity_id = ? AND deleted = 0").bind(entityId).first();
+          if (existingCommunity) return json({ error: 'community_updates_use_membership_api' }, 403, origin);
+        }
+        if (type === 'user' && (entityId !== user.id || payload.id !== user.id)) return json({ error: 'forbidden_entity' }, 403, origin);
+        if (type === 'profileMedia' && (body.ownerId !== user.id || payload.userId !== user.id || !entityId.startsWith(user.id + ':'))) return json({ error: 'forbidden_entity' }, 403, origin);
+        if (type === 'post') {
+          if (payload.deleted) {
+            const existing = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'post' AND entity_id = ?").bind(entityId).first();
+            let authorId = null;
+            try { authorId = JSON.parse(existing?.payload || '{}').author?.id; } catch {}
+            if (!existing || authorId !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
+          } else {
+            if (entityId !== payload.id) return json({ error: 'forbidden_entity' }, 403, origin);
+
+            // A post author may update the full post. Other users may only
+            // change their own vote; they must never be able to rewrite the
+            // post's title/content/author by calling savePost.
+            const existingPost = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'post' AND entity_id = ? AND deleted = 0").bind(entityId).first();
+
+            // A brand-new post has no server row yet. Allow the author to create it;
+            // only apply the vote/save merge rules when the post already exists.
+            if (!existingPost?.payload) {
+              if (payload.author?.id !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
+            } else {
+              let existingAuthorId = null;
+              try { existingAuthorId = JSON.parse(existingPost.payload)?.author?.id || null; } catch {}
+              if (existingAuthorId !== user.id) {
+              const currentPost = JSON.parse(existingPost.payload);
+              const currentVotes = { ...(currentPost.votes || {}) };
+              const currentVoteState = { ...(currentPost.voteState || {}) };
+              const currentSavedBy = { ...(currentPost.savedBy || {}) };
+              const incomingVotes = payload.votes || {};
+              const incomingVoteState = payload.voteState || {};
+              const incomingSavedBy = payload.savedBy || {};
+
+              // A user may change only their own vote/save state. Never replace
+              // another user's state with a stale client snapshot.
+              const incomingState = Object.prototype.hasOwnProperty.call(incomingVoteState, user.id)
+                ? Number(incomingVoteState[user.id])
+                : (Object.prototype.hasOwnProperty.call(incomingVotes, user.id)
+                  ? Number(incomingVotes[user.id])
+                  : Number(currentVoteState[user.id] || currentVotes[user.id] || 0));
+              if (Object.prototype.hasOwnProperty.call(incomingSavedBy, user.id)) {
+                if (incomingSavedBy[user.id]) currentSavedBy[user.id] = true;
+                else delete currentSavedBy[user.id];
+              }
+
+              if (incomingState === 1 || incomingState === -1) {
+                currentVotes[user.id] = incomingState;
+                currentVoteState[user.id] = incomingState;
+              } else {
+                delete currentVotes[user.id];
+                currentVoteState[user.id] = 0;
+              }
+
+              payload = {
+                ...currentPost,
+                votes: currentVotes,
+                voteState: currentVoteState,
+                savedBy: currentSavedBy,
+                upvotes: Object.values(currentVotes).filter((vote) => Number(vote) === 1).length,
+                downvotes: Object.values(currentVotes).filter((vote) => Number(vote) === -1).length,
+              };
+            } else if (payload.author?.id !== user.id) {
+              return json({ error: 'forbidden_entity' }, 403, origin);
+              }
+            }
+          }
+        }
+        if (type === 'comment') {
+          const existing = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'comment' AND entity_id = ?").bind(entityId).first();
+          if (payload.deleted) {
+            let existingAuthor = null;
+            try { existingAuthor = JSON.parse(existing?.payload || '{}').author?.id; } catch {}
+            if (!existing || existingAuthor !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
+          } else if (entityId !== payload.id || payload.author?.id !== user.id) return json({ error: 'forbidden_entity' }, 403, origin);
+        }
+        if (type === 'follow' && (payload.followerId !== user.id || entityId !== user.id + ':' + payload.followingId)) return json({ error: 'forbidden_entity' }, 403, origin);
+        if (type === 'notification') {
+          if (!payload.recipientId || entityId !== payload.id) return json({ error: 'forbidden_notification' }, 403, origin);
+          const existingNotification = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'notification' AND entity_id = ? AND deleted = 0").bind(entityId).first();
+          if (existingNotification?.payload) {
+            let existingPayload;
+            try { existingPayload = JSON.parse(existingNotification.payload); } catch { return json({ error: 'forbidden_notification' }, 403, origin); }
+            // The recipient may update only the read flag on an existing notification.
+            if (existingPayload.recipientId !== user.id || payload.recipientId !== user.id) return json({ error: 'forbidden_notification' }, 403, origin);
+            payload = { ...existingPayload, isRead: Boolean(payload.isRead) };
+          } else if (payload.actor?.id !== user.id) {
+            // New activity notifications must be created by the actor.
+            return json({ error: 'forbidden_notification' }, 403, origin);
+          }
+        }
+        if (type === 'communityMember') return json({ error: 'use_community_membership_endpoint' }, 403, origin);
+        if (type === 'conversation' && (entityId !== payload.id || !Array.isArray(payload.participantIds) || !payload.participantIds.includes(user.id))) return json({ error: 'forbidden_conversation' }, 403, origin);
+        if (type === 'message') {
+          if (entityId !== payload.id || payload.senderId !== user.id || !payload.conversationId) return json({ error: 'forbidden_message' }, 403, origin);
+          const conversation = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'conversation' AND entity_id = ? AND deleted = 0").bind(payload.conversationId).first();
+          try {
+            const participants = JSON.parse(conversation?.payload || '{}').participantIds;
+            if (!Array.isArray(participants) || !participants.includes(user.id)) return json({ error: 'forbidden_conversation' }, 403, origin);
+          } catch { return json({ error: 'forbidden_conversation' }, 403, origin); }
+        }
+        // Notifications belong to the recipient, not the actor. Otherwise the actor
+        // becomes the row owner and the recipient's private notification query cannot see it.
+        const ownerId = type === 'notification' ? String(payload.recipientId) : user.id;
+
+        // Posts are written as complete JSON objects by multiple clients. A stale client
+        // can therefore accidentally overwrite newer votes from another client. Merge only
+        // the incoming vote changes with the current server copy before saving the post.
+        if (type === 'post' && !payload.deleted) {
+          const existingPost = await env.DB.prepare("SELECT payload FROM entities WHERE entity_type = 'post' AND entity_id = ? AND deleted = 0").bind(entityId).first();
+          if (existingPost?.payload) {
+            try {
+              const current = JSON.parse(existingPost.payload);
+              const currentVotes = { ...(current.votes || {}) };
+              const currentVoteState = { ...(current.voteState || {}) };
+              const incomingVotes = payload.votes || {};
+              const incomingVoteState = payload.voteState || {};
+
+              for (const [voterId, state] of Object.entries(incomingVoteState)) {
+                const numericState = Number(state);
+                if (numericState === 0) {
+                  delete currentVotes[voterId];
+                  currentVoteState[voterId] = 0;
+                } else if (numericState === 1 || numericState === -1) {
+                  currentVotes[voterId] = Number(incomingVotes[voterId]) === numericState ? numericState : numericState;
+                  currentVoteState[voterId] = numericState;
+                }
+              }
+
+              // Backward compatibility for posts that only contain the old votes map.
+              for (const [voterId, vote] of Object.entries(incomingVotes)) {
+                if (!(voterId in incomingVoteState) && (Number(vote) === 1 || Number(vote) === -1)) {
+                  currentVotes[voterId] = Number(vote);
+                  currentVoteState[voterId] = Number(vote);
+                }
+              }
+
+              payload.votes = currentVotes;
+              payload.voteState = currentVoteState;
+              payload.upvotes = Object.values(currentVotes).filter((vote) => Number(vote) === 1).length;
+              payload.downvotes = Object.values(currentVotes).filter((vote) => Number(vote) === -1).length;
+            } catch {
+              // Keep the incoming post if an older malformed payload cannot be merged.
+            }
+          }
+        }
+
+        await env.DB.prepare('INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES (?, ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0').bind(type, entityId, ownerId, JSON.stringify(payload), Date.now()).run();
+        if (type === 'user') {
+          await env.DB.prepare('UPDATE auth_users SET username = ?, email = ?, profile_json = ? WHERE id = ?').bind(payload.username, payload.email, body.payload, user.id).run();
+        }
+        return json({ ok: true }, 200, origin);
+      }
+      return json({ error: 'not_found' }, 404, origin);
+    } catch (error) {
+      console.error(error);
+      return json({ error: 'server_error' }, 500, origin);
+    }
+  },
+};
