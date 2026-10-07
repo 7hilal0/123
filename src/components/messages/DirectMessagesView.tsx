@@ -11,7 +11,10 @@ import {
   Plus,
   Image as ImageIcon,
   X,
-  UserPlus
+  UserPlus,
+  Users,
+  Mic,
+  Square
 } from 'lucide-react';
 import { readImageFile } from '../../utils/fileUpload';
 import { GifPicker } from './GifPicker';
@@ -25,6 +28,7 @@ export const DirectMessagesView: React.FC = () => {
     setIsInsideChat,
     selectConversation,
     startConversationWithUser,
+    startGroupConversation,
     directMessages,
     sendDirectMessage,
     currentUser,
@@ -43,9 +47,38 @@ export const DirectMessagesView: React.FC = () => {
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [showGifPicker, setShowGifPicker] = useState(false);
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [groupMembers, setGroupMembers] = useState<string[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const startVoiceRecording = async () => {
+    if (!currentUser) { setAuthModalOpen(true, 'login'); return; }
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (event) => { if (event.data.size) audioChunksRef.current.push(event.data); };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = () => sendDirectMessage('', String(reader.result || ''), 'voice');
+        reader.readAsDataURL(blob);
+        setIsRecording(false);
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+    } catch (error) { console.error(error); setIsRecording(false); }
+  };
+  const stopVoiceRecording = () => { if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop(); };
 
   const activeConv = conversations.find((c) => c.id === activeConversationId);
   const activeChatMessages = (activeConversationId && directMessages[activeConversationId]) || [];
@@ -88,11 +121,11 @@ export const DirectMessagesView: React.FC = () => {
     setAttachedImage(null);
   };
 
-  const filteredConversations = conversations.filter(
-    (c) =>
-      c.participant.displayName.toLowerCase().includes(filterQuery.toLowerCase()) ||
-      c.participant.username.toLowerCase().includes(filterQuery.toLowerCase())
-  );
+  const filteredConversations = conversations.filter((c) => {
+    const name = c.isGroup ? (c.groupName || 'Group') : c.participant.displayName;
+    const username = c.isGroup ? '' : c.participant.username;
+    return name.toLowerCase().includes(filterQuery.toLowerCase()) || username.toLowerCase().includes(filterQuery.toLowerCase());
+  });
 
   const availableUsers = users.filter((u) => u.id !== currentUser?.id);
   const BackIcon = dir === 'rtl' ? ArrowRight : ArrowLeft;
@@ -115,6 +148,7 @@ export const DirectMessagesView: React.FC = () => {
             <h2 className="font-display font-bold text-base text-white flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-emerald-400" />
               <span>{t.directMessagesTitle}</span>
+              <button type="button" onClick={() => setIsGroupModalOpen(true)} className="ms-auto p-1.5 rounded-lg bg-white/5 hover:bg-emerald-600/20 text-neutral-300"><Users className="w-4 h-4" /></button>
             </h2>
           </div>
 
@@ -149,16 +183,16 @@ export const DirectMessagesView: React.FC = () => {
                 }`}
               >
                 <Avatar
-                  src={conv.participant.avatar}
-                  alt={conv.participant.displayName}
+                  src={conv.isGroup ? conv.groupAvatar : conv.participant.avatar}
+                  alt={conv.isGroup ? (conv.groupName || 'Group') : conv.participant.displayName}
                   size="md"
-                  status={conv.participant.status}
+                  status={conv.isGroup ? undefined : conv.participant.status}
                 />
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-xs truncate text-white">
-                      {conv.participant.displayName}
+                      {conv.isGroup ? (conv.groupName || 'Group') : conv.participant.displayName}
                     </span>
                     <span className="text-[10px] text-neutral-500 font-mono">
                       {conv.lastMessageTime}
@@ -216,10 +250,10 @@ export const DirectMessagesView: React.FC = () => {
                   className="cursor-pointer"
                 >
                   <Avatar
-                    src={activeConv.participant.avatar}
-                    alt={activeConv.participant.displayName}
+                    src={activeConv.isGroup ? activeConv.groupAvatar : activeConv.participant.avatar}
+                    alt={activeConv.isGroup ? (activeConv.groupName || 'Group') : activeConv.participant.displayName}
                     size="sm"
-                    status={activeConv.participant.status}
+                    status={activeConv.isGroup ? undefined : activeConv.participant.status}
                   />
                 </div>
 
@@ -229,14 +263,12 @@ export const DirectMessagesView: React.FC = () => {
                       onClick={() => navigateToProfile(activeConv.participant.id)}
                       className="font-semibold text-sm text-white hover:text-emerald-400 cursor-pointer"
                     >
-                      {activeConv.participant.displayName}
+                      {activeConv.isGroup ? (activeConv.groupName || 'Group') : activeConv.participant.displayName}
                     </span>
-                    <span className="text-[11px] text-neutral-500 font-mono">
-                      @{activeConv.participant.username}
-                    </span>
+                    {!activeConv.isGroup && <span className="text-[11px] text-neutral-500 font-mono">@{activeConv.participant.username}</span>}
                   </div>
                   <span className="text-[11px] text-neutral-400 block -mt-0.5">
-                    {activeConv.participant.customStatus || 'DZCORE Member'}
+                    {activeConv.isGroup ? `${Object.keys(activeConv.participants || {}).length} members` : (activeConv.participant.customStatus || 'DZCORE Member')}
                   </span>
                 </div>
               </div>
@@ -254,13 +286,13 @@ export const DirectMessagesView: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
               <div className="text-center py-6 border-b border-white/5 space-y-2">
                 <Avatar
-                  src={activeConv.participant.avatar}
-                  alt={activeConv.participant.displayName}
+                  src={activeConv.isGroup ? activeConv.groupAvatar : activeConv.participant.avatar}
+                  alt={activeConv.isGroup ? (activeConv.groupName || 'Group') : activeConv.participant.displayName}
                   size="xl"
                   className="mx-auto"
                 />
                 <h3 className="font-bold text-base text-white">
-                  {activeConv.participant.displayName}
+                  {activeConv.isGroup ? (activeConv.groupName || 'Group') : activeConv.participant.displayName}
                 </h3>
                 <p className="text-xs text-neutral-400 max-w-sm mx-auto leading-relaxed">
                   {language === 'ar'
@@ -297,7 +329,8 @@ export const DirectMessagesView: React.FC = () => {
 
                     <div className={`space-y-1.5 flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                       {/* Attached Image or Animated GIF */}
-                      {msg.mediaUrl && (
+                      {msg.mediaUrl && msg.mediaType === 'voice' && <audio controls src={msg.mediaUrl} className="max-w-[260px]" />}
+                      {msg.mediaUrl && msg.mediaType !== 'voice' && (
                         <div
                           onClick={() => setPreviewImage(msg.mediaUrl || null)}
                           className="rounded-2xl overflow-hidden border border-white/10 bg-neutral-900 shadow-md cursor-pointer hover:border-white/25 transition-all max-w-[260px] sm:max-w-[320px] relative group"
@@ -416,6 +449,8 @@ export const DirectMessagesView: React.FC = () => {
                   className="flex-1 bg-neutral-900 border border-white/10 rounded-xl px-4 py-2.5 text-xs md:text-sm text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-start"
                 />
 
+                <button type="button" onClick={isRecording ? stopVoiceRecording : startVoiceRecording} className={`p-2 rounded-xl ${isRecording ? 'bg-red-600 text-white' : 'text-neutral-400 hover:text-emerald-400 hover:bg-white/5'}`} title="Voice message">{isRecording ? <Square className="w-4 h-4" /> : <Mic className="w-5 h-5" />}</button>
+
                 <button
                   type="submit"
                   disabled={!messageText.trim() && !attachedImage}
@@ -503,6 +538,20 @@ export const DirectMessagesView: React.FC = () => {
         </div>
       )}
 
+      {isGroupModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-white/10 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl">
+            <div className="p-4 border-b border-white/5 flex items-center justify-between"><h3 className="font-bold text-white flex items-center gap-2"><Users className="w-5 h-5 text-emerald-400" />Create group</h3><button onClick={() => setIsGroupModalOpen(false)}><X className="w-5 h-5 text-neutral-400" /></button></div>
+            <div className="p-4 space-y-3">
+              <input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Group name" className="w-full bg-neutral-950 border border-white/10 rounded-xl px-3 py-2 text-sm text-white" />
+              <div className="max-h-72 overflow-y-auto space-y-1">
+                {availableUsers.map((user) => <button key={user.id} onClick={() => setGroupMembers((prev) => prev.includes(user.id) ? prev.filter((id) => id !== user.id) : [...prev, user.id])} className={`w-full flex items-center gap-3 p-2.5 rounded-xl ${groupMembers.includes(user.id) ? 'bg-emerald-600/20 border border-emerald-500/40' : 'bg-white/5 border border-transparent'}`}><Avatar src={user.avatar} alt={user.displayName} size="sm" /><span className="text-sm text-white">{user.displayName}</span>{groupMembers.includes(user.id) && <span className="ms-auto text-emerald-400">✓</span>}</button>)}
+              </div>
+              <button disabled={groupMembers.length < 2} onClick={async () => { await startGroupConversation(groupName, groupMembers); setGroupMembers([]); setGroupName(''); setIsGroupModalOpen(false); setShowMobileList(false); }} className="w-full py-2.5 rounded-xl bg-emerald-600 disabled:opacity-40 text-white font-semibold">Create group ({groupMembers.length})</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Full-Screen Image Lightbox Modal */}
       {previewImage && (
         <div
