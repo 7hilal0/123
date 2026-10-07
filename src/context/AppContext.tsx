@@ -1423,12 +1423,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       [activeConversationId]: [...(prev[activeConversationId] || []), newMsg],
     }));
 
+    const participantIds = currentConv.participantIds || [currentUser.id, currentConv.participant.id];
+    const participants = currentConv.participants || Object.fromEntries(participantIds.map((id) => [id, id === currentUser.id ? currentUser : currentConv.participant]));
+    const otherIds = participantIds.filter((id) => id !== currentUser.id);
     const otherUser = currentConv.participant;
-    const participantIds = currentConv.participantIds || [currentUser.id, otherUser.id];
-    const participants = currentConv.participants || {
-      [currentUser.id]: currentUser,
-      [otherUser.id]: otherUser,
-    };
 
     const displayLastMessage = text.trim() || (mediaUrl ? (language === 'ar' ? '📷 صورة' : '📷 Photo') : '');
 
@@ -1444,7 +1442,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unreadBy: {
         ...(currentConv.unreadBy || {}),
         [currentUser.id]: 0,
-        [otherUser.id]: Math.max(0, (currentConv.unreadBy?.[otherUser.id] || 0) + 1),
+        ...Object.fromEntries(otherIds.map((id) => [id, Math.max(0, (currentConv.unreadBy?.[id] || 0) + 1)])),
       },
     };
 
@@ -1462,9 +1460,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         mediaUrl.toLowerCase().includes('.gif') ||
         mediaUrl.toLowerCase().includes('giphy')
       ));
-      await cloudSync.saveNotification({
-        id: `notification_msg_${newMsg.id}`,
-        recipientId: otherUser.id,
+      for (const recipientId of otherIds) {
+        await cloudSync.saveNotification({
+        id: `notification_msg_${newMsg.id}_${recipientId}`,
+        recipientId,
         type: 'message',
         actor: currentUser,
         title: language === 'ar' ? 'رسالة خاصة جديدة' : language === 'fr' ? 'Nouveau message privé' : 'New private message',
@@ -1475,7 +1474,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isRead: false,
         targetType: 'conversation',
         targetId: activeConversationId,
-      });
+        });
+      }
       return true;
     } catch (error) {
       console.error('[Cloudflare] Direct message send failed:', error);
