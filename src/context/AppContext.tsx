@@ -1373,6 +1373,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveTab('messages');
   };
 
+  const startGroupConversation = async (name: string, memberIds: string[]) => {
+    if (!currentUser) { setAuthModalOpen(true, 'login'); return; }
+    const uniqueIds = Array.from(new Set([currentUser.id, ...memberIds]));
+    if (uniqueIds.length < 3) { showToast(language === 'ar' ? 'اختر شخصين على الأقل للمجموعة' : 'Choose at least two members', 'warning'); return; }
+    const cleanName = name.trim().slice(0, 60) || (language === 'ar' ? 'مجموعة جديدة' : 'New group');
+    const now = Date.now();
+    const firstOther = users.find((u) => uniqueIds.includes(u.id) && u.id !== currentUser.id) || currentUser;
+    const participants = Object.fromEntries(uniqueIds.map((id) => [id, id === currentUser.id ? currentUser : (users.find((u) => u.id === id) || firstOther)]));
+    const convId = `group_${crypto.randomUUID()}`;
+    const newConv: Conversation = { id: convId, participantIds: uniqueIds, participants, participant: firstOther, isGroup: true, groupName: cleanName, groupAvatar: firstOther.avatar, lastMessage: language === 'ar' ? 'تم إنشاء المجموعة' : 'Group created', lastMessageTime: new Date(now).toLocaleTimeString(language === 'ar' ? 'ar-DZ' : 'en-US', { hour: '2-digit', minute: '2-digit' }), lastMessageTimestamp: now, unreadCount: 0, unreadBy: Object.fromEntries(uniqueIds.map((id) => [id, 0])) };
+    setConversations((prev) => [newConv, ...prev]);
+    setDirectMessages((prev) => ({ ...prev, [convId]: [] }));
+    await cloudSync.saveConversation(newConv);
+    setActiveConversationId(convId); setIsInsideChat(true); setActiveTab('messages');
+    showToast(language === 'ar' ? 'تم إنشاء المجموعة' : 'Group created', 'success');
+  };
+
   const sendDirectMessage = async (text: string, mediaUrl?: string) => {
     if (!currentUser) {
       setAuthModalOpen(true, 'login');
