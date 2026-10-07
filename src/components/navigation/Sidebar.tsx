@@ -1,12 +1,11 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { Avatar } from '../common/Avatar';
-import { Sparkles, MessageSquare, Bell, User, Plus, LogOut, ChevronRight, ChevronLeft, Search, Globe, Settings } from 'lucide-react';
+import { Sparkles, MessageSquare, Bell, User, Plus, LogOut, Search, Globe, Settings } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
   const { currentUser, activeTab, selectedCommunitySlug, unreadCount, conversations, navigateToFeed, navigateToCreatePost, navigateToMessages, navigateToNotifications, navigateToProfile, navigateToSearch, setAuthModalOpen, navigateToSettings, logout, t, dir } = useApp();
   const totalUnreadMessages = conversations.reduce((acc, c) => acc + c.unreadCount, 0);
-  const ChevronIcon = dir === 'rtl' ? ChevronLeft : ChevronRight;
 
   return (
     <aside className={`hidden md:flex flex-col w-64 h-screen sticky top-0 bg-neutral-950/80 backdrop-blur-xl border-white/5 select-none shrink-0 z-30 ${dir === 'rtl' ? 'md:order-2 border-s md:border-e-0' : 'border-e'}`}>
