@@ -1525,8 +1525,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw error;
     }
 
+    // Update the local profile cache immediately after Cloudflare confirms the save.
+    // This keeps the latest avatar/banner available on the next app start instead
+    // of briefly restoring an older local profile.
     setCurrentUser(updated);
-    setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updated : u)));
+    setUsers((prev) => {
+      const nextUsers = prev.map((u) => (u.id === currentUser.id ? updated : u));
+      const hasCurrentUser = nextUsers.some((u) => u.id === updated.id);
+      const normalizedUsers = hasCurrentUser ? nextUsers : [updated, ...nextUsers];
+      storage.saveUsers(normalizedUsers);
+      return normalizedUsers;
+    });
+    storage.saveCurrentUserId(updated.id);
     void storage.saveProfileMediaBackup(updated.id, { avatar: updated.avatar, banner: updated.banner })
       .catch((error) => console.warn('[Storage] Profile media backup failed:', error));
 
