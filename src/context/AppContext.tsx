@@ -107,7 +107,7 @@ interface AppContextType {
   selectConversation: (conversationId: string) => void;
   startConversationWithUser: (targetUserId: string) => void;
   startGroupConversation: (name: string, memberIds: string[]) => Promise<void>;
-  sendDirectMessage: (text: string, mediaUrl?: string) => void;
+  sendDirectMessage: (text: string, mediaUrl?: string, mediaType?: 'image' | 'voice') => void;
 
   // Profile & Social
   toggleFollowUser: (userId: string) => void;
@@ -1390,7 +1390,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(language === 'ar' ? 'تم إنشاء المجموعة' : 'Group created', 'success');
   };
 
-  const sendDirectMessage = async (text: string, mediaUrl?: string) => {
+  const sendDirectMessage = async (text: string, mediaUrl?: string, mediaType: 'image' | 'voice' = 'image') => {
     if (!currentUser) {
       setAuthModalOpen(true, 'login');
       return;
@@ -1414,6 +1414,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       timestamp: formattedTime,
       createdAt: now,
       mediaUrl,
+      mediaType: mediaUrl ? mediaType : undefined,
       isRead: false,
     };
 
@@ -1428,7 +1429,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const otherIds = participantIds.filter((id) => id !== currentUser.id);
     const otherUser = currentConv.participant;
 
-    const displayLastMessage = text.trim() || (mediaUrl ? (language === 'ar' ? '📷 صورة' : '📷 Photo') : '');
+    const displayLastMessage = text.trim() || (mediaUrl ? (mediaType === 'voice' ? (language === 'ar' ? '🎤 رسالة صوتية' : language === 'fr' ? '🎤 Message vocal' : '🎤 Voice message') : (language === 'ar' ? '📷 صورة' : language === 'fr' ? '📷 Photo' : '📷 Photo')) : '');
 
     const updatedConv: Conversation = {
       ...currentConv,
@@ -1467,7 +1468,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         type: 'message',
         actor: currentUser,
         title: language === 'ar' ? 'رسالة خاصة جديدة' : language === 'fr' ? 'Nouveau message privé' : 'New private message',
-        message: isGif
+        message: mediaType === 'voice'
+          ? (language === 'ar' ? 'أرسل لك رسالة صوتية' : language === 'fr' ? 'vous a envoyé un message vocal' : 'sent you a voice message')
+          : isGif
           ? (language === 'ar' ? 'أرسل لك GIF' : language === 'fr' ? 'vous a envoyé un GIF' : 'sent you a GIF')
           : (language === 'ar' ? `أرسل لك: ${text.trim().slice(0, 100)}` : language === 'fr' ? `vous a envoyé : ${text.trim().slice(0, 100)}` : `sent you: ${text.trim().slice(0, 100)}`),
         timestamp: language === 'ar' ? 'الآن' : language === 'fr' ? 'À l’instant' : 'Just now',
