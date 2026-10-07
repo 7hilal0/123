@@ -106,6 +106,7 @@ interface AppContextType {
   setActiveConversationId: (id: string | null) => void;
   selectConversation: (conversationId: string) => void;
   startConversationWithUser: (targetUserId: string) => void;
+  startGroupConversation: (name: string, memberIds: string[]) => Promise<void>;
   sendDirectMessage: (text: string, mediaUrl?: string) => void;
 
   // Profile & Social
