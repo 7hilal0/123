@@ -1,29 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Avatar } from '../common/Avatar';
-import { Sparkles, MessageSquare, Bell, User, Plus, LogOut, ChevronRight, ChevronLeft, Search, Check, Globe, Settings } from 'lucide-react';
-import { UserStatus } from '../../types';
+import { Sparkles, MessageSquare, Bell, User, Plus, LogOut, ChevronRight, ChevronLeft, Search, Globe, Settings } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
-  const { currentUser, activeTab, selectedCommunitySlug, unreadCount, conversations, navigateToFeed, navigateToCreatePost, navigateToMessages, navigateToNotifications, navigateToProfile, navigateToSearch, setAuthModalOpen, navigateToSettings, logout, updateUserStatus, t, dir } = useApp();
-  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
-  const statusMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) setStatusMenuOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
+  const { currentUser, activeTab, selectedCommunitySlug, unreadCount, conversations, navigateToFeed, navigateToCreatePost, navigateToMessages, navigateToNotifications, navigateToProfile, navigateToSearch, setAuthModalOpen, navigateToSettings, logout, t, dir } = useApp();
   const totalUnreadMessages = conversations.reduce((acc, c) => acc + c.unreadCount, 0);
-  const statuses: { label: string; value: UserStatus; color: string }[] = [
-    { label: t.statusOnline, value: 'online', color: 'bg-emerald-500' },
-    { label: t.statusIdle, value: 'idle', color: 'bg-amber-500' },
-    { label: t.statusDnd, value: 'dnd', color: 'bg-rose-500' },
-    { label: t.statusOffline, value: 'offline', color: 'bg-neutral-500' },
-  ];
   const ChevronIcon = dir === 'rtl' ? ChevronLeft : ChevronRight;
 
   return (
@@ -54,9 +36,19 @@ export const Sidebar: React.FC = () => {
         </div>
         <div><button onClick={() => navigateToCreatePost()} className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-medium text-sm text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition-all cursor-pointer"><Plus className="w-4 h-4" /><span>{t.navCreate}</span></button></div>
       </div>
-      <div className="p-3 border-t border-white/5 bg-neutral-900/40 relative" ref={statusMenuRef}>
-        {currentUser ? <div><div className="flex items-center justify-between p-1.5 rounded-xl hover:bg-white/5 transition-colors"><button onClick={() => setStatusMenuOpen(!statusMenuOpen)} className="flex items-center gap-2.5 min-w-0 flex-1 text-start focus:outline-none"><Avatar src={currentUser.avatar} alt={currentUser.displayName} size="sm" status={currentUser.status} /><div className="min-w-0 flex-1"><div className="text-xs font-semibold text-white truncate">{currentUser.displayName}</div><div className="text-[11px] text-neutral-400 truncate font-mono">@{currentUser.username}</div></div></button><button onClick={logout} className="p-1.5 text-neutral-400 hover:text-rose-400 rounded-lg hover:bg-white/5 transition-colors" title={t.navLogout}><LogOut className="w-4 h-4" /></button></div>
-          {statusMenuOpen && <div className="absolute bottom-16 start-3 end-3 p-2 bg-neutral-900 border border-white/10 rounded-xl shadow-2xl space-y-1 z-50 animate-in fade-in slide-in-from-bottom-2"><div className="px-2 py-1 text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">{t.presenceStatus}</div>{statuses.map((s) => <button key={s.value} onClick={() => { updateUserStatus(s.value); setStatusMenuOpen(false); }} className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors ${currentUser.status === s.value ? 'bg-white/10 text-white font-medium' : 'text-neutral-300 hover:bg-white/5 hover:text-white'}`}><div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${s.color}`} /><span>{s.label}</span></div>{currentUser.status === s.value && <Check className="w-3.5 h-3.5 text-emerald-400" />}</button>)}</div>}</div> : <button onClick={() => setAuthModalOpen(true, 'login')} className="w-full py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"><User className="w-4 h-4" /><span>{t.navLogin}</span></button>}
+      <div className="p-3 border-t border-white/5 bg-neutral-900/40">
+        {currentUser ? <div className="flex items-center justify-between p-1.5 rounded-xl">
+          <button onClick={() => navigateToProfile(currentUser.id)} className="flex items-center gap-2.5 min-w-0 flex-1 text-start focus:outline-none">
+            <Avatar src={currentUser.avatar} alt={currentUser.displayName} size="sm" status={currentUser.status} />
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-semibold text-white truncate">{currentUser.displayName}</div>
+              <div className="text-[11px] text-neutral-400 truncate font-mono">@{currentUser.username}</div>
+            </div>
+          </button>
+          <button onClick={logout} className="p-1.5 text-neutral-400 hover:text-rose-400 rounded-lg hover:bg-white/5" title={t.navLogout}>
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div> : <button onClick={() => setAuthModalOpen(true, 'login')} className="w-full py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"><User className="w-4 h-4" /><span>{t.navLogin}</span></button>}
       </div>
     </aside>
   );
