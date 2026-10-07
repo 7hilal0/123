@@ -4,13 +4,11 @@
  * to ensure smooth storage in localStorage and instant client-side preview.
  */
 
-import { createAnimatedGifThumbnail } from './gifThumbnail';
-
 export const readImageFile = (
   file: File,
   maxDimension = 1200,
   quality = 0.85,
-  gifMaxBytes = 1_500_000
+  gifMaxBytes = 15 * 1024 * 1024
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
@@ -28,14 +26,15 @@ export const readImageFile = (
         return;
       }
 
+      // Keep animated GIFs untouched. Re-encoding them here used to drop frames,
+      // change timing/colors, and make some mobile GIFs fail. The editor can preview
+      // and reposition the original GIF without destroying its animation.
       if (file.type === 'image/gif') {
-        createAnimatedGifThumbnail(file, {
-          size: Math.min(maxDimension, 720),
-          cropSquare: false,
-          maxFrames: 36,
-          maxColors: 128,
-          maxBytes: gifMaxBytes,
-        }).then(resolve).catch(reject);
+        if (file.size > gifMaxBytes) {
+          reject(new Error('حجم GIF أكبر من الحد المسموح 15MB'));
+          return;
+        }
+        resolve(result);
         return;
       }
 
@@ -100,16 +99,10 @@ export const createSquareThumbnail = (
         return;
       }
 
+      // Never re-encode animated GIFs for profile thumbnails. Keep the original
+      // animation so avatars/banners remain faithful to the uploaded file.
       if (dataUrl.startsWith('data:image/gif')) {
-        fetch(dataUrl)
-          .then((response) => response.blob())
-          .then((blob) => createAnimatedGifThumbnail(new File([blob], 'thumbnail.gif', { type: 'image/gif' }), {
-            size: targetSize,
-            maxFrames: 36,
-            maxColors: 128,
-          }))
-          .then(resolve)
-          .catch(reject);
+        resolve(dataUrl);
         return;
       }
 
