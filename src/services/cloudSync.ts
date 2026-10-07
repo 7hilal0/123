@@ -2,7 +2,7 @@ import { User, Community, Post, Comment, Conversation, DirectMessage, Notificati
 import { cloudflareApi } from './cloudflareApi';
 import { DEFAULT_USER_AVATAR } from '../utils/avatarConstants';
 
-const MEDIA_CHUNK_SIZE = 48_000;
+const MEDIA_CHUNK_SIZE = 24_000;
 type EntityType = 'user' | 'community' | 'communityMember' | 'post' | 'comment' | 'conversation' | 'message' | 'notification' | 'profileMedia' | 'follow';
 type ProfileMediaChunk = { id: string; userId: string; field: 'avatar' | 'banner'; index: number; total: number; value: string; mediaVersion?: string };
 type FollowRecord = { id: string; followerId: string; followingId: string; following: boolean };
@@ -76,34 +76,30 @@ export const cloudSync = {
     // Save profile entity directly with thumbnail so all users see it immediately
     await saveEntity('user', profile, user.id);
 
-    // If media is larger than 30KB or needs full chunking, upload to media store in background
+    // Larger images are stored as verified chunks. Do not hide upload failures:
+    // the profile editor must stay open so the user can retry instead of
+    // reporting a successful save while the image exists only in local cache.
     if (avatar.length > 30_000 || banner.length > 30_000) {
-      try {
-        const uploadedVersions: Partial<Record<'avatar' | 'banner', string>> = {};
-        for (const item of [{ field: 'avatar' as const, value: avatar }, { field: 'banner' as const, value: banner }]) {
-          if (!item.value) continue;
-          const chunks = splitMedia(item.value);
-          const mediaVersion = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-          uploadedVersions[item.field] = mediaVersion;
-          const rows = chunks.map((value, index) => ({
-            id: `${user.id}:${item.field}:${mediaVersion}:${index}`,
-            userId: user.id,
-            field: item.field,
-            index,
-            total: chunks.length,
-            value,
-            mediaVersion,
-          } as ProfileMediaChunk));
-          for (let index = 0; index < rows.length; index += 20) {
-            await saveMediaBatch(rows.slice(index, index + 20));
-            await pause(100);
-          }
+      for (const item of [{ field: 'avatar' as const, value: avatar }, { field: 'banner' as const, value: banner }]) {
+        if (!item.value || item.value.length <= 30_000) continue;
 
-          // Only remove old versions after every chunk of the new version is stored.
-          await cloudflareApi.cleanupProfileMedia(item.field, mediaVersion);
+        const chunks = splitMedia(item.value);
+        const mediaVersion = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const rows = chunks.map((value, index) => ({
+          id: `${user.id}:${item.field}:${mediaVersion}:${index}`,
+          userId: user.id,
+          field: item.field,
+          index,
+          total: chunks.length,
+          value,
+          mediaVersion,
+        } as ProfileMediaChunk));
+
+        // Keep each HTTP request comfortably small for mobile connections.
+        for (let index = 0; index < rows.length; index += 10) {
+          await saveMediaBatch(rows.slice(index, index + 10));
+          await pause(80);
         }
-      } catch (err) {
-        console.warn('[Cloudflare] Media chunks backup warning:', err);
       }
     }
   },
