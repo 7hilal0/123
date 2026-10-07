@@ -113,10 +113,6 @@ export const Avatar: React.FC<AvatarProps> = ({ src, alt, size = 'md', status, c
     }
   }, [src, size]);
 
-  const presenceStatus: UserStatus | undefined = status
-    ? status
-    : undefined;
-
   const displaySrc = (!src || imageFailed)
     ? DEFAULT_USER_AVATAR
     : (thumbnail || src);
