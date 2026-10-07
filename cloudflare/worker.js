@@ -759,6 +759,26 @@ export default {
       }
       if (csrfRequired(request)) return json({ error: 'invalid_origin' }, 403, origin);
 
+      if (url.pathname === '/api/presence/heartbeat' && request.method === 'POST') {
+        const user = await currentUser(request, env);
+        if (!user) return json({ error: 'unauthorized' }, 401, origin);
+        const lastSeenAt = Date.now();
+        await env.DB.prepare("UPDATE auth_users SET profile_json = json_set(profile_json, '$.lastSeenAt', ?) WHERE id = ?").bind(lastSeenAt, user.id).run();
+        return json({ ok: true, lastSeenAt }, 200, origin);
+      }
+
+      if (url.pathname === '/api/presence' && request.method === 'GET') {
+        const cutoff = Date.now() - 45_000;
+        const rows = await env.DB.prepare("SELECT id, json_extract(profile_json, '$.lastSeenAt') AS last_seen_at FROM auth_users WHERE json_extract(profile_json, '$.lastSeenAt') IS NOT NULL").all();
+        return json({
+          users: rows.results.map((row) => ({
+            id: row.id,
+            lastSeenAt: Number(row.last_seen_at || 0),
+            online: Number(row.last_seen_at || 0) >= cutoff,
+          })),
+        }, 200, origin);
+      }
+
       if (url.pathname === '/api/community-membership' && request.method === 'POST') {
         const user = await currentUser(request, env);
         if (!user) return json({ error: 'unauthorized' }, 401, origin);
