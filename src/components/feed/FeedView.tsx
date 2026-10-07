@@ -278,6 +278,7 @@ export const FeedView: React.FC = () => {
     .slice(0, 3);
 
   return (
+    <>
       <section className="mb-5 space-y-3">
         <div className="flex items-center justify-between"><h2 className="text-sm font-bold text-white">Stories</h2><input ref={storyInputRef} type="file" accept="image/*" onChange={handleCreateStory} className="hidden" /><button onClick={() => currentUser ? storyInputRef.current?.click() : setAuthModalOpen(true, 'login')} className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white flex items-center gap-1"><Plus className="w-3 h-3" />Add story</button></div>
         <div className="flex gap-3 overflow-x-auto pb-1">{stories.map((story) => <button key={story.id} onClick={() => setStoryPreview(story)} className="relative shrink-0 w-20 h-28 rounded-2xl overflow-hidden border border-white/10 bg-neutral-900"><img src={story.mediaUrl} className="w-full h-full object-cover" /><span className="absolute bottom-1 start-1 end-1 text-[9px] text-white truncate bg-black/60 rounded px-1">{story.author?.displayName}</span></button>)}</div>
@@ -457,5 +458,6 @@ export const FeedView: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
