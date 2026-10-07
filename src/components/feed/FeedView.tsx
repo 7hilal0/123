@@ -4,7 +4,6 @@ import { PostCard } from '../posts/PostCard';
 import { Avatar } from '../common/Avatar';
 import { Post, Comment, FeedSortOption } from '../../types';
 import { cloudSync } from '../../services/cloudSync';
-import { readImageFile } from '../../utils/fileUpload';
 import {
   Flame,
   Clock,
@@ -15,7 +14,6 @@ import {
   UserPlus,
   LogIn,
   Loader2,
-  Plus,
   Play
 } from 'lucide-react';
 
@@ -90,28 +88,6 @@ export const FeedView: React.FC = () => {
     dir,
     t,
   } = useApp();
-
-  const [stories, setStories] = useState<any[]>([]);
-  const [storyPreview, setStoryPreview] = useState<any | null>(null);
-  const storyInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    let active = true;
-    cloudSync.fetchStories().then((items: any[]) => { if (active) setStories(items.filter((item) => Number(item.expiresAt) > Date.now())); }).catch(() => {});
-    return () => { active = false; };
-  }, [currentUser?.id]);
-
-  const handleCreateStory = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !currentUser) return;
-    try {
-      const mediaUrl = await readImageFile(file, 1080, 0.88);
-      const story = { id: 'story_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), author: currentUser, mediaUrl, mediaType: 'image', createdAt: Date.now(), expiresAt: Date.now() + 86400000 };
-      await cloudSync.saveStory(story);
-      setStories((prev) => [story, ...prev]);
-    } catch (error) { console.error(error); }
-    event.target.value = '';
-  };
 
   // Helper to extract timestamp from post
   const getPostTime = (p: Post): number => {
@@ -279,11 +255,6 @@ export const FeedView: React.FC = () => {
 
   return (
     <>
-      <section className="mb-5 space-y-3">
-        <div className="flex items-center justify-between"><h2 className="text-sm font-bold text-white">Stories</h2><input ref={storyInputRef} type="file" accept="image/*" onChange={handleCreateStory} className="hidden" /><button onClick={() => currentUser ? storyInputRef.current?.click() : setAuthModalOpen(true, 'login')} className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white flex items-center gap-1"><Plus className="w-3 h-3" />Add story</button></div>
-        <div className="flex gap-3 overflow-x-auto pb-1">{stories.map((story) => <button key={story.id} onClick={() => setStoryPreview(story)} className="relative shrink-0 w-20 h-28 rounded-2xl overflow-hidden border border-white/10 bg-neutral-900"><img src={story.mediaUrl} className="w-full h-full object-cover" /><span className="absolute bottom-1 start-1 end-1 text-[9px] text-white truncate bg-black/60 rounded px-1">{story.author?.displayName}</span></button>)}</div>
-      </section>
-      {storyPreview && <div onClick={() => setStoryPreview(null)} className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"><img src={storyPreview.mediaUrl} className="max-h-[90vh] max-w-[95vw] rounded-2xl object-contain" /></div>}
       {posts.some((post) => post.mediaType === 'video') && <section className="mb-5 rounded-2xl border border-white/10 bg-neutral-900/50 p-4"><div className="flex items-center gap-2 mb-3"><Play className="w-4 h-4 text-emerald-400" /><h2 className="text-sm font-bold text-white">Reels</h2></div><div className="flex gap-3 overflow-x-auto">{posts.filter((post) => post.mediaType === 'video').slice(0, 8).map((post) => <div key={post.id} className="relative shrink-0 w-40 aspect-[9/14] rounded-2xl overflow-hidden bg-black border border-white/10"><video src={post.mediaUrl} controls playsInline preload="metadata" className="w-full h-full object-cover" /><div className="absolute bottom-0 inset-x-0 p-2 bg-gradient-to-t from-black/80 to-transparent text-[10px] text-white truncate">{post.title}</div></div>)}</div></section>}
 
     <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 md:py-8 xl:py-10 text-start">
