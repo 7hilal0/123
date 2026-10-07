@@ -195,6 +195,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [directMessages, setDirectMessages] = useState<Record<string, DirectMessage[]>>(() => storage.getDirectMessages());
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => storage.getNotifications());
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'connected' | 'syncing' | 'offline'>('connected');
+  const [presence, setPresence] = useState<Record<string, number>>({});
   // Keeps optimistic deletions out of a stale Cloudflare snapshot while the delete request settles.
   const deletedPostIdsRef = useRef<Set<string>>(new Set());
   const deletedCommentIdsRef = useRef<Set<string>>(new Set());
@@ -270,6 +271,118 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     return () => { active = false; };
   }, []);
+
+  // --- Real online presence ---
+  // A user is considered online only while this browser keeps sending a
+  // heartbeat. The old manually selected status is no longer used for the
+  // presence dot.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    let active = true;
+    const applyPresence = (items: Array<{ id: string; lastSeenAt: number }>) => {
+      if (!active) return;
+      const next: Record<string, number> = {};
+      for (const item of items) {
+        if (item?.id && Number(item.lastSeenAt) > 0) next[item.id] = Number(item.lastSeenAt);
+      }
+      setPresence(next);
+
+      const isOnline = (userId: string) => {
+        const lastSeenAt = next[userId];
+        return Boolean(lastSeenAt && Date.now() - lastSeenAt < 45_000);
+      };
+
+      setUsers((previous) => previous.map((user) => ({
+        ...user,
+        lastSeenAt: next[user.id] ?? user.lastSeenAt,
+        status: isOnline(user.id) ? 'online' : 'offline',
+      })));
+
+      setCurrentUser((previous) => previous
+        ? { ...previous, lastSeenAt: next[previous.id] ?? previous.lastSeenAt, status: isOnline(previous.id) ? 'online' : 'offline' }
+        : previous);
+
+      setPosts((previous) => previous.map((post) => ({
+        ...post,
+        author: {
+          ...post.author,
+          lastSeenAt: next[post.author.id] ?? post.author.lastSeenAt,
+          status: isOnline(post.author.id) ? 'online' : 'offline',
+        },
+      })));
+
+      setComments((previous) => Object.fromEntries(
+        Object.entries(previous).map(([postId, list]) => [
+          postId,
+          list.map((comment) => ({
+            ...comment,
+            author: {
+              ...comment.author,
+              lastSeenAt: next[comment.author.id] ?? comment.author.lastSeenAt,
+              status: isOnline(comment.author.id) ? 'online' : 'offline',
+            },
+          })),
+        ])
+      ));
+
+      setConversations((previous) => previous.map((conversation) => {
+        const participant = conversation.participant;
+        if (!participant) return conversation;
+        return {
+          ...conversation,
+          participant: {
+            ...participant,
+            lastSeenAt: next[participant.id] ?? participant.lastSeenAt,
+            status: isOnline(participant.id) ? 'online' : 'offline',
+          },
+        };
+      }));
+    };
+
+    const refreshPresence = async () => {
+      try {
+        const response = await cloudflareApi.getPresence();
+        applyPresence(response.users || []);
+      } catch {
+        // Keep the last known presence when a poll briefly fails.
+      }
+    };
+
+    const sendHeartbeat = async () => {
+      try {
+        const response = await cloudflareApi.heartbeat();
+        if (!active) return;
+        setPresence((previous) => ({ ...previous, [currentUser.id]: response.lastSeenAt }));
+        setCurrentUser((previous) => previous
+          ? { ...previous, lastSeenAt: response.lastSeenAt, status: 'online' }
+          : previous);
+      } catch {
+        // A temporary network failure will naturally make the user offline
+        // after the server-side 45 second expiry window.
+      }
+    };
+
+    void sendHeartbeat();
+    void refreshPresence();
+    const heartbeatTimer = window.setInterval(sendHeartbeat, 20_000);
+    const presenceTimer = window.setInterval(refreshPresence, 10_000);
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void sendHeartbeat();
+        void refreshPresence();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      active = false;
+      window.clearInterval(heartbeatTimer);
+      window.clearInterval(presenceTimer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [currentUser?.id]);
 
   // --- Real-time Cloud Conversations Subscription ---
   useEffect(() => {
