@@ -435,29 +435,152 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
         </form>
 
         {imageEditor && (
-          <div className="fixed inset-0 z-[80] flex flex-col bg-black/95 text-white" onClick={() => setImageEditor(null)}>
-            <header className="flex items-center justify-between border-b border-white/10 px-4 py-4 sm:px-8">
-              <button type="button" onClick={() => setImageEditor(null)} aria-label="Cancel"><X className="h-7 w-7" /></button>
-              <h2 className="text-lg font-bold">Edit Image</h2>
-              <button type="button" onClick={saveImageEdit} aria-label="Apply"><Check className="h-7 w-7" /></button>
+          <div
+            className="fixed inset-0 z-[80] flex h-[100dvh] flex-col overflow-hidden bg-[#07080a] text-white"
+            onClick={() => setImageEditor(null)}
+          >
+            <header className="shrink-0 border-b border-white/10 bg-[#0b0d10]/95 px-4 pb-3 pt-[calc(12px+env(safe-area-inset-top))] backdrop-blur-xl sm:px-6">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setImageEditor(null)}
+                  className="flex h-11 w-11 items-center justify-center rounded-full bg-white/[0.06] text-white transition active:scale-95 hover:bg-white/10"
+                  aria-label={t.cancel}
+                >
+                  <X className="h-6 w-6" />
+                </button>
+
+                <div className="text-center">
+                  <h2 className="text-base font-bold sm:text-lg">
+                    {dir === 'rtl' ? 'تعديل الصورة' : language === 'fr' ? 'Modifier l’image' : 'Edit image'}
+                  </h2>
+                  <p className="mt-0.5 text-[10px] text-neutral-500">
+                    {imageEditor.target === 'avatar'
+                      ? (dir === 'rtl' ? 'صورة الملف الشخصي' : language === 'fr' ? 'Photo de profil' : 'Profile photo')
+                      : (dir === 'rtl' ? 'غلاف الملف الشخصي' : language === 'fr' ? 'Bannière du profil' : 'Profile banner')}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={saveImageEdit}
+                  className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 transition active:scale-95 hover:bg-emerald-400"
+                  aria-label={dir === 'rtl' ? 'تطبيق' : language === 'fr' ? 'Appliquer' : 'Apply'}
+                >
+                  <Check className="h-6 w-6" strokeWidth={2.5} />
+                </button>
+              </div>
             </header>
-            <div className="flex flex-1 items-center justify-center p-5" onClick={(event) => event.stopPropagation()}>
-              <div
-                className={`relative cursor-grab touch-none overflow-hidden border border-white/70 bg-neutral-900 active:cursor-grabbing ${imageEditor.target === 'avatar' ? 'aspect-square w-[min(82vw,420px)] rounded-full' : 'aspect-[12/5] w-full max-w-3xl rounded-2xl'}`}
-                onPointerDown={startImageDrag}
-                onPointerMove={moveImageDrag}
-                onPointerUp={stopImageDrag}
-                onPointerCancel={stopImageDrag}
-              >
-                <img src={imageEditor.src} alt="Edit preview" draggable={false} className="h-full w-full select-none object-cover" style={{ transform: `translate(${imageOffset.x}%, ${imageOffset.y}%) scale(${getImageScale()}) rotate(${imageRotation}deg)` }} />
-                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,transparent_33%,rgba(255,255,255,.5)_33%,rgba(255,255,255,.5)_33.3%,transparent_33.3%,transparent_66%,rgba(255,255,255,.5)_66%,rgba(255,255,255,.5)_66.3%,transparent_66.3%),linear-gradient(to_bottom,transparent_33%,rgba(255,255,255,.5)_33%,rgba(255,255,255,.5)_33.3%,transparent_33.3%,transparent_66%,rgba(255,255,255,.5)_66%,rgba(255,255,255,.5)_66.3%,transparent_66.3%)]" />
+
+            <div
+              className="flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4 py-5 sm:px-8"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex w-full max-w-3xl flex-col items-center gap-4">
+                <div className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[10px] font-medium text-neutral-400">
+                  {dir === 'rtl' ? 'حرّك الصورة واسحبها داخل الإطار' : language === 'fr' ? 'Faites glisser l’image dans le cadre' : 'Drag the image inside the frame'}
+                </div>
+
+                <div
+                  className="relative flex w-full items-center justify-center overflow-visible"
+                  style={{ maxHeight: imageEditor.target === 'avatar' ? 'min(62vh, 520px)' : 'min(48vh, 420px)' }}
+                >
+                  <div
+                    className={[
+                      'relative overflow-hidden border border-white/50 bg-[#111318] shadow-[0_24px_80px_rgba(0,0,0,.55)] touch-none select-none',
+                      imageEditor.target === 'avatar'
+                        ? 'aspect-square w-[min(78vw,420px)] rounded-full'
+                        : 'aspect-[2.4/1] w-full max-w-3xl rounded-2xl sm:rounded-3xl',
+                    ].join(' ')}
+                    onPointerDown={startImageDrag}
+                    onPointerMove={moveImageDrag}
+                    onPointerUp={stopImageDrag}
+                    onPointerCancel={stopImageDrag}
+                    onPointerLeave={stopImageDrag}
+                  >
+                    <img
+                      src={imageEditor.src}
+                      alt="Edit preview"
+                      draggable={false}
+                      className="absolute inset-0 h-full w-full select-none object-cover"
+                      style={{
+                        transform: `translate(${imageOffset.x}%, ${imageOffset.y}%) scale(${getImageScale()}) rotate(${imageRotation}deg)`,
+                        transformOrigin: 'center',
+                      }}
+                    />
+
+                    <div className="pointer-events-none absolute inset-0">
+                      <div className="absolute inset-0 border border-white/20" />
+                      <div className="absolute inset-0 bg-[linear-gradient(to_right,transparent_calc(33.333%_-_0.5px),rgba(255,255,255,.28)_33.333%,rgba(255,255,255,.28)_calc(33.333%_+_0.5px),transparent_calc(33.333%_+_1px),transparent_calc(66.666%_-_1px),rgba(255,255,255,.28)_66.666%,rgba(255,255,255,.28)_calc(66.666%_+_0.5px),transparent_calc(66.666%_+_1px)),linear-gradient(to_bottom,transparent_calc(33.333%_-_0.5px),rgba(255,255,255,.28)_33.333%,rgba(255,255,255,.28)_calc(33.333%_+_0.5px),transparent_calc(33.333%_+_1px),transparent_calc(66.666%_-_1px),rgba(255,255,255,.28)_66.666%,rgba(255,255,255,.28)_calc(66.666%_+_0.5px),transparent_calc(66.666%_+_1px))]" />
+                      <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/15" />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="space-y-5 border-t border-white/10 bg-[#101114] px-6 py-6 sm:px-12">
-              <label className="flex items-center gap-4 text-sm"><span className="w-16">Scale</span><input type="range" min="1" max="3" step="0.01" value={imageZoom} onChange={(event) => { setImageZoom(Number(event.target.value)); setImageOffset({ x: 0, y: 0 }); }} className="w-full accent-white" /></label>
-              <p className="text-center text-xs text-neutral-400">Drag the image to position it inside the frame</p>
-              <button type="button" onClick={() => setImageRotation((value) => (value + 90) % 360)} className="mx-auto flex items-center gap-2 rounded-xl border border-white/15 px-4 py-2 text-sm"><RotateCw className="h-4 w-4" /> Rotate</button>
-              {imageEditor.gif && <p className="text-center text-xs text-neutral-400">GIF animation will be preserved. Crop controls preview the frame, while the original animation is saved.</p>}
+
+            <div
+              className="shrink-0 border-t border-white/10 bg-[#0d0f13]/98 px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-4 shadow-[0_-20px_50px_rgba(0,0,0,.35)] backdrop-blur-xl sm:px-8"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="mx-auto max-w-2xl">
+                <div className="mb-4 flex items-center justify-between gap-4">
+                  <span className="text-xs font-semibold text-neutral-300">
+                    {dir === 'rtl' ? 'التكبير' : language === 'fr' ? 'Zoom' : 'Zoom'}
+                  </span>
+                  <span className="rounded-lg bg-white/[0.06] px-2 py-1 font-mono text-[10px] text-neutral-400">
+                    {Math.round(getImageScale() * 100)}%
+                  </span>
+                </div>
+
+                <div className="relative flex items-center gap-3">
+                  <span className="text-xs text-neutral-500">−</span>
+                  <input
+                    type="range"
+                    min="1"
+                    max="3"
+                    step="0.01"
+                    value={imageZoom}
+                    onChange={(event) => setImageZoom(Number(event.target.value))}
+                    className="h-1.5 w-full cursor-pointer appearance-none rounded-full accent-emerald-400"
+                    aria-label="Zoom"
+                  />
+                  <span className="text-xs text-neutral-500">+</span>
+                </div>
+
+                <div className="mt-4 flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageZoom(1);
+                      setImageRotation(0);
+                      setImageOffset({ x: 0, y: 0 });
+                    }}
+                    className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-semibold text-neutral-300 transition active:scale-95 hover:bg-white/[0.08] hover:text-white"
+                  >
+                    {dir === 'rtl' ? 'إعادة ضبط' : language === 'fr' ? 'Réinitialiser' : 'Reset'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setImageRotation((value) => (value + 90) % 360)}
+                    className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-semibold text-neutral-300 transition active:scale-95 hover:bg-white/[0.08] hover:text-white"
+                  >
+                    <RotateCw className="h-4 w-4" />
+                    {dir === 'rtl' ? 'تدوير' : language === 'fr' ? 'Pivoter' : 'Rotate'}
+                  </button>
+                </div>
+
+                {imageEditor.gif && (
+                  <p className="mt-3 text-center text-[10px] leading-5 text-amber-300/70">
+                    {dir === 'rtl'
+                      ? 'GIF: سيتم الحفاظ على الحركة، بينما المعاينة هنا لتموضع الصورة فقط.'
+                      : language === 'fr'
+                        ? 'GIF : l’animation sera conservée. L’aperçu sert uniquement au positionnement.'
+                        : 'GIF animation will be preserved. This preview controls positioning only.'}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         )}
