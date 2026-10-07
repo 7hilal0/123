@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { Avatar } from '../common/Avatar';
 import { Sparkles, MessageSquare, Bell, User, Plus, LogOut, ChevronRight, ChevronLeft, Search, Globe, Settings } from 'lucide-react';
