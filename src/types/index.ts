@@ -105,6 +105,7 @@ export interface DirectMessage {
   timestamp: string;
   createdAt?: number;
   mediaUrl?: string;
+  mediaType?: 'image' | 'voice';
   isRead: boolean;
 }
 
