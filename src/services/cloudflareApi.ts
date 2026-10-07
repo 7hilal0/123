@@ -32,13 +32,15 @@ export const cloudflareApi = {
   register: (input: { username: string; displayName: string; email: string; password: string; avatar?: string }) => request<{ user: User }>('/api/auth/register', { method: 'POST', body: JSON.stringify(input) }),
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
   updateAccount: (input: { email?: string; newPassword?: string; currentPassword: string }) => request<{ user: User }>('/api/auth/account', { method: 'PUT', body: JSON.stringify(input) }),
+  heartbeat: () => request<{ ok: boolean; lastSeenAt: number }>('/api/presence/heartbeat', { method: 'POST', body: '{}' }),
+  getPresence: () => request<{ users: Array<{ id: string; lastSeenAt: number }> }>('/api/presence'),
   submitReport: (targetType: 'post' | 'user' | 'comment', targetId: string, reason: string) =>
     request<{ report: { id: string; status: string } }>('/api/reports', {
       method: 'POST',
       body: JSON.stringify({ targetType, targetId, reason }),
     }),
   listEntities: async (type?: string, ownerId?: string, extra: Record<string, string> = {}) => {
-    const res = await request<{ items?: Array<{ entityType: string; entityId: string; ownerId?: string; payload: string }> }>(
+    const res = await request<{ items?: Array<{ entityType: string; entityId: string; ownerId?: string; payload: string> }>(
       `/api/entities?${new URLSearchParams({ ...(type ? { type } : {}), ...(ownerId ? { ownerId } : {}), ...extra })}`,
     );
     return { items: Array.isArray(res?.items) ? res.items : [] };
