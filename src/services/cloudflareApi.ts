@@ -40,7 +40,7 @@ export const cloudflareApi = {
       body: JSON.stringify({ targetType, targetId, reason }),
     }),
   listEntities: async (type?: string, ownerId?: string, extra: Record<string, string> = {}) => {
-    const res = await request<{ items?: Array<{ entityType: string; entityId: string; ownerId?: string; payload: string> }>(
+    const res = await request<{ items?: Array<{ entityType: string; entityId: string; ownerId?: string; payload: string }> }>(
       `/api/entities?${new URLSearchParams({ ...(type ? { type } : {}), ...(ownerId ? { ownerId } : {}), ...extra })}`,
     );
     return { items: Array.isArray(res?.items) ? res.items : [] };
