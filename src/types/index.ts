@@ -11,6 +11,7 @@ export interface User {
   bio: string;
   status: UserStatus;
   customStatus?: string;
+  lastSeenAt?: number;
   badges: string[];
   karma: number;
   joinedDate: string;
@@ -37,7 +38,7 @@ export interface CommunityModerator {
 export interface Community {
   id: string;
   name: string;
-  slug: string; // e.g. "n/technica"
+  slug: string;
   description: string;
   icon: string;
   banner: string;
@@ -117,7 +118,6 @@ export interface Conversation {
   lastMessageTimestamp?: number;
   lastSenderId?: string;
   unreadCount: number;
-  /** Per-user unread counts so each participant can read independently. */
   unreadBy?: Record<string, number>;
   pinned?: boolean;
 }
