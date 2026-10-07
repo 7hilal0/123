@@ -49,7 +49,7 @@ function hslToHex(hue: number, saturation: number, lightness: number) {
 }
 
 export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) => {
-  const { currentUser, updateCurrentUserProfile, t, dir, language } = useApp();
+  const { currentUser, updateCurrentUserProfile, t, dir, language, showToast } = useApp();
   const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
   const [bio, setBio] = useState(currentUser?.bio || '');
   const [customStatus, setCustomStatus] = useState(currentUser?.customStatus || '');
@@ -116,7 +116,26 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
     target: 'avatar' | 'banner',
   ) => {
     const file = event.target.files?.[0];
+    event.target.value = '';
     if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast(
+        language === 'ar' ? 'اختر ملف صورة صالحاً.' : language === 'fr' ? 'Choisissez une image valide.' : 'Choose a valid image file.',
+        'warning'
+      );
+      return;
+    }
+
+    // Keep very large files from freezing mobile browsers while decoding/editing.
+    if (file.size > 15 * 1024 * 1024) {
+      showToast(
+        language === 'ar' ? 'الصورة كبيرة جداً. الحد الأقصى 15 ميغابايت.' : language === 'fr' ? 'Image trop grande. Maximum 15 Mo.' : 'Image is too large. Maximum 15 MB.',
+        'warning'
+      );
+      return;
+    }
+
     try {
       const src = await readImageFile(file, target === 'avatar' ? 720 : 1400, 0.85);
       setImageZoom(1);
@@ -125,8 +144,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
       setImageEditor({ src, target, setter, gif: file.type === 'image/gif' });
     } catch (error) {
       console.error('Unable to read profile image', error);
-    } finally {
-      event.target.value = '';
+      showToast(
+        language === 'ar' ? 'تعذر فتح الصورة. جرّب صورة أخرى.' : language === 'fr' ? 'Impossible d’ouvrir cette image. Essayez-en une autre.' : 'Could not open this image. Try another one.',
+        'warning'
+      );
     }
   };
 
@@ -237,20 +258,20 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                 className="h-full w-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#0d1014] via-black/10 to-black/20" />
-              <button
-                type="button"
-                onClick={() => bannerInputRef.current?.click()}
-                className="absolute end-3 top-3 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-xl border border-white/20 bg-black/55 px-3 py-2 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/75 sm:end-4 sm:top-4"
+              <label
+                htmlFor="dzcore-profile-banner-input"
+                className="absolute end-3 top-3 flex max-w-[calc(100%-1.5rem)] cursor-pointer items-center gap-2 rounded-xl border border-white/20 bg-black/55 px-3 py-2 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/75 sm:end-4 sm:top-4"
               >
                 <Camera className="h-4 w-4" />
-                  <span className="truncate">{t.bannerUpload}</span>
-              </button>
+                <span className="truncate">{t.bannerUpload}</span>
+              </label>
               <input
+                id="dzcore-profile-banner-input"
                 ref={bannerInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,.gif"
                 onChange={(event) => handleImage(event, setBannerUrl, 'banner')}
-                className="hidden"
+                className="sr-only"
               />
             </div>
 
@@ -263,20 +284,20 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                     className="h-24 w-24 rounded-full object-cover sm:h-32 sm:w-32"
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => avatarInputRef.current?.click()}
-                  className="absolute bottom-1 end-1 rounded-full border-4 border-[#0d1014] bg-emerald-500 p-2 text-white shadow-lg transition hover:bg-emerald-400"
+                <label
+                  htmlFor="dzcore-profile-avatar-input"
+                  className="absolute bottom-1 end-1 cursor-pointer rounded-full border-4 border-[#0d1014] bg-emerald-500 p-2 text-white shadow-lg transition hover:bg-emerald-400"
                   aria-label={t.avatarUpload}
                 >
                   <Camera className="h-4 w-4" />
-                </button>
+                </label>
                 <input
+                  id="dzcore-profile-avatar-input"
                   ref={avatarInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.gif"
                   onChange={(event) => handleImage(event, setAvatarUrl, 'avatar')}
-                  className="hidden"
+                  className="sr-only"
                 />
               </div>
               <div className="pb-2">
