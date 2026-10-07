@@ -120,6 +120,9 @@ export interface Conversation {
   unreadCount: number;
   unreadBy?: Record<string, number>;
   pinned?: boolean;
+  isGroup?: boolean;
+  groupName?: string;
+  groupAvatar?: string;
 }
 
 export type NotificationType = 'upvote' | 'downvote' | 'comment' | 'reply' | 'follow' | 'mention' | 'community' | 'message';
