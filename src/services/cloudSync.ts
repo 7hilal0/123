@@ -219,8 +219,6 @@ export const cloudSync = {
     userMediaRequests.set(userId, request);
     return request;
   },
-  async saveStory(story: any): Promise<void> { await saveEntity('story', story, story.author?.id); },
-  async fetchStories(): Promise<any[]> { const stories = await fetchType<any>('story'); const now = Date.now(); return stories.filter((story) => Number(story.expiresAt) > now).sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)); },
   saveCommunity: (community: Community) => saveEntity('community', community),
   async fetchCommunities(currentUserId?: string) {
     const communities = await fetchType<Community>('community');
