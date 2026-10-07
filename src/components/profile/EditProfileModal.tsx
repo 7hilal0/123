@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Camera, Check, Palette, RotateCw, Save, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { UserStatus } from '../../types';
 import { readImageFile } from '../../utils/fileUpload';
 import { DEFAULT_USER_AVATAR } from '../../utils/avatarConstants';
 
@@ -62,7 +61,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
   const [pickerHue, setPickerHue] = useState(() => hexToHsl(currentUser?.profileColor || '#10b981')[0]);
   const [pickerSaturation, setPickerSaturation] = useState(() => hexToHsl(currentUser?.profileColor || '#10b981')[1]);
   const [pickerLightness, setPickerLightness] = useState(() => hexToHsl(currentUser?.profileColor || '#10b981')[2]);
-  const [status, setStatus] = useState<UserStatus>(currentUser?.status || 'online');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -404,21 +402,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
               </section>
             </div>
 
-            <aside className="min-w-0 space-y-5">
-              <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-4 sm:p-5">
-                <h3 className="mb-3 text-sm font-bold text-white">Presence</h3>
-                <select
-                  value={status}
-                  onChange={(event) => setStatus(event.target.value as UserStatus)}
-                  className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white outline-none focus:border-emerald-500/70"
-                >
-                  <option value="online">{t.statusOnline}</option>
-                  <option value="idle">{t.statusIdle}</option>
-                  <option value="dnd">{t.statusDnd}</option>
-                  <option value="offline">{t.statusOffline}</option>
-                </select>
-              </section>
-            </aside>
+
           </div>
 
           <footer className="sticky bottom-0 z-20 border-t border-white/10 bg-[#0d1014]/95 px-4 py-3 backdrop-blur-xl sm:px-8">
