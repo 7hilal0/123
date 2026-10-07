@@ -151,8 +151,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
     }
   };
 
-  const getImageScale = () => Math.max(1.15, imageZoom);
-  const getImageOffsetLimit = () => (getImageScale() - 1) * 50;
+  // Keep a small default zoom so the user can freely reposition a banner/avatar
+  // without immediately exposing empty edges. The drag range grows smoothly with zoom.
+  const getImageScale = () => Math.max(1.18, imageZoom);
+  const getImageOffsetLimit = () => 18 + (getImageScale() - 1.18) * 70;
   const startImageDrag = (event: React.PointerEvent<HTMLDivElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
     imageDragRef.current = { x: event.clientX, y: event.clientY, offsetX: imageOffset.x, offsetY: imageOffset.y };
@@ -161,8 +163,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
     if (!imageDragRef.current) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const limit = getImageOffsetLimit();
-    const nextX = imageDragRef.current.offsetX + ((event.clientX - imageDragRef.current.x) / rect.width) * 100;
-    const nextY = imageDragRef.current.offsetY + ((event.clientY - imageDragRef.current.y) / rect.height) * 100;
+    const sensitivity = 1.35;
+    const nextX = imageDragRef.current.offsetX + ((event.clientX - imageDragRef.current.x) / rect.width) * 100 * sensitivity;
+    const nextY = imageDragRef.current.offsetY + ((event.clientY - imageDragRef.current.y) / rect.height) * 100 * sensitivity;
     setImageOffset({ x: clamp(nextX, -limit, limit), y: clamp(nextY, -limit, limit) });
   };
   const stopImageDrag = () => { imageDragRef.current = null; };
@@ -496,7 +499,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
                     onPointerMove={moveImageDrag}
                     onPointerUp={stopImageDrag}
                     onPointerCancel={stopImageDrag}
-                    onPointerLeave={stopImageDrag}
                   >
                     <img
                       src={imageEditor.src}
