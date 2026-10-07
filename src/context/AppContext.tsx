@@ -290,7 +290,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const isOnline = (userId: string) => {
         const lastSeenAt = next[userId];
-        return Boolean(lastSeenAt && Date.now() - lastSeenAt < 45_000);
+        return Boolean(lastSeenAt && Date.now() - lastSeenAt < 5_000);
       };
 
       setUsers((previous) => previous.map((user) => ({
@@ -365,8 +365,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     void sendHeartbeat();
     void refreshPresence();
-    const heartbeatTimer = window.setInterval(sendHeartbeat, 20_000);
-    const presenceTimer = window.setInterval(refreshPresence, 10_000);
+    const heartbeatTimer = window.setInterval(sendHeartbeat, 3_000);
+    const presenceTimer = window.setInterval(refreshPresence, 3_000);
 
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
