@@ -4,11 +4,47 @@
  * to ensure smooth storage in localStorage and instant client-side preview.
  */
 
+import { createAnimatedGifThumbnail } from './gifThumbnail';
+
+const MAX_GIF_BYTES = 15 * 1024 * 1024;
+const GIF_COMPRESS_THRESHOLD = 8 * 1024 * 1024;
+
+const compressLargeGif = async (file: File): Promise<string> => {
+  if (file.size <= GIF_COMPRESS_THRESHOLD) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('فشل قراءة ملف GIF'));
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  try {
+    // Only large GIFs are recompressed. Smaller GIFs stay byte-for-byte untouched.
+    return await createAnimatedGifThumbnail(file, {
+      size: 512,
+      cropSquare: false,
+      maxFrames: 60,
+      maxColors: 192,
+      maxBytes: 6 * 1024 * 1024,
+    });
+  } catch {
+    // If compression fails on a device/browser, keep the original instead of
+    // breaking the upload. The 15MB limit still protects storage.
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('فشل قراءة ملف GIF'));
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.readAsDataURL(file);
+    });
+  }
+};
+
 export const readImageFile = (
   file: File,
   maxDimension = 1200,
   quality = 0.85,
-  gifMaxBytes = 15 * 1024 * 1024
+  gifMaxBytes = MAX_GIF_BYTES
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
@@ -19,22 +55,30 @@ export const readImageFile = (
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('فشل قراءة ملف الصورة'));
 
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const result = e.target?.result as string;
       if (!result) {
         reject(new Error('ملف الصورة فارغ'));
         return;
       }
 
-      // Keep animated GIFs untouched. Re-encoding them here used to drop frames,
-      // change timing/colors, and make some mobile GIFs fail. The editor can preview
-      // and reposition the original GIF without destroying its animation.
+      // GIFs up to 8MB are kept completely untouched. Larger GIFs are gently
+      // re-encoded to reduce storage/transfer cost while preserving animation.
       if (file.type === 'image/gif') {
         if (file.size > gifMaxBytes) {
           reject(new Error('حجم GIF أكبر من الحد المسموح 15MB'));
           return;
         }
-        resolve(result);
+
+        try {
+          if (file.size > GIF_COMPRESS_THRESHOLD) {
+            resolve(await compressLargeGif(file));
+          } else {
+            resolve(result);
+          }
+        } catch {
+          resolve(result);
+        }
         return;
       }
 
@@ -73,7 +117,7 @@ export const readImageFile = (
       };
 
       img.onerror = () => {
-        resolve(result); // Fallback to raw data url if canvas fails
+        resolve(result);
       };
 
       img.src = result;
@@ -99,8 +143,8 @@ export const createSquareThumbnail = (
         return;
       }
 
-      // Never re-encode animated GIFs for profile thumbnails. Keep the original
-      // animation so avatars/banners remain faithful to the uploaded file.
+      // Do not re-encode GIF data URLs. readImageFile already handles large GIF
+      // compression while preserving animation.
       if (dataUrl.startsWith('data:image/gif')) {
         resolve(dataUrl);
         return;
@@ -117,7 +161,6 @@ export const createSquareThumbnail = (
           return;
         }
 
-        // Center crop to square
         const minDim = Math.min(img.width, img.height);
         const sx = (img.width - minDim) / 2;
         const sy = (img.height - minDim) / 2;
