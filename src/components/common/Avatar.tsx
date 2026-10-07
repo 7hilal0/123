@@ -32,7 +32,7 @@ const statusColors: Record<UserStatus, string> = {
   online: 'bg-emerald-500',
   idle: 'bg-amber-500',
   dnd: 'bg-rose-500',
-  offline: 'bg-neutral-500',
+  offline: 'bg-red-500',
 };
 
 const THUMB_DB = 'dzcore_avatar_thumbnails_v1';
@@ -112,6 +112,10 @@ export const Avatar: React.FC<AvatarProps> = ({ src, alt, size = 'md', status, c
       void createThumbnail(src).then((preview) => { if (preview) setThumbnail(preview); });
     }
   }, [src, size]);
+
+  const presenceStatus: UserStatus | undefined = status
+    ? status
+    : undefined;
 
   const displaySrc = (!src || imageFailed)
     ? DEFAULT_USER_AVATAR
