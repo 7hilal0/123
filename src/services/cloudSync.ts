@@ -170,7 +170,7 @@ export const cloudSync = {
     ]);
     const follows = (followRows || [])
       .map((row) => (row?.payload ? parse<FollowRecord>(row.payload) : null))
-      .filter((value): value is FollowRecord => Boolean(value) && value.following);
+      .filter((value): value is FollowRecord => value !== null && value.following);
     const ids = new Set(
       follows
         .filter((follow) => direction === 'followers' ? follow.followingId === userId : follow.followerId === userId)
