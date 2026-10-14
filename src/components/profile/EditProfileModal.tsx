@@ -210,7 +210,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
         banner: bannerUrl,
         profileColor,
         displayNameColor,
-        status,
       });
       onClose();
     } catch {
