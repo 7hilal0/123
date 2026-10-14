@@ -1912,6 +1912,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setActiveConversationId,
         selectConversation,
         startConversationWithUser,
+        startGroupConversation,
         sendDirectMessage,
 
         toggleFollowUser,
