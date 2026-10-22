@@ -27,6 +27,7 @@ export const DirectMessagesView: React.FC = () => {
     isInsideChat,
     setIsInsideChat,
     selectConversation,
+    markConversationRead,
     startConversationWithUser,
     startGroupConversation,
     directMessages,
@@ -92,10 +93,23 @@ export const DirectMessagesView: React.FC = () => {
     }
   }, [activeConv, isInsideChat]);
 
-  // Scroll to bottom when messages update
+  // Scroll and mark messages as read when the conversation is open and visible.
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeChatMessages]);
+    if (activeConversationId && isInsideChat && !showMobileList && document.visibilityState === 'visible') {
+      markConversationRead(activeConversationId);
+    }
+  }, [activeChatMessages, activeConversationId, isInsideChat, showMobileList, markConversationRead]);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && activeConversationId && isInsideChat && !showMobileList) {
+        markConversationRead(activeConversationId);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [activeConversationId, isInsideChat, showMobileList, markConversationRead]);
 
   const handleImageAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -364,8 +378,9 @@ export const DirectMessagesView: React.FC = () => {
                         </div>
                       )}
 
-                      <span className="text-[10px] text-neutral-500 font-mono block px-1">
+                      <span className="text-[10px] text-neutral-500 font-mono flex items-center gap-1 px-1">
                         {msg.timestamp}
+                        {isMe && <span aria-label={msg.isRead ? 'Seen' : 'Sent'} title={msg.isRead ? (language === 'ar' ? 'تمت المشاهدة' : 'Seen') : (language === 'ar' ? 'تم الإرسال' : 'Sent')} className={msg.isRead ? 'text-sky-400' : 'text-neutral-500'}>{msg.isRead ? '✓✓' : '✓'}</span>}
                       </span>
                     </div>
                   </div>
