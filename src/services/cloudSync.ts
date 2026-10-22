@@ -38,7 +38,7 @@ async function fetchType<T>(type: EntityType, predicate?: (value: T) => boolean,
   return predicate ? values.filter(predicate) : values;
 }
 async function saveEntity<T extends { id: string }>(entityType: EntityType, entity: T, ownerId?: string): Promise<void> { await cloudflareApi.saveEntity(entityType, entity.id, JSON.stringify(entity), ownerId || entity.id); }
-function subscribePoll<T>(fetcher: () => Promise<T[]>, callback: (items: T[]) => void, label: string): () => void {
+function subscribePoll<T>(fetcher: () => Promise<T[]>, callback: (items: T[]) => void, label: string, intervalMs = 10000): () => void {
   let stopped = false;
   const poll = async () => {
     try {
@@ -51,7 +51,7 @@ function subscribePoll<T>(fetcher: () => Promise<T[]>, callback: (items: T[]) =>
     }
   };
   void poll();
-  const timer = window.setInterval(poll, 10000);
+  const timer = window.setInterval(poll, intervalMs);
   return () => {
     stopped = true;
     window.clearInterval(timer);
@@ -300,7 +300,7 @@ export const cloudSync = {
     const messages = await fetchType<DirectMessage & { conversationId?: string }>('message', undefined, undefined, { conversationId });
     return messages.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
   },
-  subscribeMessages(conversationId: string, callback: (items: DirectMessage[]) => void) { return subscribePoll(() => this.fetchMessages(conversationId), callback, 'messages'); },
+  subscribeMessages(conversationId: string, callback: (items: DirectMessage[]) => void) { return subscribePoll(() => this.fetchMessages(conversationId), callback, 'messages', 2000); },
   saveNotification: (notification: NotificationItem) => saveEntity('notification', notification, notification.recipientId),
   subscribeNotifications(userId: string, callback: (items: NotificationItem[]) => void) { return subscribePoll(() => fetchType<NotificationItem>('notification', undefined, userId), callback, 'notifications'); },
 };
