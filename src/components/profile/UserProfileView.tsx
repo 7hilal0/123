@@ -148,7 +148,6 @@ export const UserProfileView: React.FC = () => {
                 alt={displayUser.displayName}
                 size="2xl"
                 status={displayUser.status}
-                showStatus={false}
               />
             </div>
 
