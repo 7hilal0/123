@@ -105,6 +105,7 @@ interface AppContextType {
   setIsInsideChat: (val: boolean) => void;
   setActiveConversationId: (id: string | null) => void;
   selectConversation: (conversationId: string) => void;
+  markConversationRead: (conversationId: string) => void;
   startConversationWithUser: (targetUserId: string) => void;
   startGroupConversation: (name: string, memberIds: string[]) => Promise<void>;
   sendDirectMessage: (text: string, mediaUrl?: string, mediaType?: 'image' | 'voice') => void;
@@ -1304,10 +1305,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const selectConversation = (conversationId: string) => {
     setActiveConversationId(conversationId);
     setIsInsideChat(true);
-    setConversations((prev) =>
-      prev.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c))
-    );
+    setConversations((prev) => prev.map((c) => c.id === conversationId
+      ? { ...c, unreadCount: 0, unreadBy: { ...(c.unreadBy || {}), ...(currentUser ? { [currentUser.id]: 0 } : {}) } }
+      : c));
   };
+
+  const markConversationRead = React.useCallback((conversationId: string) => {
+    if (!currentUser || !conversationId) return;
+    const messages = directMessages[conversationId] || [];
+    const unreadIncoming = messages.filter((message) => message.senderId !== currentUser.id && !message.isRead);
+    if (unreadIncoming.length) {
+      setDirectMessages((prev) => ({
+        ...prev,
+        [conversationId]: (prev[conversationId] || []).map((message) =>
+          message.senderId !== currentUser.id ? { ...message, isRead: true } : message
+        ),
+      }));
+      void Promise.all(unreadIncoming.map((message) => cloudSync.saveDirectMessage(conversationId, { ...message, isRead: true })))
+        .catch((error) => console.error('[Cloudflare] Could not save read receipts:', error));
+    }
+    const conversation = conversations.find((item) => item.id === conversationId);
+    if (conversation && ((conversation.unreadBy?.[currentUser.id] || 0) > 0 || conversation.unreadCount > 0)) {
+      const updated = { ...conversation, unreadCount: 0, unreadBy: { ...(conversation.unreadBy || {}), [currentUser.id]: 0 } };
+      setConversations((prev) => prev.map((item) => item.id === conversationId ? updated : item));
+      void cloudSync.saveConversation(updated).catch((error) => console.error('[Cloudflare] Could not clear conversation unread count:', error));
+    }
+  }, [currentUser, directMessages, conversations]);
 
   const startConversationWithUser = async (targetUserId: string) => {
     if (!currentUser) {
@@ -1911,6 +1934,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsInsideChat,
         setActiveConversationId,
         selectConversation,
+        markConversationRead,
         startConversationWithUser,
         startGroupConversation,
         sendDirectMessage,
