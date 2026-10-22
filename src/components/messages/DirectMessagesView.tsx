@@ -187,6 +187,7 @@ export const DirectMessagesView: React.FC = () => {
                   alt={conv.isGroup ? (conv.groupName || 'Group') : conv.participant.displayName}
                   size="md"
                   status={conv.isGroup ? undefined : conv.participant.status}
+                  showStatus={false}
                 />
 
                 <div className="min-w-0 flex-1">
@@ -254,6 +255,7 @@ export const DirectMessagesView: React.FC = () => {
                     alt={activeConv.isGroup ? (activeConv.groupName || 'Group') : activeConv.participant.displayName}
                     size="sm"
                     status={activeConv.isGroup ? undefined : activeConv.participant.status}
+                    showStatus={false}
                   />
                 </div>
 
