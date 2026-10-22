@@ -364,6 +364,45 @@ export default {
         if (url.pathname === '/api/admin/posts' && request.method === 'GET') return json({ posts: await adminEntities(env, 'post') }, 200, origin);
       }
 
+      // Rewarded-ad server callback. Configure AD_REWARD_SECRET as a Worker secret.
+      // The ad provider must call this endpoint only after a verified completed view.
+      if (url.pathname === '/api/ads/reward-callback' && request.method === 'POST') {
+        const expectedSecret = String(env.AD_REWARD_SECRET || '');
+        const providedSecret = String(request.headers.get('x-ad-reward-secret') || '');
+        if (!expectedSecret || providedSecret.length !== expectedSecret.length || !(await digest(providedSecret) === await digest(expectedSecret))) {
+          return json({ error: 'unauthorized_ad_callback' }, 401, origin);
+        }
+        const body = await request.json().catch(() => ({}));
+        const userId = String(body.userId || '').trim();
+        const transactionId = String(body.transactionId || '').trim();
+        if (!userId || userId.length > 200 || !transactionId || transactionId.length > 200) {
+          return json({ error: 'invalid_reward_payload' }, 400, origin);
+        }
+        // Idempotency: one provider transaction can only award Karma once.
+        const existingReward = await env.DB.prepare(
+          "SELECT entity_id FROM entities WHERE entity_type = 'adReward' AND entity_id = ? LIMIT 1"
+        ).bind(transactionId).first();
+        if (existingReward) return json({ ok: true, alreadyRewarded: true, points: 10 }, 200, origin);
+        const userRow = await env.DB.prepare(
+          'SELECT id, username, email, profile_json FROM auth_users WHERE id = ? LIMIT 1'
+        ).bind(userId).first();
+        if (!userRow) return json({ error: 'user_not_found' }, 404, origin);
+        const profile = JSON.parse(userRow.profile_json || '{}');
+        profile.karma = Math.max(0, Number(profile.karma) || 0) + 10;
+        const now = Date.now();
+        // Save the reward receipt and updated profile together in a D1 batch.
+        await env.DB.batch([
+          env.DB.prepare(
+            "INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES ('adReward', ?, ?, ?, ?, 0)"
+          ).bind(transactionId, userId, JSON.stringify({ transactionId, userId, points: 10, createdAt: now }), now),
+          env.DB.prepare('UPDATE auth_users SET profile_json = ? WHERE id = ?').bind(JSON.stringify(profile), userId),
+          env.DB.prepare(
+            "INSERT INTO entities (entity_type, entity_id, owner_id, payload, updated_at, deleted) VALUES ('user', ?, ?, ?, ?, 0) ON CONFLICT(entity_type, entity_id) DO UPDATE SET owner_id=excluded.owner_id, payload=excluded.payload, updated_at=excluded.updated_at, deleted=0"
+          ).bind(userId, userId, JSON.stringify(profile), now),
+        ]);
+        return json({ ok: true, points: 10, karma: profile.karma }, 200, origin);
+      }
+
       if (url.pathname === '/api/auth/me' && request.method === 'GET') return json({ user: cleanUser(await currentUser(request, env)) }, 200, origin);
       if (url.pathname === '/api/auth/google/app-start' && request.method === 'GET') {
         const mode = url.searchParams.get('mode') === 'register' ? 'register' : 'login';
