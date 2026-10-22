@@ -279,6 +279,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, isDetailedView = false
                 alt={displayAuthor.displayName}
                 size="xs"
                 status={displayAuthor.status}
+                showStatus={false}
               />
               <div className="flex items-center gap-1.5 text-start">
                 <span className="font-semibold text-neutral-100 group-hover/author:text-emerald-400 transition-colors">
