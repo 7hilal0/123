@@ -7,6 +7,7 @@ interface AvatarProps {
   alt: string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   status?: UserStatus;
+  showStatus?: boolean;
   className?: string;
 }
 
@@ -32,7 +33,7 @@ const statusColors: Record<UserStatus, string> = {
   online: 'bg-emerald-500',
   idle: 'bg-amber-500',
   dnd: 'bg-rose-500',
-  offline: 'bg-red-500',
+  offline: 'bg-neutral-400',
 };
 
 const THUMB_DB = 'dzcore_avatar_thumbnails_v1';
@@ -99,7 +100,7 @@ async function createThumbnail(src: string): Promise<string | null> {
   return job;
 }
 
-export const Avatar: React.FC<AvatarProps> = ({ src, alt, size = 'md', status, className = '' }) => {
+export const Avatar: React.FC<AvatarProps> = ({ src, alt, size = 'md', status, showStatus = true, className = '' }) => {
   const [imageFailed, setImageFailed] = useState(false);
   const [thumbnail, setThumbnail] = useState<string | null>(null);
 
@@ -130,7 +131,7 @@ export const Avatar: React.FC<AvatarProps> = ({ src, alt, size = 'md', status, c
           className="w-full h-full object-cover"
         />
       </div>
-      {status && (
+      {showStatus && status && (
         <span className={`absolute bottom-0 right-0 rounded-full ring-neutral-950 ${statusColors[status]} ${statusSizes[size]}`} title={`Status: ${status}`} />
       )}
     </div>
