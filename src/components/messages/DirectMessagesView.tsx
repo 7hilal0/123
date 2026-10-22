@@ -289,6 +289,7 @@ export const DirectMessagesView: React.FC = () => {
                   src={activeConv.isGroup ? activeConv.groupAvatar : activeConv.participant.avatar}
                   alt={activeConv.isGroup ? (activeConv.groupName || 'Group') : activeConv.participant.displayName}
                   size="xl"
+                  status={activeConv.isGroup ? undefined : activeConv.participant.status}
                   className="mx-auto"
                 />
                 <h3 className="font-bold text-base text-white">
@@ -324,6 +325,7 @@ export const DirectMessagesView: React.FC = () => {
                         src={authorUser.avatar}
                         alt={authorUser.displayName}
                         size="xs"
+                        status={authorUser.status}
                       />
                     </button>
 
