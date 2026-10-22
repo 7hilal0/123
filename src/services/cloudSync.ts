@@ -294,7 +294,7 @@ export const cloudSync = {
     return saveEntity('conversation', compactConversation, undefined);
   },
   fetchConversations: (userId: string) => fetchType<Conversation>('conversation', (conversation) => Boolean(conversation.participantIds?.includes(userId) || conversation.id.includes(userId) || conversation.participant?.id === userId)),
-  subscribeConversations(userId: string, callback: (items: Conversation[]) => void) { return subscribePoll(() => this.fetchConversations(userId), callback, 'conversations'); },
+  subscribeConversations(userId: string, callback: (items: Conversation[]) => void) { return subscribePoll(() => this.fetchConversations(userId), callback, 'conversations', 2500); },
   saveDirectMessage: (conversationId: string, message: DirectMessage) => saveEntity('message', { ...message, conversationId } as DirectMessage & { conversationId: string }, message.senderId),
   async fetchMessages(conversationId: string) {
     const messages = await fetchType<DirectMessage & { conversationId?: string }>('message', undefined, undefined, { conversationId });
